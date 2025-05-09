@@ -282,7 +282,7 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
   }
 
   private fun getStepCountData(start: Long, end: Long, result: MethodChannel.Result) {
-    val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+    val sdf = SimpleDateFormat("yyyy-MM-dd HH", Locale.getDefault())
     sdf.timeZone = TimeZone.getDefault() // 또는 "UTC"로 설정
 
     val request: AggregateRequest = AggregateRequest.Builder()
