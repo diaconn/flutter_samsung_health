@@ -188,13 +188,13 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
       .build()
 
     resolver.aggregate(request).setResultListener { readResult ->
-      Log.d(APP_TAG, "1분 집계 readResult :: ${readResult}")
+      Log.d(APP_TAG, "1분 단위 집계 결과 수: ${readResult.count}")
       for (data in readResult) {
         val avgHr = data.getFloat("avg_hr").toDouble()
         val time = data.getLong("minute") // 집계 시작 시간
+        Log.d(APP_TAG, "1분 데이터 → 시간: $time, 평균 심박수: $avgHr")
         oneMinuteResults.add(time to avgHr)
       }
-
       val groupedData = mutableListOf<Map<String, Any>>()
 
       // 1분 단위 데이터를 5분 단위로 그룹화
@@ -205,6 +205,7 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
             val startTime = chunk.first().first
             val endTime = chunk.last().first + 60_000  // 마지막 1분의 끝
 
+            Log.d(APP_TAG, "5분 그룹 생성 → 시작: $startTime, 끝: $endTime, 평균: $avg")
             groupedData.add(
               mapOf(
                 "start_time" to startTime,
@@ -213,9 +214,11 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
                 "sample_count" to chunk.size
               )
             )
+          } else {
+            Log.d(APP_TAG, "5분 데이터 부족 → ${chunk.size}개만 존재")
           }
         }
-
+      Log.d(APP_TAG, "최종 그룹 수: ${groupedData.size}")
       result.success(groupedData)
     }
   }
