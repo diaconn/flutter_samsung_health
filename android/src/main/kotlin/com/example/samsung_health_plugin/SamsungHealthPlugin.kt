@@ -31,6 +31,10 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
+import java.util.Date
 
 /** SamsungHealthPlugin */
 class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
@@ -189,11 +193,23 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
 
     resolver.aggregate(request).setResultListener { readResult ->
       Log.d(APP_TAG, "1분 단위 집계 결과 수: ${readResult.count}")
+      val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+      sdf.timeZone = TimeZone.getDefault() // 또는 "UTC"로 설정
+
+
       for (data in readResult) {
         val avgHr = data.getFloat("avg_hr").toDouble()
-        val time = data.getLong("minute") // 집계 시작 시간
-        Log.d(APP_TAG, "1분 데이터 → 시간: $time, 평균 심박수: $avgHr")
-        oneMinuteResults.add(time to avgHr)
+        val timeStr = data.getString("minute") ?: continue// 집계 시작 시간
+
+        val timestamp = try {
+          sdf.parse(timeStr)?.time ?: continue
+        } catch (e: Exception) {
+          Log.e(APP_TAG, "날짜 파싱 오류: $timeStr", e)
+          continue
+        }
+
+        Log.d(APP_TAG, "1분 데이터 → 시간: $timestamp ($timeStr), 평균 심박수: $avgHr")
+        oneMinuteResults.add(timestamp to avgHr)
       }
       val groupedData = mutableListOf<Map<String, Any>>()
 
@@ -245,7 +261,7 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
       var isExercising = false
       exResult.forEach {
         val liveData = it.getString(HealthConstants.Exercise.LIVE_DATA)
-        //Log.d(APP_TAG, "운동 종료시간 확인 :  $end, 현재시간 : ${System.currentTimeMillis()}")
+        Log.d(APP_TAG, "운동 종료시간 확인 :  $end, 현재시간 : ${System.currentTimeMillis()}")
         // 라이브데이터가 널이면 운동중으로 판단
         if (liveData == null ) {
           isExercising = true
@@ -263,46 +279,37 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
       Log.d(APP_TAG, "운동조회 결과. $exercisesList")
       result.success(exercisesList)
     }
-//    resolver.read(request).setResultListener { dataResult ->
-//      for (data in dataResult) {
-//        resultList.add(
-//          mapOf(
-//            "type" to data.getInt("exercise_type"),
-//            "duration" to data.getLong("duration"),
-//            "start_time" to data.getLong("start_time"),
-//            "end_time" to data.getLong("end_time"),
-//            "calorie" to data.getFloat("calorie"),
-//            "distance" to data.getFloat("distance"),
-//            "live_data" to data.getLong("live_data")
-//          )
-//        )
-//      }
-//      result.success(resultList)
-//    }
   }
 
   private fun getStepCountData(start: Long, end: Long, result: MethodChannel.Result) {
-    val request = ReadRequest.Builder()
-      .setDataType("com.samsung.health.step_count")
-      .setProperties(arrayOf("count", "start_time", "end_time"))
+    val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+    sdf.timeZone = TimeZone.getDefault() // 또는 "UTC"로 설정
+
+    val request: AggregateRequest = AggregateRequest.Builder()
+      .setDataType(HealthConstants.StepCount.HEALTH_DATA_TYPE)
+      .addFunction(AggregateFunction.SUM, HealthConstants.StepCount.COUNT, "sum_steps")
+      .setTimeGroup(AggregateRequest.TimeGroupUnit.HOURLY, 1, HealthConstants.StepCount.START_TIME, "hour")
       .setLocalTimeRange(HealthConstants.StepCount.START_TIME, HealthConstants.StepCount.TIME_OFFSET, start, end)
-      .setSort(HealthConstants.StepCount.START_TIME, HealthDataResolver.SortOrder.DESC)
       .build()
 
     val resolver = HealthDataResolver(mStore, null)
-    val stepList = mutableListOf<Map<String, Any>>()
+    val hourlyStepList = mutableListOf<Pair<Long, Int>>()  // <timestamp, avg_hr>
 
-    resolver.read(request).setResultListener { dataResult ->
+    resolver.aggregate(request).setResultListener { dataResult ->
       for (data in dataResult) {
-        stepList.add(
-          mapOf(
-            "count" to data.getInt("count"),
-            "start_time" to data.getLong("start_time"),
-            "end_time" to data.getLong("end_time")
-          )
-        )
+        val timeStr = data.getString("hour") ?: continue// "yyyy-MM-dd HH" 형식의 문자열
+        val steps = data.getInt("sum_steps")
+        val timestamp = try {
+          sdf.parse(timeStr)?.time ?: continue
+        } catch (e: Exception) {
+          Log.e(APP_TAG, "날짜 파싱 오류: $timeStr", e)
+          continue
+        }
+
+        Log.d(APP_TAG, "1시간 데이터 → 시간: $timestamp ($timeStr), 누적 걸음수: $steps")
+        hourlyStepList.add(timestamp to steps)
       }
-      result.success(stepList)
+      result.success(hourlyStepList)
     }
   }
 
