@@ -168,6 +168,7 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
   }
 
   private fun getHeartRate5minSeries(start: Long, end: Long, result: MethodChannel.Result) {
+    Log.d(APP_TAG, "getHeartRate5minSeries 호출")
     val intervalMillis = 5 * 60 * 1000  // 5분
     val resolver = HealthDataResolver(mStore, null)
     val dataList = mutableListOf<Map<String, Any>>()
@@ -220,42 +221,61 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
   }
 
   private fun getExerciseData(start: Long, end: Long, result: MethodChannel.Result) {
-    val request = ReadRequest.Builder()
+    val exerciseRequest = ReadRequest.Builder()
       .setDataType(HealthConstants.Exercise.HEALTH_DATA_TYPE)
+      .setLocalTimeRange(HealthConstants.Exercise.START_TIME, HealthConstants.Exercise.TIME_OFFSET, start, end)
+      .setSort(HealthConstants.Exercise.START_TIME, HealthDataResolver.SortOrder.DESC)
       .setProperties(
         arrayOf(
           HealthConstants.Exercise.EXERCISE_TYPE,
-          HealthConstants.Exercise.DURATION,
+          HealthConstants.Exercise.CALORIE,
           HealthConstants.Exercise.START_TIME,
           HealthConstants.Exercise.END_TIME,
-          HealthConstants.Exercise.CALORIE,
-          HealthConstants.Exercise.DISTANCE,
-          HealthConstants.Exercise.LIVE_DATA,
+          HealthConstants.Exercise.LIVE_DATA
         )
-      )
-      .setLocalTimeRange(HealthConstants.Exercise.START_TIME, HealthConstants.Exercise.TIME_OFFSET, start, end)
-      .setSort(HealthConstants.Exercise.START_TIME, HealthDataResolver.SortOrder.DESC)
-      .build()
+      ).build()
 
     val resolver = HealthDataResolver(mStore, null)
-    val resultList = mutableListOf<Map<String, Any>>()
+    val exercisesList = mutableListOf<Map<String, Any>>()
 
-    resolver.read(request).setResultListener { dataResult ->
-      for (data in dataResult) {
-        resultList.add(
+    resolver.read(exerciseRequest).setResultListener { exResult ->
+      var isExercising = false
+      exResult.forEach {
+        val liveData = it.getString(HealthConstants.Exercise.LIVE_DATA)
+        //Log.d(APP_TAG, "운동 종료시간 확인 :  $end, 현재시간 : ${System.currentTimeMillis()}")
+        // 라이브데이터가 널이면 운동중으로 판단
+        if (liveData == null ) {
+          isExercising = true
+        }
+        exercisesList.add(
           mapOf(
-            "type" to data.getInt("exercise_type"),
-            "duration" to data.getLong("duration"),
-            "start_time" to data.getLong("start_time"),
-            "end_time" to data.getLong("end_time"),
-            "calorie" to data.getFloat("calorie"),
-            "distance" to data.getFloat("distance"),
-            "live_data" to data.getLong("live_data")
+            "exerciseType" to it.getInt(HealthConstants.Exercise.EXERCISE_TYPE),
+            "calories" to it.getFloat(HealthConstants.Exercise.CALORIE),
+            "startTime" to it.getLong(HealthConstants.Exercise.START_TIME),
+            "endTime" to it.getLong(HealthConstants.Exercise.END_TIME),
+            "liveData" to it.getString(HealthConstants.Exercise.LIVE_DATA)
           )
         )
       }
-      result.success(resultList)
+
+      result.success(exercisesList)
     }
+//    resolver.read(request).setResultListener { dataResult ->
+//      for (data in dataResult) {
+//        resultList.add(
+//          mapOf(
+//            "type" to data.getInt("exercise_type"),
+//            "duration" to data.getLong("duration"),
+//            "start_time" to data.getLong("start_time"),
+//            "end_time" to data.getLong("end_time"),
+//            "calorie" to data.getFloat("calorie"),
+//            "distance" to data.getFloat("distance"),
+//            "live_data" to data.getLong("live_data")
+//          )
+//        )
+//      }
+//      result.success(resultList)
+//    }
   }
 
   private fun getStepCountData(start: Long, end: Long, result: MethodChannel.Result) {
@@ -323,4 +343,30 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
   override fun onDetachedFromActivityForConfigChanges() {
     activity = null
   }
+
+  data class MinuteData(
+    val timestamp: Long,         // 시작 시간 (밀리초)
+    val avgHeartRate: Double     // 1분 평균 심박수
+  )
+
+  data class FiveMinuteGroup(
+    val startTimestamp: Long,
+    val avgHeartRate: Double
+  )
+
+  fun aggregateToFiveMinuteAverage(minuteDataList: List<MinuteData>): List<FiveMinuteGroup> {
+    val result = mutableListOf<FiveMinuteGroup>()
+
+    // 5분씩 묶어서 평균 계산
+    for (i in 0..minuteDataList.size - 5 step 5) {
+      val group = minuteDataList.subList(i, i + 5)
+      val avg = group.map { it.avgHeartRate }.average()
+      val startTime = group.first().timestamp
+
+      result.add(FiveMinuteGroup(startTime, avg))
+    }
+
+    return result
+  }
+
 }
