@@ -18,6 +18,8 @@ import com.samsung.android.sdk.healthdata.HealthConstants.Sleep
 import com.samsung.android.sdk.healthdata.HealthConstants.StepCount
 import com.samsung.android.sdk.healthdata.HealthDataResolver
 import com.samsung.android.sdk.healthdata.HealthDataResolver.ReadRequest
+import com.samsung.android.sdk.healthdata.HealthDataResolver.AggregateRequest
+import com.samsung.android.sdk.healthdata.HealthDataResolver.AggregateRequest.AggregateFunction
 import com.samsung.android.sdk.healthdata.HealthDataStore
 import com.samsung.android.sdk.healthdata.HealthPermissionManager
 import com.samsung.android.sdk.healthdata.HealthPermissionManager.PermissionKey
@@ -340,33 +342,5 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
 
   override fun onDetachedFromActivityForConfigChanges() {
     activity = null
-  }
-
-
-
-  fun aggregateToFiveMinuteAverage(minuteDataList: List<MinuteData>): List<FiveMinuteGroup> {
-    val result = mutableListOf<FiveMinuteGroup>()
-
-    // 5분씩 묶어서 평균 계산
-    for (i in 0..minuteDataList.size - 5 step 5) {
-      val group = minuteDataList.subList(i, i + 5)
-      val avg = group.map { it.avgHeartRate }.average()
-      val startTime = group.first().timestamp
-
-      result.add(FiveMinuteGroup(startTime, avg))
-    }
-
-    return result
-  }
-
-  private fun getStartTimeOfToday(): Long {
-    val today: Calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
-
-    today.set(Calendar.HOUR_OF_DAY, 0)
-    today.set(Calendar.MINUTE, 0)
-    today.set(Calendar.SECOND, 0)
-    today.set(Calendar.MILLISECOND, 0)
-
-    return today.getTimeInMillis()
   }
 }
