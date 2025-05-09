@@ -27,8 +27,18 @@ abstract class SamsungHealthPluginPlatform extends PlatformInterface {
     throw UnimplementedError('platformVersion() has not been implemented.');
   }
 
+  ///  연결 (권한 확인 및 요청)
+  Future<List<Map<String, dynamic>>> connect();
+
+  /// 5분 심박
   Future<List<Map<String, dynamic>>> getHeartRate5minSeries(int startMillis, int endMillis);
+
+  /// 운동
   Future<List<Map<String, dynamic>>> getExerciseSessions(int start, int end);
+
+  /// 걷기 수
   Future<List<Map<String, dynamic>>> getStepCountSeries(int start, int end);
+
+  /// 수면
   Future<List<Map<String, dynamic>>> getSleepData(int start, int end);
 }

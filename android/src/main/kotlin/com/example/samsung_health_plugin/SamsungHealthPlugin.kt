@@ -62,7 +62,7 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
       "getPlatformVersion" -> {
         result.success("Android ${android.os.Build.VERSION.RELEASE}")
       }
-      "connectSamsungHealth" -> {
+      "connect" -> {
         connectSamsungHealth()
       }
       "getHeartRate5minSeries" -> {
@@ -219,10 +219,12 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
       .setProperties(
         arrayOf(
           HealthConstants.Exercise.EXERCISE_TYPE,
-          HealthConstants.Exercise.CALORIE,
+          HealthConstants.Exercise.DURATION,
           HealthConstants.Exercise.START_TIME,
           HealthConstants.Exercise.END_TIME,
-          HealthConstants.Exercise.LIVE_DATA
+          HealthConstants.Exercise.CALORIE,
+          HealthConstants.Exercise.DISTANCE,
+          HealthConstants.Exercise.LIVE_DATA,
         )
       )
       .setLocalTimeRange(HealthConstants.Exercise.START_TIME, HealthConstants.Exercise.TIME_OFFSET, start, end)
@@ -239,8 +241,10 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
             "type" to data.getInt("exercise_type"),
             "duration" to data.getLong("duration"),
             "start_time" to data.getLong("start_time"),
+            "end_time" to data.getLong("end_time"),
             "calorie" to data.getFloat("calorie"),
-            "distance" to data.getFloat("distance")
+            "distance" to data.getFloat("distance"),
+            "live_data" to data.getLong("live_data")
           )
         )
       }

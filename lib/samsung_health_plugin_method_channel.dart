@@ -21,7 +21,6 @@ class MethodChannelSamsungHealthPlugin extends SamsungHealthPluginPlatform {
       'startMillis': startMillis,
       'endMillis': endMillis,
     });
-
     return (result ?? []).cast<Map<String, dynamic>>();
   }
 
@@ -31,7 +30,6 @@ class MethodChannelSamsungHealthPlugin extends SamsungHealthPluginPlatform {
       'startMillis': start,
       'endMillis': end,
     });
-
     return (result ?? []).cast<Map<String, dynamic>>();
   }
 
@@ -41,7 +39,6 @@ class MethodChannelSamsungHealthPlugin extends SamsungHealthPluginPlatform {
       'startMillis': start,
       'endMillis': end,
     });
-
     return (result ?? []).cast<Map<String, dynamic>>();
   }
 
@@ -51,7 +48,12 @@ class MethodChannelSamsungHealthPlugin extends SamsungHealthPluginPlatform {
       'startMillis': start,
       'endMillis': end,
     });
+    return (result ?? []).cast<Map<String, dynamic>>();
+  }
 
+  @override
+  Future<List<Map<String, dynamic>>> connect() async {
+    final result = await methodChannel.invokeMethod<List>('connect', {});
     return (result ?? []).cast<Map<String, dynamic>>();
   }
 }
