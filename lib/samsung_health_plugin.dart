@@ -5,7 +5,7 @@ class SamsungHealthPlugin {
     return SamsungHealthPluginPlatform.instance.getPlatformVersion();
   }
 
-  Future<List<Map<String, dynamic>>> connect() {
+  Future<Map<String, dynamic>> connect() {
     return SamsungHealthPluginPlatform.instance.connect();
   }
 

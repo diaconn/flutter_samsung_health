@@ -63,7 +63,7 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
         result.success("Android ${android.os.Build.VERSION.RELEASE}")
       }
       "connect" -> {
-        connectSamsungHealth()
+        connectSamsungHealth(result)
       }
       "getHeartRate5minSeries" -> {
         val startMillis = call.argument<Long>("startMillis")!!
@@ -96,46 +96,52 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
   /**
    * 삼성헬스 연계 관련 함수 추가.
    */
-  private fun connectSamsungHealth() {
+  private fun connectSamsungHealth(result: MethodChannel.Result) {
     Log.d(APP_TAG, "connectSamsungHealth() 호출")
-
+    val resultMap: MutableMap<String, Any> = mutableMapOf()
     mStore = HealthDataStore(context, object : HealthDataStore.ConnectionListener {
       override fun onConnected() {
         Log.d(APP_TAG, "삼성 헬스 연결 성공")
-        if (!isPermissionAcquired()) {
-          requestPermission()
+        if (!isPermissionAcquired(result)) {
+          requestPermission(result)
         }
+        resultMap.put("isConnect", true)
+        result.success(resultMap)
       }
 
       override fun onConnectionFailed(error: HealthConnectionErrorResult?) {
         Log.e(APP_TAG, "연결 실패: $error")
-
+        resultMap.put("isConnect", false)
+        result.success(resultMap)
       }
 
       override fun onDisconnected() {
         Log.w(APP_TAG, "삼성 헬스 연결 종료")
-
+        resultMap.put("isConnect", false)
+        result.success(resultMap)
       }
     })
 
     mStore.connectService()
   }
 
-  private fun isPermissionAcquired(): Boolean {
+  private fun isPermissionAcquired(result: MethodChannel.Result): Boolean {
     val pmsManager = HealthPermissionManager(mStore)
     return try {
       // Check whether the permissions that this application needs are acquired
       Log.d(APP_TAG, "permissions. $permissions")
       val resultMap: Map<PermissionKey, Boolean> = pmsManager.isPermissionAcquired(permissions)
       Log.d(APP_TAG, "isPermissionAcquired. $resultMap")
+
       !resultMap.containsValue(false)
+
     } catch (e: Exception) {
       Log.d(APP_TAG, "Permission request fails. $e")
       false
     }
   }
 
-  private fun requestPermission() {
+  private fun requestPermission(result: MethodChannel.Result) {
     val pmsManager = HealthPermissionManager(mStore)
     try {
       Log.d(APP_TAG, "삼성헬스 권한요청 시작 ")

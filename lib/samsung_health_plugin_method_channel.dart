@@ -21,7 +21,9 @@ class MethodChannelSamsungHealthPlugin extends SamsungHealthPluginPlatform {
       'startMillis': startMillis,
       'endMillis': endMillis,
     });
-    return (result ?? []).cast<Map<String, dynamic>>();
+    return (result ?? [])
+        .map((item) => Map<String, dynamic>.from((item as Map).map((key, value) => MapEntry(key.toString(), value))))
+        .toList();
   }
 
   @override
@@ -30,7 +32,9 @@ class MethodChannelSamsungHealthPlugin extends SamsungHealthPluginPlatform {
       'startMillis': start,
       'endMillis': end,
     });
-    return (result ?? []).cast<Map<String, dynamic>>();
+    return (result ?? [])
+        .map((item) => Map<String, dynamic>.from((item as Map).map((key, value) => MapEntry(key.toString(), value))))
+        .toList();
   }
 
   @override
@@ -39,7 +43,9 @@ class MethodChannelSamsungHealthPlugin extends SamsungHealthPluginPlatform {
       'startMillis': start,
       'endMillis': end,
     });
-    return (result ?? []).cast<Map<String, dynamic>>();
+    return (result ?? [])
+        .map((item) => Map<String, dynamic>.from((item as Map).map((key, value) => MapEntry(key.toString(), value))))
+        .toList();
   }
 
   @override
@@ -48,12 +54,14 @@ class MethodChannelSamsungHealthPlugin extends SamsungHealthPluginPlatform {
       'startMillis': start,
       'endMillis': end,
     });
-    return (result ?? []).cast<Map<String, dynamic>>();
+    return (result ?? [])
+        .map((item) => Map<String, dynamic>.from((item as Map).map((key, value) => MapEntry(key.toString(), value))))
+        .toList();
   }
 
   @override
-  Future<List<Map<String, dynamic>>> connect() async {
-    final result = await methodChannel.invokeMethod<List>('connect', {});
-    return (result ?? []).cast<Map<String, dynamic>>();
+  Future<Map<String, dynamic>> connect() async {
+    final result = await methodChannel.invokeMethod<Map>('connect', {});
+    return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {'isConnect': false};
   }
 }

@@ -28,7 +28,7 @@ abstract class SamsungHealthPluginPlatform extends PlatformInterface {
   }
 
   ///  연결 (권한 확인 및 요청)
-  Future<List<Map<String, dynamic>>> connect();
+  Future<Map<String, dynamic>> connect();
 
   /// 5분 심박
   Future<List<Map<String, dynamic>>> getHeartRate5minSeries(int startMillis, int endMillis);
