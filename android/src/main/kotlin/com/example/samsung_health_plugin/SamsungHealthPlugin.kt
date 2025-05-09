@@ -1,17 +1,8 @@
 package com.example.samsung_health_plugin
 
-import android.content.Context
 import android.app.Activity
+import android.content.Context
 import android.util.Log
-import androidx.annotation.NonNull
-
-import io.flutter.embedding.engine.plugins.FlutterPlugin
-import io.flutter.embedding.engine.plugins.activity.ActivityAware
-import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
-import io.flutter.plugin.common.MethodCall
-import io.flutter.plugin.common.MethodChannel
-import io.flutter.plugin.common.MethodChannel.MethodCallHandler
-import io.flutter.plugin.common.MethodChannel.Result
 import com.samsung.android.sdk.healthdata.HealthConnectionErrorResult
 import com.samsung.android.sdk.healthdata.HealthConstants
 import com.samsung.android.sdk.healthdata.HealthConstants.Exercise
@@ -23,15 +14,21 @@ import com.samsung.android.sdk.healthdata.HealthConstants.HeartRate
 import com.samsung.android.sdk.healthdata.HealthConstants.HeartRate.END_TIME
 import com.samsung.android.sdk.healthdata.HealthConstants.HeartRate.HEART_RATE
 import com.samsung.android.sdk.healthdata.HealthConstants.HeartRate.START_TIME
-import com.samsung.android.sdk.healthdata.HealthConstants.StepCount
 import com.samsung.android.sdk.healthdata.HealthConstants.Sleep
+import com.samsung.android.sdk.healthdata.HealthConstants.StepCount
 import com.samsung.android.sdk.healthdata.HealthDataResolver
 import com.samsung.android.sdk.healthdata.HealthDataResolver.ReadRequest
 import com.samsung.android.sdk.healthdata.HealthDataStore
 import com.samsung.android.sdk.healthdata.HealthPermissionManager
 import com.samsung.android.sdk.healthdata.HealthPermissionManager.PermissionKey
 import com.samsung.android.sdk.healthdata.HealthPermissionManager.PermissionType
-import java.util.concurrent.TimeUnit
+import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.embedding.engine.plugins.activity.ActivityAware
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
+import io.flutter.plugin.common.MethodCall
+import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.MethodChannel.MethodCallHandler
+import io.flutter.plugin.common.MethodChannel.Result
 
 /** SamsungHealthPlugin */
 class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
@@ -42,6 +39,7 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
   private lateinit var channel : MethodChannel
   private lateinit var context: Context
   private val APP_TAG : String = "SamsungHealthPlugin"
+  private val ONE_DAY_IN_MILLIS: Long = 24 * 60 * 60 * 1000L
   private lateinit var mStore : HealthDataStore
   private val permissions = setOf(
     PermissionKey(Exercise.HEALTH_DATA_TYPE, PermissionType.READ),
@@ -169,55 +167,55 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
 
   private fun getHeartRate5minSeries(start: Long, end: Long, result: MethodChannel.Result) {
     Log.d(APP_TAG, "getHeartRate5minSeries 호출")
-    val intervalMillis = 5 * 60 * 1000  // 5분
+
     val resolver = HealthDataResolver(mStore, null)
-    val dataList = mutableListOf<Map<String, Any>>()
+    val oneMinuteResults = mutableListOf<Pair<Long, Double>>()  // <timestamp, avg_hr>
 
-    var currentStart = start
+    val request: AggregateRequest = AggregateRequest.Builder()
+      .setDataType(HealthConstants.HeartRate.HEALTH_DATA_TYPE)
+      .addFunction(AggregateFunction.AVG, HealthConstants.HeartRate.HEART_RATE, "avg_hr")
+      .setTimeGroup(
+        AggregateRequest.TimeGroupUnit.MINUTELY, 1,
+        HealthConstants.HeartRate.START_TIME, "minute"
+      )
+      .setLocalTimeRange(
+        HealthConstants.HeartRate.START_TIME,
+        HealthConstants.HeartRate.TIME_OFFSET,
+        start, end
+      )
+      .build()
 
-    fun fetchNextChunk() {
-      if (currentStart >= end) {
-        result.success(dataList)
-        return
+    resolver.aggregate(request).setResultListener { readResult ->
+      Log.d(APP_TAG, "1분 집계 readResult :: ${readResult}")
+      for (data in readResult) {
+        val avgHr = data.getFloat("avg_hr").toDouble()
+        val time = data.getLong("minute") // 집계 시작 시간
+        oneMinuteResults.add(time to avgHr)
       }
 
-      val currentEnd = (currentStart + intervalMillis).coerceAtMost(end)
+      val groupedData = mutableListOf<Map<String, Any>>()
 
-      val request = ReadRequest.Builder()
-        .setDataType(HealthConstants.HeartRate.HEALTH_DATA_TYPE)
-        .setProperties(arrayOf("heart_rate", "start_time", "end_time"))
-        .setLocalTimeRange(
-          HealthConstants.HeartRate.START_TIME, HealthConstants.HeartRate.TIME_OFFSET,
-          currentStart, currentEnd
-        )
-        .build()
+      // 1분 단위 데이터를 5분 단위로 그룹화
+      oneMinuteResults.sortedBy { it.first } // 시간순 정렬
+        .chunked(5) { chunk ->
+          if (chunk.size == 5) {
+            val avg = chunk.map { it.second }.average()
+            val startTime = chunk.first().first
+            val endTime = chunk.last().first + 60_000  // 마지막 1분의 끝
 
-      resolver.read(request).setResultListener { readResult ->
-        val heartRates = mutableListOf<Double>()
-
-        for (data in readResult) {
-          val rate = data.getFloat("heart_rate")
-          heartRates.add(rate.toDouble())
+            groupedData.add(
+              mapOf(
+                "start_time" to startTime,
+                "end_time" to endTime,
+                "avg_heart_rate" to avg,
+                "sample_count" to chunk.size
+              )
+            )
+          }
         }
 
-        // 평균값 예시로 전달 (최대/최소/개수도 포함 가능)
-        val avg = if (heartRates.isNotEmpty()) heartRates.average() else 0.0
-
-        dataList.add(
-          mapOf(
-            "start_time" to currentStart,
-            "end_time" to currentEnd,
-            "avg_heart_rate" to avg,
-            "sample_count" to heartRates.size
-          )
-        )
-
-        currentStart = currentEnd
-        fetchNextChunk()
-      }
+      result.success(groupedData)
     }
-
-    fetchNextChunk()
   }
 
   private fun getExerciseData(start: Long, end: Long, result: MethodChannel.Result) {
@@ -344,15 +342,7 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
     activity = null
   }
 
-  data class MinuteData(
-    val timestamp: Long,         // 시작 시간 (밀리초)
-    val avgHeartRate: Double     // 1분 평균 심박수
-  )
 
-  data class FiveMinuteGroup(
-    val startTimestamp: Long,
-    val avgHeartRate: Double
-  )
 
   fun aggregateToFiveMinuteAverage(minuteDataList: List<MinuteData>): List<FiveMinuteGroup> {
     val result = mutableListOf<FiveMinuteGroup>()
@@ -369,4 +359,14 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
     return result
   }
 
+  private fun getStartTimeOfToday(): Long {
+    val today: Calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+
+    today.set(Calendar.HOUR_OF_DAY, 0)
+    today.set(Calendar.MINUTE, 0)
+    today.set(Calendar.SECOND, 0)
+    today.set(Calendar.MILLISECOND, 0)
+
+    return today.getTimeInMillis()
+  }
 }
