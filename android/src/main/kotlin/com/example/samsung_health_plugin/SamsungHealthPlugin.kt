@@ -257,7 +257,7 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
           )
         )
       }
-
+      Log.d(APP_TAG, "운동조회 결과. $exercisesList")
       result.success(exercisesList)
     }
 //    resolver.read(request).setResultListener { dataResult ->
