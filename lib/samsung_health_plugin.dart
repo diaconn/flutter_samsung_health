@@ -9,6 +9,9 @@ class SamsungHealthPlugin {
     return SamsungHealthPluginPlatform.instance.connect();
   }
 
+  /**
+   * 심박수 조회
+   */
   Future<List<Map<String, dynamic>>> getHeartRate5minSeries({
     required int startMillis,
     required int endMillis,
@@ -16,6 +19,9 @@ class SamsungHealthPlugin {
     return SamsungHealthPluginPlatform.instance.getHeartRate5minSeries(startMillis, endMillis);
   }
 
+  /**
+   * 운동세션조회
+   */
   Future<List<Map<String, dynamic>>> getExerciseSessions({
     required int startMillis,
     required int endMillis,
@@ -23,6 +29,9 @@ class SamsungHealthPlugin {
     return SamsungHealthPluginPlatform.instance.getExerciseSessions(startMillis, endMillis);
   }
 
+  /**
+   * 걸음수 조회
+   */
   Future<List<Map<String, dynamic>>> getStepCountSeries({
     required int startMillis,
     required int endMillis,
@@ -30,6 +39,9 @@ class SamsungHealthPlugin {
     return SamsungHealthPluginPlatform.instance.getStepCountSeries(startMillis, endMillis);
   }
 
+  /**
+   * 수면정보 조회
+   */
   Future<List<Map<String, dynamic>>> getSleepData({
     required int startMillis,
     required int endMillis,

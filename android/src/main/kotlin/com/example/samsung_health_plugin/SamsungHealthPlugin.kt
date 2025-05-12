@@ -171,6 +171,9 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
     Log.d(APP_TAG, "showPermissionAlarmDialog 호출")
   }
 
+  /**
+   * 심박수 집계
+   */
   private fun getHeartRate5minSeries(start: Long, end: Long, result: MethodChannel.Result) {
     Log.d(APP_TAG, "getHeartRate5minSeries 호출")
 
@@ -180,10 +183,7 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
     val request: AggregateRequest = AggregateRequest.Builder()
       .setDataType(HealthConstants.HeartRate.HEALTH_DATA_TYPE)
       .addFunction(AggregateFunction.AVG, HealthConstants.HeartRate.HEART_RATE, "avg_hr")
-      .setTimeGroup(
-        AggregateRequest.TimeGroupUnit.MINUTELY, 1,
-        HealthConstants.HeartRate.START_TIME, "minute"
-      )
+      .setTimeGroup(AggregateRequest.TimeGroupUnit.MINUTELY, 1, HealthConstants.HeartRate.START_TIME, "minute")
       .setLocalTimeRange(
         HealthConstants.HeartRate.START_TIME,
         HealthConstants.HeartRate.TIME_OFFSET,
@@ -196,42 +196,49 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
       val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
       sdf.timeZone = TimeZone.getDefault() // 또는 "UTC"로 설정
 
-
+      // 1분 데이터: timestamp -> avg_hr
+      val dataMap = mutableMapOf<Long, Double>()
       for (data in readResult) {
         val avgHr = data.getFloat("avg_hr").toDouble()
-        val timeStr = data.getString("minute") ?: continue// 집계 시작 시간
-
+        val timeStr = data.getString("minute") ?: continue
         val timestamp = try {
           sdf.parse(timeStr)?.time ?: continue
         } catch (e: Exception) {
           Log.e(APP_TAG, "날짜 파싱 오류: $timeStr", e)
           continue
         }
-
         Log.d(APP_TAG, "1분 데이터 → 시간: $timestamp ($timeStr), 평균 심박수: $avgHr")
-        oneMinuteResults.add(timestamp to avgHr)
+        dataMap[timestamp] = avgHr
       }
+
+      // 1분 단위로 결과 채우기 (누락시 Double.NaN)
+      var cursor = start
+      while (cursor < end) {
+        val value = dataMap[cursor]
+        oneMinuteResults.add(cursor to (value ?: Double.NaN))
+        cursor += 60_000L
+      }
+
       val groupedData = mutableListOf<Map<String, Any>>()
-
-      // 1분 단위 데이터를 5분 단위로 그룹화
-      oneMinuteResults.sortedBy { it.first } // 시간순 정렬
+      // 1분 단위 데이터를 5분 단위로 그룹화, NaN 무시
+      oneMinuteResults.sortedBy { it.first }
         .chunked(5) { chunk ->
-          if (chunk.size == 5) {
-            val avg = chunk.map { it.second }.average()
+          val validValues = chunk.mapNotNull { if (it.second.isNaN()) null else it.second }
+          if (validValues.isNotEmpty()) {
+            val avg = validValues.average()
             val startTime = chunk.first().first
-            val endTime = chunk.last().first + 60_000  // 마지막 1분의 끝
-
+            val endTime = chunk.last().first + 60_000
             Log.d(APP_TAG, "5분 그룹 생성 → 시작: $startTime, 끝: $endTime, 평균: $avg")
             groupedData.add(
               mapOf(
                 "start_time" to startTime,
                 "end_time" to endTime,
                 "avg_heart_rate" to avg,
-                "sample_count" to chunk.size
+                "sample_count" to validValues.size
               )
             )
           } else {
-            Log.d(APP_TAG, "5분 데이터 부족 → ${chunk.size}개만 존재")
+            Log.d(APP_TAG, "5분 그룹 모두 비어 있음 (skip)")
           }
         }
       Log.d(APP_TAG, "최종 그룹 수: ${groupedData.size}")
