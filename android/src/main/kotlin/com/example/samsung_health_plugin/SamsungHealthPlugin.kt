@@ -180,7 +180,6 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
     Log.d(APP_TAG, "getHeartRate5minSeries 호출")
 
     val resolver = HealthDataResolver(mStore, null)
-    val oneMinuteResults = mutableListOf<Pair<Long, Double>>()  // <timestamp, avg_hr>
 
     val request: AggregateRequest = AggregateRequest.Builder()
       .setDataType(HealthConstants.HeartRate.HEALTH_DATA_TYPE)
@@ -195,8 +194,8 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
       val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
       sdf.timeZone = TimeZone.getDefault() // 또는 "UTC"로 설정
 
-      // 1분 데이터: timestamp -> avg_hr
-      val dataMap = mutableMapOf<Long, Double>()
+
+      val heartRateList = mutableListOf<Pair<Long, Double>>()  // <timestamp, avg_hr>
       for (data in readResult) {
         val avgHr = data.getFloat("avg_hr").toDouble()
         val timeStr = data.getString("minute") ?: continue
@@ -207,41 +206,9 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
           continue
         }
         Log.d(APP_TAG, "1분 데이터 → 시간: $timestamp ($timeStr), 평균 심박수: $avgHr")
-        dataMap[timestamp] = avgHr
+        heartRateList.add(timestamp to avgHr)
       }
-
-      // 1분 단위로 결과 채우기 (누락시 Double.NaN)
-      var cursor = start
-      while (cursor < end) {
-        val value = dataMap[cursor]
-        oneMinuteResults.add(cursor to (value ?: Double.NaN))
-        cursor += 60_000L
-      }
-
-      val groupedData = mutableListOf<Map<String, Any>>()
-      // 1분 단위 데이터를 5분 단위로 그룹화, NaN 무시
-      oneMinuteResults.sortedBy { it.first }
-        .chunked(5) { chunk ->
-          val validValues = chunk.mapNotNull { if (it.second.isNaN()) null else it.second }
-          if (validValues.isNotEmpty()) {
-            val avg = validValues.average()
-            val startTime = chunk.first().first
-            val endTime = chunk.last().first + 60_000
-            Log.d(APP_TAG, "5분 그룹 생성 → 시작: $startTime, 끝: $endTime, 평균: $avg")
-            groupedData.add(
-              mapOf(
-                "start_time" to startTime,
-                "end_time" to endTime,
-                "avg_heart_rate" to avg,
-                "sample_count" to validValues.size
-              )
-            )
-          } else {
-            Log.d(APP_TAG, "5분 그룹 모두 비어 있음 (skip)")
-          }
-        }
-      Log.d(APP_TAG, "최종 그룹 수: ${groupedData.size}")
-      result.success(groupedData)
+      result.success(heartRateList)
     }
   }
 
