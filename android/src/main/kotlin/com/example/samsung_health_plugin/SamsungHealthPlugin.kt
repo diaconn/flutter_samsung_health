@@ -35,6 +35,8 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
 import java.util.Date
+import java.util.Calendar
+import java.util.concurrent.TimeUnit
 
 /** SamsungHealthPlugin */
 class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
@@ -183,12 +185,9 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
     val request: AggregateRequest = AggregateRequest.Builder()
       .setDataType(HealthConstants.HeartRate.HEALTH_DATA_TYPE)
       .addFunction(AggregateFunction.AVG, HealthConstants.HeartRate.HEART_RATE, "avg_hr")
-      .setTimeGroup(AggregateRequest.TimeGroupUnit.MINUTELY, 1, HealthConstants.HeartRate.START_TIME, "minute")
-      .setLocalTimeRange(
-        HealthConstants.HeartRate.START_TIME,
-        HealthConstants.HeartRate.TIME_OFFSET,
-        start, end
-      )
+      .setTimeGroup(AggregateRequest.TimeGroupUnit.MINUTELY, 1, HealthConstants.HeartRate.START_TIME, HealthConstants.HeartRate.TIME_OFFSET, "minute")
+      .setLocalTimeRange(HealthConstants.HeartRate.START_TIME, HealthConstants.HeartRate.TIME_OFFSET, start, end)
+      .setSort(HealthConstants.HeartRate.START_TIME, HealthDataResolver.SortOrder.DESC)
       .build()
 
     resolver.aggregate(request).setResultListener { readResult ->
@@ -246,6 +245,9 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
     }
   }
 
+  /**
+   * 운동조회
+   */
   private fun getExerciseData(start: Long, end: Long, result: MethodChannel.Result) {
     val exerciseRequest = ReadRequest.Builder()
       .setDataType(HealthConstants.Exercise.HEALTH_DATA_TYPE)
@@ -288,24 +290,28 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
     }
   }
 
+  /**
+   * 걷기정보 집계조회
+   */
   private fun getStepCountData(start: Long, end: Long, result: MethodChannel.Result) {
     val sdf = SimpleDateFormat("yyyy-MM-dd HH", Locale.getDefault())
     sdf.timeZone = TimeZone.getDefault() // 또는 "UTC"로 설정
 
     val request: AggregateRequest = AggregateRequest.Builder()
-      .setDataType(HealthConstants.StepCount.HEALTH_DATA_TYPE)
-      .addFunction(AggregateFunction.SUM, HealthConstants.StepCount.COUNT, "sum_steps")
-      .setTimeGroup(AggregateRequest.TimeGroupUnit.HOURLY, 1, HealthConstants.StepCount.START_TIME, "hour")
-      .setLocalTimeRange(HealthConstants.StepCount.START_TIME, HealthConstants.StepCount.TIME_OFFSET, start, end)
+      .setDataType(StepCount.HEALTH_DATA_TYPE)
+      .addFunction(AggregateFunction.SUM, StepCount.COUNT, "total_step")
+      .setLocalTimeRange(StepCount.START_TIME, StepCount.TIME_OFFSET, start, end)
+      .setTimeGroup(AggregateRequest.TimeGroupUnit.HOURLY, 1, HealthConstants.StepCount.START_TIME, StepCount.TIME_OFFSET, "hour")
+      .setSort(HealthConstants.HeartRate.START_TIME, HealthDataResolver.SortOrder.DESC)
       .build()
 
     val resolver = HealthDataResolver(mStore, null)
-    val hourlyStepList = mutableListOf<Pair<Long, Int>>()  // <timestamp, avg_hr>
+    val hourlyStepList = mutableListOf<Pair<Long, Int>>()
 
     resolver.aggregate(request).setResultListener { dataResult ->
       for (data in dataResult) {
         val timeStr = data.getString("hour") ?: continue// "yyyy-MM-dd HH" 형식의 문자열
-        val steps = data.getInt("sum_steps")
+        val steps = data.getInt("total_step")
         val timestamp = try {
           sdf.parse(timeStr)?.time ?: continue
         } catch (e: Exception) {
@@ -320,11 +326,17 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
     }
   }
 
+
+
+  /**
+   * 수면정보 조회
+   */
   private fun getSleepData(start: Long, end: Long, result: MethodChannel.Result) {
     val request = ReadRequest.Builder()
       .setDataType("com.samsung.health.sleep")
       .setProperties(arrayOf("start_time", "end_time", "sleep_type", "efficiency"))
       .setLocalTimeRange(HealthConstants.StepCount.START_TIME, HealthConstants.StepCount.TIME_OFFSET, start, end)
+      .setSort(HealthConstants.HeartRate.START_TIME, HealthDataResolver.SortOrder.DESC)
       .build()
 
     val resolver = HealthDataResolver(mStore, null)
