@@ -195,7 +195,7 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
       sdf.timeZone = TimeZone.getDefault() // 또는 "UTC"로 설정
 
 
-      val heartRateList = mutableListOf<Pair<Long, Double>>()  // <timestamp, avg_hr>
+      val heartRateList = mutableListOf<Map<Long, Double>>()  // <timestamp, avg_hr>
       for (data in readResult) {
         val avgHr = data.getFloat("avg_hr").toDouble()
         val timeStr = data.getString("minute") ?: continue
@@ -206,7 +206,7 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
           continue
         }
         Log.d(APP_TAG, "1분 데이터 → 시간: $timestamp ($timeStr), 평균 심박수: $avgHr")
-        heartRateList.add(timestamp to avgHr)
+        heartRateList.add(mapOf("timestamp" to timestamp, "avg_hr" to steps))
       }
       result.success(heartRateList)
     }
@@ -273,7 +273,7 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
       .build()
 
     val resolver = HealthDataResolver(mStore, null)
-    val hourlyStepList = mutableListOf<Pair<Long, Int>>()
+    val hourlyStepList = mutableListOf<Map<Long, Int>>()
 
     resolver.aggregate(request).setResultListener { dataResult ->
       for (data in dataResult) {
@@ -285,9 +285,9 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
           Log.e(APP_TAG, "날짜 파싱 오류: $timeStr", e)
           continue
         }
-
+        // 수정된 방식 (Flutter에서 이해 가능한 구조로 변환)
         Log.d(APP_TAG, "1시간 데이터 → 시간: $timestamp ($timeStr), 누적 걸음수: $steps")
-        hourlyStepList.add(timestamp to steps)
+        hourlyStepList.add(mapOf("timestamp" to timestamp, "steps" to steps))
       }
       result.success(hourlyStepList)
     }
