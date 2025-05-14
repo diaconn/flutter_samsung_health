@@ -195,7 +195,7 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
       sdf.timeZone = TimeZone.getDefault() // 또는 "UTC"로 설정
 
 
-      val heartRateList = mutableListOf<Map<Long, Double>>()  // <timestamp, avg_hr>
+      val heartRateList = mutableListOf<Map<String, Any>>()  // <timestamp, avg_hr>
       for (data in readResult) {
         val avgHr = data.getFloat("avg_hr").toDouble()
         val timeStr = data.getString("minute") ?: continue
@@ -206,7 +206,7 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
           continue
         }
         Log.d(APP_TAG, "1분 데이터 → 시간: $timestamp ($timeStr), 평균 심박수: $avgHr")
-        heartRateList.add(mapOf("timestamp" to timestamp, "avg_hr" to steps))
+        heartRateList.add(mapOf("timestamp" to timestamp, "avg_hr" to avgHr))
       }
       result.success(heartRateList)
     }
@@ -273,7 +273,7 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
       .build()
 
     val resolver = HealthDataResolver(mStore, null)
-    val hourlyStepList = mutableListOf<Map<Long, Int>>()
+    val hourlyStepList = mutableListOf<Map<String, Any>>()
 
     resolver.aggregate(request).setResultListener { dataResult ->
       for (data in dataResult) {
