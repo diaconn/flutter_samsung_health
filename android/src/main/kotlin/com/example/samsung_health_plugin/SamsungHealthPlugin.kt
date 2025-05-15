@@ -184,13 +184,13 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
     val request: AggregateRequest = AggregateRequest.Builder()
       .setDataType(HealthConstants.HeartRate.HEALTH_DATA_TYPE)
       .addFunction(AggregateFunction.AVG, HealthConstants.HeartRate.HEART_RATE, "avg_hr")
-      .setTimeGroup(AggregateRequest.TimeGroupUnit.MINUTELY, 1, HealthConstants.HeartRate.START_TIME, HealthConstants.HeartRate.TIME_OFFSET, "minute")
+      .setTimeGroup(AggregateRequest.TimeGroupUnit.MINUTELY, 5, HealthConstants.HeartRate.START_TIME, HealthConstants.HeartRate.TIME_OFFSET, "minute")
       .setLocalTimeRange(HealthConstants.HeartRate.START_TIME, HealthConstants.HeartRate.TIME_OFFSET, start, end)
       .setSort(HealthConstants.HeartRate.START_TIME, HealthDataResolver.SortOrder.DESC)
       .build()
 
     resolver.aggregate(request).setResultListener { readResult ->
-      Log.d(APP_TAG, "1분 단위 집계 결과 수: ${readResult.count}")
+      Log.d(APP_TAG, "5분 단위 집계 결과 수: ${readResult.count}")
       val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
       sdf.timeZone = TimeZone.getDefault() // 또는 "UTC"로 설정
 
@@ -205,7 +205,7 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
           Log.e(APP_TAG, "날짜 파싱 오류: $timeStr", e)
           continue
         }
-        Log.d(APP_TAG, "1분 데이터 → 시간: $timestamp ($timeStr), 평균 심박수: $avgHr")
+        Log.d(APP_TAG, "5분 데이터 → 시간: $timestamp ($timeStr), 평균 심박수: $avgHr")
         heartRateList.add(mapOf("timestamp" to timestamp, "avg_hr" to avgHr))
       }
       result.success(heartRateList)
