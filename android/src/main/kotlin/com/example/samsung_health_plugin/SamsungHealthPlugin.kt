@@ -10,11 +10,14 @@ import com.samsung.android.sdk.healthdata.HealthConstants.Exercise.CALORIE
 import com.samsung.android.sdk.healthdata.HealthConstants.Exercise.END_TIME
 import com.samsung.android.sdk.healthdata.HealthConstants.Exercise.EXERCISE_TYPE
 import com.samsung.android.sdk.healthdata.HealthConstants.Exercise.START_TIME
+import com.samsung.android.sdk.healthdata.HealthConstants.Exercise.DURATION
+import com.samsung.android.sdk.healthdata.HealthConstants.Exercise.DISTANCE
 import com.samsung.android.sdk.healthdata.HealthConstants.HeartRate
 import com.samsung.android.sdk.healthdata.HealthConstants.HeartRate.END_TIME
 import com.samsung.android.sdk.healthdata.HealthConstants.HeartRate.HEART_RATE
 import com.samsung.android.sdk.healthdata.HealthConstants.HeartRate.START_TIME
 import com.samsung.android.sdk.healthdata.HealthConstants.Sleep
+import com.samsung.android.sdk.healthdata.HealthConstants.SleepStage
 import com.samsung.android.sdk.healthdata.HealthConstants.StepCount
 import com.samsung.android.sdk.healthdata.HealthDataResolver
 import com.samsung.android.sdk.healthdata.HealthDataResolver.ReadRequest
@@ -206,7 +209,7 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
           continue
         }
         Log.d(APP_TAG, "5분 데이터 → 시간: $timestamp ($timeStr), 평균 심박수: $avgHr")
-        heartRateList.add(mapOf("timestamp" to timestamp, "avg_hr" to avgHr))
+        heartRateList.add(mapOf("timestamp" to timestamp, "timeStr" to timeStr, "avg_hr" to avgHr))
       }
       result.success(heartRateList)
     }
@@ -223,9 +226,14 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
       .setProperties(
         arrayOf(
           HealthConstants.Exercise.EXERCISE_TYPE,
-          HealthConstants.Exercise.CALORIE,
           HealthConstants.Exercise.START_TIME,
           HealthConstants.Exercise.END_TIME,
+          HealthConstants.Exercise.DURATION,
+          HealthConstants.Exercise.DISTANCE,
+          HealthConstants.Exercise.CALORIE,
+          HealthConstants.Exercise.MAX_HEART_RATE,
+          HealthConstants.Exercise.MEAN_HEART_RATE,
+          HealthConstants.Exercise.MIN_HEART_RATE,
           HealthConstants.Exercise.LIVE_DATA
         )
       ).build()
@@ -244,10 +252,16 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
         }
         exercisesList.add(
           mapOf(
-            "exerciseType" to it.getInt(HealthConstants.Exercise.EXERCISE_TYPE),
+            "exercise_type" to ExerciseTypeMapper.getName(it.getInt(HealthConstants.Exercise.EXERCISE_TYPE)),
+            "exercise_type_name" to ExerciseTypeMapper.getName(it.getInt(HealthConstants.Exercise.EXERCISE_TYPE)),
+            "start_time" to it.getLong(HealthConstants.Exercise.START_TIME),
+            "end_time" to it.getLong(HealthConstants.Exercise.END_TIME),
+            "duration" to it.getLong(HealthConstants.Exercise.DURATION),
+            "distance" to it.getLong(HealthConstants.Exercise.DISTANCE),
             "calories" to it.getFloat(HealthConstants.Exercise.CALORIE),
-            "startTime" to it.getLong(HealthConstants.Exercise.START_TIME),
-            "endTime" to it.getLong(HealthConstants.Exercise.END_TIME),
+            "max_heart_rate" to it.getFloat(HealthConstants.Exercise.MAX_HEART_RATE),
+            "mean_heart_rate" to it.getFloat(HealthConstants.Exercise.MEAN_HEART_RATE),
+            "min_heart_rate" to it.getFloat(HealthConstants.Exercise.MIN_HEART_RATE),
             "liveData" to it.getString(HealthConstants.Exercise.LIVE_DATA)
           )
         )
@@ -261,15 +275,15 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
    * 걷기정보 집계조회
    */
   private fun getStepCountData(start: Long, end: Long, result: MethodChannel.Result) {
-    val sdf = SimpleDateFormat("yyyy-MM-dd HH", Locale.getDefault())
+    val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
     sdf.timeZone = TimeZone.getDefault() // 또는 "UTC"로 설정
 
     val request: AggregateRequest = AggregateRequest.Builder()
       .setDataType(StepCount.HEALTH_DATA_TYPE)
       .addFunction(AggregateFunction.SUM, StepCount.COUNT, "total_step")
       .setLocalTimeRange(StepCount.START_TIME, StepCount.TIME_OFFSET, start, end)
-      .setTimeGroup(AggregateRequest.TimeGroupUnit.HOURLY, 1, HealthConstants.StepCount.START_TIME, StepCount.TIME_OFFSET, "hour")
-      .setSort(HealthConstants.HeartRate.START_TIME, HealthDataResolver.SortOrder.DESC)
+      .setTimeGroup(AggregateRequest.TimeGroupUnit.MINUTELY, 5, HealthConstants.StepCount.START_TIME, StepCount.TIME_OFFSET, "minute")
+      .setSort(HealthConstants.StepCount.START_TIME, HealthDataResolver.SortOrder.DESC)
       .build()
 
     val resolver = HealthDataResolver(mStore, null)
@@ -277,7 +291,7 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
 
     resolver.aggregate(request).setResultListener { dataResult ->
       for (data in dataResult) {
-        val timeStr = data.getString("hour") ?: continue// "yyyy-MM-dd HH" 형식의 문자열
+        val timeStr = data.getString("minute") ?: continue// "yyyy-MM-dd HH:min" 형식의 문자열
         val steps = data.getInt("total_step")
         val timestamp = try {
           sdf.parse(timeStr)?.time ?: continue
@@ -286,24 +300,28 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
           continue
         }
         // 수정된 방식 (Flutter에서 이해 가능한 구조로 변환)
-        Log.d(APP_TAG, "1시간 데이터 → 시간: $timestamp ($timeStr), 누적 걸음수: $steps")
-        hourlyStepList.add(mapOf("timestamp" to timestamp, "steps" to steps))
+        Log.d(APP_TAG, "5분 누적 데이터 → 시간: $timestamp ($timeStr), 누적 걸음수: $steps")
+        hourlyStepList.add(mapOf("timestamp" to timestamp, "time_str" to timeStr, "steps" to steps))
       }
       result.success(hourlyStepList)
     }
   }
-
-
 
   /**
    * 수면정보 조회
    */
   private fun getSleepData(start: Long, end: Long, result: MethodChannel.Result) {
     val request = ReadRequest.Builder()
-      .setDataType("com.samsung.health.sleep")
-      .setProperties(arrayOf("start_time", "end_time", "sleep_type", "efficiency"))
-      .setLocalTimeRange(HealthConstants.StepCount.START_TIME, HealthConstants.StepCount.TIME_OFFSET, start, end)
-      .setSort(HealthConstants.HeartRate.START_TIME, HealthDataResolver.SortOrder.DESC)
+      .setDataType(SleepStage.HEALTH_DATA_TYPE)
+      .setProperties(
+        arrayOf(
+          HealthConstants.SleepStage.START_TIME,
+          HealthConstants.SleepStage.END_TIME,
+          HealthConstants.SleepStage.TIME_OFFSET,
+          HealthConstants.SleepStage.SLEEP_ID,
+          HealthConstants.SleepStage.STAGE
+        ))
+      .setSort(HealthConstants.SleepStage.START_TIME, HealthDataResolver.SortOrder.DESC)
       .build()
 
     val resolver = HealthDataResolver(mStore, null)
@@ -313,10 +331,12 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
       for (data in dataResult) {
         sleepList.add(
           mapOf(
-            "type" to data.getInt("sleep_type"),
-            "start_time" to data.getLong("start_time"),
-            "end_time" to data.getLong("end_time"),
-            "efficiency" to data.getFloat("efficiency")
+            "start_time" to data.getLong(HealthConstants.SleepStage.START_TIME),
+            "end_time" to data.getLong(HealthConstants.SleepStage.END_TIME),
+            "time_offset" to data.getLong(HealthConstants.SleepStage.TIME_OFFSET),
+            "sleep_id" to data.getInt(HealthConstants.SleepStage.SLEEP_ID),
+            "stage" to data.getInt(HealthConstants.SleepStage.STAGE),
+            "exercise_type_name" to SleepTypeMapper.getName(data.getInt(HealthConstants.SleepStage.STAGE))
           )
         )
       }
@@ -338,5 +358,45 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
 
   override fun onDetachedFromActivityForConfigChanges() {
     activity = null
+  }
+}
+
+object ExerciseTypeMapper {
+    private val typeMap = mapOf(
+        1001 to "Walking",
+        1002 to "Running",
+        1003 to "Cycling",
+        1004 to "Hiking",
+        1005 to "Mountain Biking",
+        1006 to "Treadmill",
+        1007 to "Elliptical Trainer",
+        1008 to "Pilates",
+        1009 to "Rowing Machine",
+        1010 to "Spinning",
+        1011 to "Stair Climber",
+        1012 to "Yoga",
+        1013 to "Aerobics",
+        1014 to "Dancing",
+        1015 to "Strength Training",
+        1016 to "Swimming",
+        1017 to "Circuit Training",
+        1018 to "Other"
+    )
+
+    fun getName(type: Int): String {
+        return typeMap[type] ?: "Unknown"
+    }
+}
+
+object SleepTypeMapper {
+  private val map = mapOf(
+    40001 to "Awake",
+    40002 to "Light",
+    40003 to "Deep",
+    40004 to "REM"
+  )
+
+  fun getName(type: Int): String {
+    return map[type] ?: "Unknown"
   }
 }
