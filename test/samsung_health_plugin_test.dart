@@ -5,7 +5,7 @@ import 'package:samsung_health_plugin/samsung_health_plugin_platform_interface.d
 
 class MockSamsungHealthPluginPlatform with MockPlatformInterfaceMixin implements SamsungHealthPluginPlatform {
   @override
-  Future<List<Map<String, dynamic>>> getHeartRate5minSeries(int startMillis, int endMillis) {
+  Future<List<Map<String, dynamic>>> getHeartRate5minSeries(int start, int end) {
     // TODO: implement getHeartRate5minSeries
     throw UnimplementedError();
   }
@@ -31,6 +31,12 @@ class MockSamsungHealthPluginPlatform with MockPlatformInterfaceMixin implements
   @override
   Future<List<Map<String, dynamic>>> getStepCountSeries(int start, int end) {
     // TODO: implement getStepCountSeries
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getNutritionData(int start, int end) {
+    // TODO: implement getNutritionData
     throw UnimplementedError();
   }
 }

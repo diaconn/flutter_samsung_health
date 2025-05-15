@@ -37,4 +37,7 @@ abstract class SamsungHealthPluginPlatform extends PlatformInterface {
 
   /// 수면
   Future<List<Map<String, dynamic>>> getSleepData(int start, int end);
+
+  /// 식사(영양소) 정보
+  Future<List<Map<String, dynamic>>> getNutritionData(int start, int end);
 }

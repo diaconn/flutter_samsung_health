@@ -19,6 +19,7 @@ import com.samsung.android.sdk.healthdata.HealthConstants.HeartRate.START_TIME
 import com.samsung.android.sdk.healthdata.HealthConstants.Sleep
 import com.samsung.android.sdk.healthdata.HealthConstants.SleepStage
 import com.samsung.android.sdk.healthdata.HealthConstants.StepCount
+import com.samsung.android.sdk.healthdata.HealthConstants.Nutrition
 import com.samsung.android.sdk.healthdata.HealthDataResolver
 import com.samsung.android.sdk.healthdata.HealthDataResolver.ReadRequest
 import com.samsung.android.sdk.healthdata.HealthDataResolver.AggregateRequest
@@ -37,9 +38,6 @@ import io.flutter.plugin.common.MethodChannel.Result
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
-import java.util.Date
-import java.util.Calendar
-import java.util.concurrent.TimeUnit
 
 /** SamsungHealthPlugin */
 class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
@@ -73,24 +71,29 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
         connectSamsungHealth(result)
       }
       "getHeartRate5minSeries" -> {
-        val startMillis = call.argument<Long>("startMillis")!!
-        val endMillis = call.argument<Long>("endMillis")!!
-        getHeartRate5minSeries(startMillis, endMillis, result)
+        val start = call.argument<Long>("start")!!
+        val end = call.argument<Long>("end")!!
+        getHeartRate5minSeries(start, end, result)
       }
       "getExerciseSessions" -> {
-        val startMillis = call.argument<Long>("startMillis")!!
-        val endMillis = call.argument<Long>("endMillis")!!
-        getExerciseData(startMillis, endMillis, result)
+        val start = call.argument<Long>("start")!!
+        val end = call.argument<Long>("end")!!
+        getExerciseData(start, end, result)
       }
       "getStepCountSeries" -> {
-        val startMillis = call.argument<Long>("startMillis")!!
-        val endMillis = call.argument<Long>("endMillis")!!
-        getStepCountData(startMillis, endMillis, result)
+        val start = call.argument<Long>("start")!!
+        val end = call.argument<Long>("end")!!
+        getStepCountData(start, end, result)
       }
       "getSleepData" -> {
-        val startMillis = call.argument<Long>("startMillis")!!
-        val endMillis = call.argument<Long>("endMillis")!!
-        getSleepData(startMillis, endMillis, result)
+        val start = call.argument<Long>("start")!!
+        val end = call.argument<Long>("end")!!
+        getSleepData(start, end, result)
+      }
+      "getNutritionData" -> {
+        val start = call.argument<Long>("start")!!
+        val end = call.argument<Long>("end")!!
+        getNutritionData(start, end, result)
       }
       else -> result.notImplemented()
     }
@@ -207,7 +210,7 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
           continue
         }
         Log.d(APP_TAG, "5분 데이터 → 시간: $timestamp ($timeStr), 평균 심박수: $avgHr")
-        heartRateList.add(mapOf("timestamp" to timestamp, "timeStr" to timeStr, "avg_hr" to avgHr))
+        heartRateList.add(mapOf("timestamp" to timestamp, "time_str" to timeStr, "avg_hr" to avgHr))
       }
       result.success(heartRateList)
     }
@@ -342,6 +345,75 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
     }
   }
 
+  /**
+   * 식사 영양소 정보 조회
+   */
+  private fun getNutritionData(start: Long, end: Long, result: MethodChannel.Result) {
+    val request = ReadRequest.Builder()
+      .setDataType(Nutrition.HEALTH_DATA_TYPE)
+      .setProperties(
+        arrayOf(
+          HealthConstants.Nutrition.START_TIME,
+          HealthConstants.Nutrition.TIME_OFFSET,
+          HealthConstants.Nutrition.MEAL_TYPE,
+          HealthConstants.Nutrition.CALORIE,
+          HealthConstants.Nutrition.TITLE,
+          HealthConstants.Nutrition.TOTAL_FAT,
+          HealthConstants.Nutrition.SATURATED_FAT,
+          HealthConstants.Nutrition.POLYSATURATED_FAT,
+          HealthConstants.Nutrition.MONOSATURATED_FAT,
+          HealthConstants.Nutrition.TRANS_FAT,
+          HealthConstants.Nutrition.CARBOHYDRATE,
+          HealthConstants.Nutrition.DIETARY_FIBER,
+          HealthConstants.Nutrition.SUGAR,
+          HealthConstants.Nutrition.PROTEIN,
+          HealthConstants.Nutrition.CHOLESTEROL,
+          HealthConstants.Nutrition.SODIUM,
+          HealthConstants.Nutrition.POTASSIUM,
+          HealthConstants.Nutrition.VITAMIN_A,
+          HealthConstants.Nutrition.VITAMIN_C,
+          HealthConstants.Nutrition.CALCIUM,
+          HealthConstants.Nutrition.IRON
+        ))
+      .setSort(HealthConstants.Nutrition.START_TIME, HealthDataResolver.SortOrder.DESC)
+      .build()
+
+    val resolver = HealthDataResolver(mStore, null)
+    val nutritionList = mutableListOf<Map<String, Any>>()
+
+    resolver.read(request).setResultListener { dataResult ->
+      for (data in dataResult) {
+        nutritionList.add(
+          mapOf(
+            "start_time" to data.getLong(HealthConstants.Nutrition.START_TIME),
+            "time_offset" to data.getLong(HealthConstants.Nutrition.TIME_OFFSET),
+            "meal_type" to data.getString(HealthConstants.Nutrition.MEAL_TYPE),
+            "meal_type_name" to MealTypeMapper.getName(data.getInt(HealthConstants.Nutrition.MEAL_TYPE)),
+            "calorie" to data.getString(HealthConstants.Nutrition.CALORIE),
+            "title" to data.getString(HealthConstants.Nutrition.TITLE),
+            "total_fat" to data.getString(HealthConstants.Nutrition.TOTAL_FAT),
+            "saturated_fat" to data.getString(HealthConstants.Nutrition.SATURATED_FAT),
+            "polysaturated_fat" to data.getString(HealthConstants.Nutrition.POLYSATURATED_FAT),
+            "monosaturated_fat" to data.getString(HealthConstants.Nutrition.MONOSATURATED_FAT),
+            "trans_fat" to data.getString(HealthConstants.Nutrition.TRANS_FAT),
+            "carbohydrate" to data.getString(HealthConstants.Nutrition.CARBOHYDRATE),
+            "dietary_fiber" to data.getString(HealthConstants.Nutrition.DIETARY_FIBER),
+            "sugar" to data.getString(HealthConstants.Nutrition.SUGAR),
+            "protein" to data.getString(HealthConstants.Nutrition.PROTEIN),
+            "cholesterol" to data.getString(HealthConstants.Nutrition.CHOLESTEROL),
+            "sodium" to data.getString(HealthConstants.Nutrition.SODIUM),
+            "potassium" to data.getString(HealthConstants.Nutrition.POTASSIUM),
+            "vitamin_a" to data.getString(HealthConstants.Nutrition.VITAMIN_A),
+            "vitamin_c" to data.getString(HealthConstants.Nutrition.VITAMIN_C),
+            "calcium" to data.getString(HealthConstants.Nutrition.CALCIUM),
+            "iron" to data.getString(HealthConstants.Nutrition.IRON)
+            )
+          )
+      }
+      result.success(nutritionList)
+    }
+  }
+
   override fun onAttachedToActivity(binding: ActivityPluginBinding) {
     activity = binding.activity
   }
@@ -392,6 +464,21 @@ object SleepTypeMapper {
     40002 to "Light",
     40003 to "Deep",
     40004 to "REM"
+  )
+
+  fun getName(type: Int): String {
+    return map[type] ?: "Unknown"
+  }
+}
+
+object MealTypeMapper {
+  private val map = mapOf(
+    100001 to "Breakfast",
+    100002 to "Lunch",
+    100003 to "Dinner",
+    100004 to "Morning Snack",
+    100005 to "Afternoon Snack",
+    100006 to "Evening Snack"
   )
 
   fun getName(type: Int): String {
