@@ -68,9 +68,7 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
 
   override fun onMethodCall(call: MethodCall, result: Result) {
     when (call.method) {
-      "getPlatformVersion" -> {
-        result.success("Android ${android.os.Build.VERSION.RELEASE}")
-      }
+
       "connect" -> {
         connectSamsungHealth(result)
       }

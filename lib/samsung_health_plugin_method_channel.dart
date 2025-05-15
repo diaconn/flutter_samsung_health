@@ -9,23 +9,19 @@ class MethodChannelSamsungHealthPlugin extends SamsungHealthPluginPlatform {
   @visibleForTesting
   final methodChannel = const MethodChannel('samsung_health_plugin');
 
+  /// 심박 조회(5분 평균)
   @override
-  Future<String?> getPlatformVersion() async {
-    final version = await methodChannel.invokeMethod<String>('getPlatformVersion');
-    return version;
-  }
-
-  @override
-  Future<List<Map<String, dynamic>>> getHeartRate5minSeries(int startMillis, int endMillis) async {
+  Future<List<Map<String, dynamic>>> getHeartRate5minSeries(int start, int end) async {
     final result = await methodChannel.invokeMethod<List>('getHeartRate5minSeries', {
-      'startMillis': startMillis,
-      'endMillis': endMillis,
+      'startMillis': start,
+      'endMillis': end,
     });
     return (result ?? [])
         .map((item) => Map<String, dynamic>.from((item as Map).map((key, value) => MapEntry(key.toString(), value))))
         .toList();
   }
 
+  /// 운동 세션 조회
   @override
   Future<List<Map<String, dynamic>>> getExerciseSessions(int start, int end) async {
     final result = await methodChannel.invokeMethod<List>('getExerciseSessions', {
@@ -37,6 +33,7 @@ class MethodChannelSamsungHealthPlugin extends SamsungHealthPluginPlatform {
         .toList();
   }
 
+  /// 수면 조회
   @override
   Future<List<Map<String, dynamic>>> getSleepData(int start, int end) async {
     final result = await methodChannel.invokeMethod<List>('getSleepData', {
@@ -48,6 +45,7 @@ class MethodChannelSamsungHealthPlugin extends SamsungHealthPluginPlatform {
         .toList();
   }
 
+  /// 걷기수 조회 (5분 누적)
   @override
   Future<List<Map<String, dynamic>>> getStepCountSeries(int start, int end) async {
     final result = await methodChannel.invokeMethod<List>('getStepCountSeries', {
@@ -59,6 +57,7 @@ class MethodChannelSamsungHealthPlugin extends SamsungHealthPluginPlatform {
         .toList();
   }
 
+  /// 삼성 헬스 연결
   @override
   Future<Map<String, dynamic>> connect() async {
     final result = await methodChannel.invokeMethod<Map>('connect', {});
