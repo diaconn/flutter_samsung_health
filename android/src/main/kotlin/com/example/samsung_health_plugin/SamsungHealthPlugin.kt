@@ -334,7 +334,7 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
             "start_time" to data.getLong(HealthConstants.SleepStage.START_TIME),
             "end_time" to data.getLong(HealthConstants.SleepStage.END_TIME),
             "time_offset" to data.getLong(HealthConstants.SleepStage.TIME_OFFSET),
-            "sleep_id" to data.getInt(HealthConstants.SleepStage.SLEEP_ID),
+            "sleep_id" to data.getString(HealthConstants.SleepStage.SLEEP_ID),
             "stage" to data.getInt(HealthConstants.SleepStage.STAGE),
             "exercise_type_name" to SleepTypeMapper.getName(data.getInt(HealthConstants.SleepStage.STAGE))
           )
