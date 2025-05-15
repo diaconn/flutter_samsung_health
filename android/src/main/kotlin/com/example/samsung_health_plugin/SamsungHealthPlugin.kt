@@ -50,14 +50,13 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
   private lateinit var channel : MethodChannel
   private lateinit var context: Context
   private val APP_TAG : String = "SamsungHealthPlugin"
-  private val ONE_DAY_IN_MILLIS: Long = 24 * 60 * 60 * 1000L
   private lateinit var mStore : HealthDataStore
   private val permissions = setOf(
     PermissionKey(Exercise.HEALTH_DATA_TYPE, PermissionType.READ),
     PermissionKey(StepCount.HEALTH_DATA_TYPE, PermissionType.READ),
     PermissionKey(HeartRate.HEALTH_DATA_TYPE, PermissionType.READ),
     PermissionKey(Sleep.HEALTH_DATA_TYPE, PermissionType.READ),
-    PermissionKey(SleepStage.HEALTH_DATA_TYPE, PermissionType.READ),
+    PermissionKey(SleepStage.HEALTH_DATA_TYPE, PermissionType.READ)
   )
   private var activity: Activity? = null
 
