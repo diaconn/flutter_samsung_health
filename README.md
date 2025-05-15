@@ -70,9 +70,8 @@ import 'package:samsung_health_plugin/samsung_health_plugin.dart';
 
 final plugin = SamsungHealthPlugin();
 await plugin.connect();
-```
 
-전체 예시는 `example/` 폴더를 참고하세요.
+```
 
 ---
 
