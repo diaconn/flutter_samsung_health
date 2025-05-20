@@ -1,4 +1,4 @@
-# samsung\_health\_plugin
+# flutter\_samsung\_health
 
 Android용 삼성 헬스 SDK를 연동하는 Flutter 플러그인입니다.
 
@@ -8,13 +8,13 @@ Android용 삼성 헬스 SDK를 연동하는 Flutter 플러그인입니다.
 
 ```yaml
 dependencies:
-  samsung_health_plugin:
+  flutter_samsung_health:
     git:
-      url: https://github.com/your-org/samsung_health_plugin.git
+      url: https://github.com/diaconn/flutter_samsung_health.git
       ref: main
 ```
 
-> ⚠️ 이 플러그인은 삼성의 `samsung-health-data-1.5.1.aar` 파일을 필요로 하며, 이 파일은 앱 프로젝트에 **직접 포함**해야 합니다.
+> ⚠️ 이 플러그인은 삼성의 `samsung-health-data-1.x.x.aar` 파일을 필요로 하며, 이 파일은 앱 프로젝트에 **직접 포함**해야 합니다.
 
 ---
 
@@ -22,14 +22,14 @@ dependencies:
 
 ### 1. `.aar` 파일 추가
 
-`samsung-health-data-1.5.1.aar` 파일을 다운로드하여 다음 위치에 넣어주세요:
+`samsung-health-data-1.x.x.aar` 파일을 다운로드하여 다음 위치에 넣어주세요:
 
 ```
 my_flutter_app/
 └── android/
     └── app/
         └── libs/
-            └── samsung-health-data-1.5.1.aar
+            └── samsung-health-data-1.x.x.aar
 ```
 
 ### 2. `android/app/build.gradle` 수정
@@ -46,7 +46,7 @@ repositories {
 }
 
 dependencies {
-    implementation(name: 'samsung-health-data-1.5.1', ext: 'aar')
+    implementation(name: 'samsung-health-data-1.x.x', ext: 'aar')
 }
 ```
 
@@ -66,9 +66,9 @@ dependencies {
 Dart 코드에서 플러그인을 사용하려면 다음과 같이 호출하세요:
 
 ```dart
-import 'package:samsung_health_plugin/samsung_health_plugin.dart';
+import 'package:flutter_samsung_health/flutter_samsung_health.dart';
 
-final plugin = SamsungHealthPlugin();
+final plugin = FutterSamsungHealth();
 await plugin.connect();
 
 ```
