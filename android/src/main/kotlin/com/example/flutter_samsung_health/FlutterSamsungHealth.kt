@@ -6,16 +6,7 @@ import android.util.Log
 import com.samsung.android.sdk.healthdata.HealthConnectionErrorResult
 import com.samsung.android.sdk.healthdata.HealthConstants
 import com.samsung.android.sdk.healthdata.HealthConstants.Exercise
-import com.samsung.android.sdk.healthdata.HealthConstants.Exercise.CALORIE
-import com.samsung.android.sdk.healthdata.HealthConstants.Exercise.END_TIME
-import com.samsung.android.sdk.healthdata.HealthConstants.Exercise.EXERCISE_TYPE
-import com.samsung.android.sdk.healthdata.HealthConstants.Exercise.START_TIME
-import com.samsung.android.sdk.healthdata.HealthConstants.Exercise.DURATION
-import com.samsung.android.sdk.healthdata.HealthConstants.Exercise.DISTANCE
 import com.samsung.android.sdk.healthdata.HealthConstants.HeartRate
-import com.samsung.android.sdk.healthdata.HealthConstants.HeartRate.END_TIME
-import com.samsung.android.sdk.healthdata.HealthConstants.HeartRate.HEART_RATE
-import com.samsung.android.sdk.healthdata.HealthConstants.HeartRate.START_TIME
 import com.samsung.android.sdk.healthdata.HealthConstants.Sleep
 import com.samsung.android.sdk.healthdata.HealthConstants.SleepStage
 import com.samsung.android.sdk.healthdata.HealthConstants.StepCount
