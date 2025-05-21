@@ -54,8 +54,7 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
     PermissionKey(StepCount.HEALTH_DATA_TYPE, PermissionType.READ),
     PermissionKey(HeartRate.HEALTH_DATA_TYPE, PermissionType.READ),
     PermissionKey(Sleep.HEALTH_DATA_TYPE, PermissionType.READ),
-    PermissionKey(SleepStage.HEALTH_DATA_TYPE, PermissionType.READ),
-    PermissionKey(Nutrition.HEALTH_DATA_TYPE, PermissionType.READ)
+    PermissionKey(SleepStage.HEALTH_DATA_TYPE, PermissionType.READ)
   )
   private var activity: Activity? = null
 
