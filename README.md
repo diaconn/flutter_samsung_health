@@ -11,7 +11,7 @@ dependencies:
   flutter_samsung_health:
     git:
       url: https://github.com/diaconn/flutter_samsung_health.git
-      ref: main
+      ref: master
 ```
 
 > ⚠️ 이 플러그인은 삼성의 `samsung-health-data-1.x.x.aar` 파일을 필요로 하며, 이 파일은 앱 프로젝트에 **직접 포함**해야 합니다.
