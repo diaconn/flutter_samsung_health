@@ -1,4 +1,4 @@
-name: samsung_health_plugin
+name: flutter_samsung_health
 description: "A new Flutter plugin project."
 version: 0.0.1
 homepage:
@@ -35,8 +35,8 @@ flutter:
   plugin:
     platforms:
       android:
-        package: com.example.samsung_health_plugin
-        pluginClass: SamsungHealthPlugin
+        package: com.example.flutter_samsung_health
+        pluginClass: FlutterSamsungHealth
 
   # To add assets to your plugin package, add an assets section, like this:
   # assets:

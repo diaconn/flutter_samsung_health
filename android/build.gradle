@@ -1,4 +1,4 @@
-group = "com.example.samsung_health_plugin"
+group = "com.example.flutter_samsung_health"
 version = "1.0-SNAPSHOT"
 
 buildscript {
@@ -28,7 +28,7 @@ apply plugin: "com.android.library"
 apply plugin: "kotlin-android"
 
 android {
-    namespace = "com.example.samsung_health_plugin"
+    namespace = "com.example.flutter_samsung_health"
 
     compileSdk = 34
 

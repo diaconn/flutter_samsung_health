@@ -1,24 +1,24 @@
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
-import 'samsung_health_plugin_method_channel.dart';
+import 'flutter_samsung_health_method_channel.dart';
 
-abstract class SamsungHealthPluginPlatform extends PlatformInterface {
+abstract class FlutterSamsungHealthPlatform extends PlatformInterface {
   /// Constructs a SamsungHealthPluginPlatform.
-  SamsungHealthPluginPlatform() : super(token: _token);
+  FlutterSamsungHealthPlatform() : super(token: _token);
 
   static final Object _token = Object();
 
-  static SamsungHealthPluginPlatform _instance = MethodChannelSamsungHealthPlugin();
+  static FlutterSamsungHealthPlatform _instance = MethodChannelFlutterSamsungHealth();
 
-  /// The default instance of [SamsungHealthPluginPlatform] to use.
+  /// The default instance of [FlutterSamsungHealthPlatform] to use.
   ///
-  /// Defaults to [MethodChannelSamsungHealthPlugin].
-  static SamsungHealthPluginPlatform get instance => _instance;
+  /// Defaults to [MethodChannelFlutterSamsungHealth].
+  static FlutterSamsungHealthPlatform get instance => _instance;
 
   /// Platform-specific implementations should set this with their own
-  /// platform-specific class that extends [SamsungHealthPluginPlatform] when
+  /// platform-specific class that extends [FlutterSamsungHealthPlatform] when
   /// they register themselves.
-  static set instance(SamsungHealthPluginPlatform instance) {
+  static set instance(FlutterSamsungHealthPlatform instance) {
     PlatformInterface.verifyToken(instance, _token);
     _instance = instance;
   }

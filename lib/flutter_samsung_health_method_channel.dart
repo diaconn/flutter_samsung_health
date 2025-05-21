@@ -1,13 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-import 'samsung_health_plugin_platform_interface.dart';
+import 'flutter_samsung_health_platform_interface.dart';
 
-/// An implementation of [SamsungHealthPluginPlatform] that uses method channels.
-class MethodChannelSamsungHealthPlugin extends SamsungHealthPluginPlatform {
+/// An implementation of [FlutterSamsungHealthPlatform] that uses method channels.
+class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
   /// The method channel used to interact with the native platform.
   @visibleForTesting
-  final methodChannel = const MethodChannel('samsung_health_plugin');
+  final methodChannel = const MethodChannel('flutter_samsung_health');
 
   /// 삼성 헬스 연결
   @override

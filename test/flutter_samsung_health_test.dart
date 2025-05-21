@@ -1,9 +1,9 @@
+import 'package:flutter_samsung_health/flutter_samsung_health_method_channel.dart';
+import 'package:flutter_samsung_health/flutter_samsung_health_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
-import 'package:samsung_health_plugin/samsung_health_plugin_method_channel.dart';
-import 'package:samsung_health_plugin/samsung_health_plugin_platform_interface.dart';
 
-class MockSamsungHealthPluginPlatform with MockPlatformInterfaceMixin implements SamsungHealthPluginPlatform {
+class MockSamsungHealthPluginPlatform with MockPlatformInterfaceMixin implements FlutterSamsungHealthPlatform {
   @override
   Future<List<Map<String, dynamic>>> getHeartRate5minSeries(int start, int end) {
     // TODO: implement getHeartRate5minSeries
@@ -42,9 +42,9 @@ class MockSamsungHealthPluginPlatform with MockPlatformInterfaceMixin implements
 }
 
 void main() {
-  final SamsungHealthPluginPlatform initialPlatform = SamsungHealthPluginPlatform.instance;
+  final FlutterSamsungHealthPlatform initialPlatform = FlutterSamsungHealthPlatform.instance;
 
-  test('$MethodChannelSamsungHealthPlugin is the default instance', () {
-    expect(initialPlatform, isInstanceOf<MethodChannelSamsungHealthPlugin>());
+  test('$MethodChannelFlutterSamsungHealth is the default instance', () {
+    expect(initialPlatform, isInstanceOf<MethodChannelFlutterSamsungHealth>());
   });
 }

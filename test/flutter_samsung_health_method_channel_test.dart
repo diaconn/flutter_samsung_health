@@ -1,12 +1,12 @@
 import 'package:flutter/services.dart';
+import 'package:flutter_samsung_health/flutter_samsung_health_method_channel.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:samsung_health_plugin/samsung_health_plugin_method_channel.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  MethodChannelSamsungHealthPlugin platform = MethodChannelSamsungHealthPlugin();
-  const MethodChannel channel = MethodChannel('samsung_health_plugin');
+  MethodChannelFlutterSamsungHealth platform = MethodChannelFlutterSamsungHealth();
+  const MethodChannel channel = MethodChannel('flutter_samsung_health');
 
   setUp(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(

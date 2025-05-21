@@ -1,9 +1,9 @@
-import 'samsung_health_plugin_platform_interface.dart';
+import 'flutter_samsung_health_platform_interface.dart';
 
-class SamsungHealthPlugin {
+class FlutterSamsungHealth {
   /// 삼성 헬스 SDK 연결
   Future<Map<String, dynamic>> connect() {
-    return SamsungHealthPluginPlatform.instance.connect();
+    return FlutterSamsungHealthPlatform.instance.connect();
   }
 
   /// 심박수 조회(5분 평균)
@@ -11,7 +11,7 @@ class SamsungHealthPlugin {
     required int start,
     required int end,
   }) {
-    return SamsungHealthPluginPlatform.instance.getHeartRate5minSeries(start, end);
+    return FlutterSamsungHealthPlatform.instance.getHeartRate5minSeries(start, end);
   }
 
   /// 운동 세션 조회
@@ -19,7 +19,7 @@ class SamsungHealthPlugin {
     required int start,
     required int end,
   }) {
-    return SamsungHealthPluginPlatform.instance.getExerciseSessions(start, end);
+    return FlutterSamsungHealthPlatform.instance.getExerciseSessions(start, end);
   }
 
   /// 걸음수 조회(5분 누적)
@@ -27,7 +27,7 @@ class SamsungHealthPlugin {
     required int start,
     required int end,
   }) {
-    return SamsungHealthPluginPlatform.instance.getStepCountSeries(start, end);
+    return FlutterSamsungHealthPlatform.instance.getStepCountSeries(start, end);
   }
 
   /// 수면 정보 조회
@@ -35,7 +35,7 @@ class SamsungHealthPlugin {
     required int start,
     required int end,
   }) {
-    return SamsungHealthPluginPlatform.instance.getSleepData(start, end);
+    return FlutterSamsungHealthPlatform.instance.getSleepData(start, end);
   }
 
   /// 식사 영양소 정보 조회
@@ -43,6 +43,6 @@ class SamsungHealthPlugin {
     required int start,
     required int end,
   }) {
-    return SamsungHealthPluginPlatform.instance.getNutritionData(start, end);
+    return FlutterSamsungHealthPlatform.instance.getNutritionData(start, end);
   }
 }

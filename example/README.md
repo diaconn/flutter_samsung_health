@@ -1,6 +1,6 @@
-# samsung_health_plugin_example
+# flutter_samsung_health_example
 
-Demonstrates how to use the samsung_health_plugin plugin.
+Demonstrates how to use the flutter_samsung_health plugin.
 
 ## Getting Started
 

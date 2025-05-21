@@ -1,4 +1,4 @@
-package com.example.samsung_health_plugin
+package com.example.flutter_samsung_health
 
 import android.app.Activity
 import android.content.Context
@@ -39,15 +39,15 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
 
-/** SamsungHealthPlugin */
-class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
+/** FlutterSamsungHealth */
+class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
   /// The MethodChannel that will the communication between Flutter and native Android
   ///
   /// This local reference serves to register the plugin with the Flutter Engine and unregister it
   /// when the Flutter Engine is detached from the Activity
   private lateinit var channel : MethodChannel
   private lateinit var context: Context
-  private val APP_TAG : String = "SamsungHealthPlugin"
+  private val APP_TAG : String = "FlutterSamsungHealth"
   private lateinit var mStore : HealthDataStore
   private val permissions = setOf(
     PermissionKey(Exercise.HEALTH_DATA_TYPE, PermissionType.READ),
@@ -61,7 +61,7 @@ class SamsungHealthPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
 
   override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
     context = flutterPluginBinding.applicationContext
-    channel = MethodChannel(flutterPluginBinding.binaryMessenger, "samsung_health_plugin")
+    channel = MethodChannel(flutterPluginBinding.binaryMessenger, "flutter_samsung_health")
     channel.setMethodCallHandler(this)
   }
 

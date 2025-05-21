@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:samsung_health_plugin/samsung_health_plugin.dart';
+import 'package:flutter_samsung_health/flutter_samsung_health.dart';
 
 void main() {
   runApp(const MyApp());
@@ -17,7 +17,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   String _connectState = 'Not Connected';
-  final _samsungHealthPlugin = SamsungHealthPlugin();
+  final _flutterSamsungHealth = FlutterSamsungHealth();
 
   @override
   void initState() {
@@ -31,7 +31,7 @@ class _MyAppState extends State<MyApp> {
     // Platform messages may fail, so we use a try/catch PlatformException.
     // We also handle the message potentially returning null.
     try {
-      var result = await _samsungHealthPlugin.connect();
+      var result = await _flutterSamsungHealth.connect();
       var isConnect = result["isConnect"];
       connectState = isConnect ? "Connected" : "Not Connected";
     } on PlatformException {
