@@ -63,27 +63,70 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
       "getHeartRate5minSeries" -> {
         val start = call.argument<Long>("start")!!
         val end = call.argument<Long>("end")!!
-        getHeartRate5minSeries(start, end, result)
+        val permission = PermissionKey(HeartRate.HEALTH_DATA_TYPE, PermissionType.READ)
+        checkPermissionAndExecute(permission,
+          onGranted = {
+            getHeartRate5minSeries(start, end, result)
+          },
+          onDenied = {
+            requestPermission(result)
+          }
+        )
       }
       "getExerciseSessions" -> {
         val start = call.argument<Long>("start")!!
         val end = call.argument<Long>("end")!!
-        getExerciseData(start, end, result)
+        val permission = PermissionKey(Exercise.HEALTH_DATA_TYPE, PermissionType.READ)
+        checkPermissionAndExecute(permission,
+          onGranted = {
+            getExerciseData(start, end, result)
+          },
+          onDenied = {
+            requestPermission(result)
+          }
+        )
       }
       "getStepCountSeries" -> {
         val start = call.argument<Long>("start")!!
         val end = call.argument<Long>("end")!!
-        getStepCountData(start, end, result)
+        val permission = PermissionKey(StepCount.HEALTH_DATA_TYPE, PermissionType.READ)
+        checkPermissionAndExecute(permission,
+          onGranted = {
+            getStepCountData(start, end, result)
+          },
+          onDenied = {
+            requestPermission(result)
+          }
+        )
       }
       "getSleepData" -> {
         val start = call.argument<Long>("start")!!
         val end = call.argument<Long>("end")!!
         getSleepData(start, end, result)
+        val permission = PermissionKey(Sleep.HEALTH_DATA_TYPE, PermissionType.READ)
+        checkPermissionAndExecute(permission,
+          onGranted = {
+            getExerciseData(start, end, result)
+          },
+          onDenied = {
+            requestPermission(result)
+            //result.error("PERMISSION_DENIED", "수면 권한이 없습니다.", null)
+          }
+        )
       }
       "getNutritionData" -> {
         val start = call.argument<Long>("start")!!
         val end = call.argument<Long>("end")!!
-        getNutritionData(start, end, result)
+        val permission = PermissionKey(Exercise.HEALTH_DATA_TYPE, PermissionType.READ)
+        checkPermissionAndExecute(permission,
+          onGranted = {
+            getNutritionData(start, end, result)
+          },
+          onDenied = {
+            requestPermission(result)
+//            result.error("PERMISSION_DENIED", "심박수 권한이 없습니다.", null)
+          }
+        )
       }
       else -> result.notImplemented()
     }
@@ -102,9 +145,9 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
     mStore = HealthDataStore(context, object : HealthDataStore.ConnectionListener {
       override fun onConnected() {
         Log.d(APP_TAG, "삼성 헬스 연결 성공")
-        if (!isPermissionAcquired(result)) {
-          requestPermission(result)
-        }
+//        if (!isPermissionAcquired(result)) {
+//          requestPermission(result)
+//        }
         resultMap.put("isConnect", true)
         result.success(resultMap)
       }
@@ -172,9 +215,7 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
    */
   private fun getHeartRate5minSeries(start: Long, end: Long, result: MethodChannel.Result) {
     Log.d(APP_TAG, "getHeartRate5minSeries 호출")
-
     val resolver = HealthDataResolver(mStore, null)
-
     val request: AggregateRequest = AggregateRequest.Builder()
       .setDataType(HealthConstants.HeartRate.HEALTH_DATA_TYPE)
       .addFunction(AggregateFunction.AVG, HealthConstants.HeartRate.HEART_RATE, "avg_hr")
@@ -187,8 +228,6 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
       Log.d(APP_TAG, "5분 단위 집계 결과 수: ${readResult.count}")
       val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
       sdf.timeZone = TimeZone.getDefault() // 또는 "UTC"로 설정
-
-
       val heartRateList = mutableListOf<Map<String, Any>>()  // <timestamp, avg_hr>
       for (data in readResult) {
         val avgHr = data.getFloat("avg_hr").toDouble()
@@ -268,7 +307,6 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
   private fun getStepCountData(start: Long, end: Long, result: MethodChannel.Result) {
     val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
     sdf.timeZone = TimeZone.getDefault() // 또는 "UTC"로 설정
-
     val request: AggregateRequest = AggregateRequest.Builder()
       .setDataType(StepCount.HEALTH_DATA_TYPE)
       .addFunction(AggregateFunction.SUM, StepCount.COUNT, "total_step")
@@ -276,10 +314,8 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
       .setTimeGroup(AggregateRequest.TimeGroupUnit.MINUTELY, 5, HealthConstants.StepCount.START_TIME, StepCount.TIME_OFFSET, "minute")
       .setSort(HealthConstants.StepCount.START_TIME, HealthDataResolver.SortOrder.DESC)
       .build()
-
     val resolver = HealthDataResolver(mStore, null)
     val hourlyStepList = mutableListOf<Map<String, Any>>()
-
     resolver.aggregate(request).setResultListener { dataResult ->
       for (data in dataResult) {
         val timeStr = data.getString("minute") ?: continue// "yyyy-MM-dd HH:min" 형식의 문자열
@@ -314,10 +350,8 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
         ))
       .setSort(HealthConstants.SleepStage.START_TIME, HealthDataResolver.SortOrder.DESC)
       .build()
-
     val resolver = HealthDataResolver(mStore, null)
     val sleepList = mutableListOf<Map<String, Any>>()
-
     resolver.read(request).setResultListener { dataResult ->
       for (data in dataResult) {
         sleepList.add(
@@ -419,6 +453,26 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
   override fun onDetachedFromActivityForConfigChanges() {
     activity = null
   }
+
+  private fun checkPermissionAndExecute(
+    permissionKey: PermissionKey,
+    onGranted: () -> Unit,
+    onDenied: () -> Unit
+  ) {
+    val permissionManager = HealthPermissionManager(mStore)
+    try {
+      val resultMap = permissionManager.isPermissionAcquired(setOf(permissionKey))
+      if (resultMap[permissionKey] == true) {
+        onGranted()
+      } else {
+        onDenied()
+      }
+    } catch (e: Exception) {
+      Log.e(APP_TAG, "권한 확인 중 오류", e)
+      onDenied()
+    }
+  }
+
 }
 
 object ExerciseTypeMapper {
