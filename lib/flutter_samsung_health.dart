@@ -14,6 +14,14 @@ class FlutterSamsungHealth {
     return FlutterSamsungHealthPlatform.instance.getHeartRate5minSeries(start, end);
   }
 
+  /// 심박수 조회(5분 평균)
+  Future<List<Map<String, dynamic>>> getHeartRateData({
+    required int start,
+    required int end,
+  }) {
+    return FlutterSamsungHealthPlatform.instance.getHeartRateData(start, end);
+  }
+
   /// 운동 세션 조회
   Future<List<Map<String, dynamic>>> getExerciseSessions({
     required int start,

@@ -39,6 +39,12 @@ class MockSamsungHealthPluginPlatform with MockPlatformInterfaceMixin implements
     // TODO: implement getNutritionData
     throw UnimplementedError();
   }
+
+  @override
+  Future<List<Map<String, dynamic>>> getHeartRateData(int start, int end) {
+    // TODO: implement getHeartRateData
+    throw UnimplementedError();
+  }
 }
 
 void main() {

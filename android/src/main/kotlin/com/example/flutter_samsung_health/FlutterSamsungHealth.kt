@@ -73,6 +73,19 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
           }
         )
       }
+      "getHeartRateData" -> {
+        val start = call.argument<Long>("start")!!
+        val end = call.argument<Long>("end")!!
+        val permission = PermissionKey(HeartRate.HEALTH_DATA_TYPE, PermissionType.READ)
+        checkPermissionAndExecute(permission,
+          onGranted = {
+            getHeartRateData(start, end, result)
+          },
+          onDenied = {
+            requestPermission(result)
+          }
+        )
+      }
       "getExerciseSessions" -> {
         val start = call.argument<Long>("start")!!
         val end = call.argument<Long>("end")!!
@@ -106,7 +119,7 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
         val permission = PermissionKey(Sleep.HEALTH_DATA_TYPE, PermissionType.READ)
         checkPermissionAndExecute(permission,
           onGranted = {
-            getExerciseData(start, end, result)
+            getSleepData(start, end, result)
           },
           onDenied = {
             requestPermission(result)
@@ -246,6 +259,51 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
   }
 
   /**
+   * 심박수 일반 요청
+   */
+  private fun getHeartRateData(start: Long, end: Long, result: MethodChannel.Result) {
+    Log.d(APP_TAG, "getHeartRateData 호출")
+    val heartRateRequest = ReadRequest.Builder()
+      .setDataType(HealthConstants.HeartRate.HEALTH_DATA_TYPE)
+      .setLocalTimeRange(HealthConstants.HeartRate.START_TIME, HealthConstants.HeartRate.TIME_OFFSET, start, end)
+      .setSort(HealthConstants.HeartRate.START_TIME, HealthDataResolver.SortOrder.DESC)
+      .setProperties(
+        arrayOf(
+          HealthConstants.HeartRate.START_TIME,
+          HealthConstants.HeartRate.END_TIME,
+          HealthConstants.HeartRate.TIME_OFFSET,
+          HealthConstants.HeartRate.HEART_RATE,
+          HealthConstants.HeartRate.HEART_BEAT_COUNT,
+          HealthConstants.HeartRate.MIN,
+          HealthConstants.HeartRate.MAX,
+          HealthConstants.HeartRate.BINNING_DATA
+        ))
+      .build()
+
+    val resolver = HealthDataResolver(mStore, null)
+    resolver.read(heartRateRequest).setResultListener { readResult ->
+      Log.d(APP_TAG, "심박 요청 결과 수: ${readResult.count}")
+      val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+      sdf.timeZone = TimeZone.getDefault() // 또는 "UTC"로 설정
+      val heartRateList = mutableListOf<Map<String, Any>>()  // <timestamp, avg_hr>
+      for (data in readResult) {
+        heartRateList.add(
+          mapOf(
+            "start_time" to data.getLong(HealthConstants.HeartRate.START_TIME),
+            "end_time" to data.getLong(HealthConstants.HeartRate.END_TIME),
+            "time_offset" to data.getLong(HealthConstants.HeartRate.TIME_OFFSET),
+            "heart_rate" to data.getFloat(HealthConstants.HeartRate.HEART_RATE),
+            "heart_beat_count" to data.getLong(HealthConstants.HeartRate.HEART_BEAT_COUNT),
+            "min" to data.getFloat(HealthConstants.HeartRate.MIN),
+            "max" to data.getFloat(HealthConstants.HeartRate.MAX)
+          )
+        )
+      }
+      result.success(heartRateList)
+    }
+  }
+
+  /**
    * 운동조회
    */
   private fun getExerciseData(start: Long, end: Long, result: MethodChannel.Result) {
@@ -361,7 +419,7 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
             "time_offset" to data.getLong(HealthConstants.SleepStage.TIME_OFFSET),
             "sleep_id" to data.getString(HealthConstants.SleepStage.SLEEP_ID),
             "stage" to data.getInt(HealthConstants.SleepStage.STAGE),
-            "exercise_type_name" to SleepTypeMapper.getName(data.getInt(HealthConstants.SleepStage.STAGE))
+            "stage_type_name" to SleepTypeMapper.getName(data.getInt(HealthConstants.SleepStage.STAGE))
           )
         )
       }
