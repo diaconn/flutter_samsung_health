@@ -115,7 +115,6 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
       "getSleepData" -> {
         val start = call.argument<Long>("start")!!
         val end = call.argument<Long>("end")!!
-        getSleepData(start, end, result)
         val permission = PermissionKey(Sleep.HEALTH_DATA_TYPE, PermissionType.READ)
         checkPermissionAndExecute(permission,
           onGranted = {
