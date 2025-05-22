@@ -398,6 +398,7 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
   private fun getSleepData(start: Long, end: Long, result: MethodChannel.Result) {
     val request = ReadRequest.Builder()
       .setDataType(SleepStage.HEALTH_DATA_TYPE)
+      .setLocalTimeRange(StepCount.START_TIME, StepCount.TIME_OFFSET, start, end)
       .setProperties(
         arrayOf(
           HealthConstants.SleepStage.START_TIME,
