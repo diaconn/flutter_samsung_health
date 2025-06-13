@@ -129,7 +129,7 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
       "getNutritionData" -> {
         val start = call.argument<Long>("start")!!
         val end = call.argument<Long>("end")!!
-        val permission = PermissionKey(Exercise.HEALTH_DATA_TYPE, PermissionType.READ)
+        val permission = PermissionKey(Nutrition.HEALTH_DATA_TYPE, PermissionType.READ)
         checkPermissionAndExecute(permission,
           onGranted = {
             getNutritionData(start, end, result)
