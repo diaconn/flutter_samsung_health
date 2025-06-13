@@ -344,7 +344,7 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
             "start_time" to it.getLong(HealthConstants.Exercise.START_TIME),
             "end_time" to it.getLong(HealthConstants.Exercise.END_TIME),
             "duration" to it.getLong(HealthConstants.Exercise.DURATION),
-            "distance" to it.getLong(HealthConstants.Exercise.DISTANCE),
+            "distance" to it.getFloat(HealthConstants.Exercise.DISTANCE),
             "calories" to it.getFloat(HealthConstants.Exercise.CALORIE),
             "max_heart_rate" to it.getFloat(HealthConstants.Exercise.MAX_HEART_RATE),
             "mean_heart_rate" to it.getFloat(HealthConstants.Exercise.MEAN_HEART_RATE),
@@ -367,6 +367,9 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
     val request: AggregateRequest = AggregateRequest.Builder()
       .setDataType(StepCount.HEALTH_DATA_TYPE)
       .addFunction(AggregateFunction.SUM, StepCount.COUNT, "total_step")
+      .addFunction(AggregateFunction.SUM, StepCount.CALORIE, "total_calorie")
+      .addFunction(AggregateFunction.SUM, StepCount.DISTANCE, "total_distance")
+      .addFunction(AggregateFunction.AVG, StepCount.SPEED, "avg_speed")
       .setLocalTimeRange(StepCount.START_TIME, StepCount.TIME_OFFSET, start, end)
       .setTimeGroup(AggregateRequest.TimeGroupUnit.MINUTELY, 5, HealthConstants.StepCount.START_TIME, StepCount.TIME_OFFSET, "minute")
       .setSort(HealthConstants.StepCount.START_TIME, HealthDataResolver.SortOrder.DESC)
@@ -392,12 +395,12 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
   }
 
   /**
-   * 수면정보 조회
+   * 수면단계정보 조회
    */
-  private fun getSleepData(start: Long, end: Long, result: MethodChannel.Result) {
+  private fun getSleepStageData(start: Long, end: Long, result: MethodChannel.Result) {
     val request = ReadRequest.Builder()
       .setDataType(SleepStage.HEALTH_DATA_TYPE)
-      .setLocalTimeRange(StepCount.START_TIME, StepCount.TIME_OFFSET, start, end)
+      .setLocalTimeRange(SleepStage.START_TIME, SleepStage.TIME_OFFSET, start, end)
       .setProperties(
         arrayOf(
           HealthConstants.SleepStage.START_TIME,
@@ -420,6 +423,39 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
             "sleep_id" to data.getString(HealthConstants.SleepStage.SLEEP_ID),
             "stage" to data.getInt(HealthConstants.SleepStage.STAGE),
             "stage_type_name" to SleepTypeMapper.getName(data.getInt(HealthConstants.SleepStage.STAGE))
+          )
+        )
+      }
+      result.success(sleepList)
+    }
+  }
+
+  /**
+   * 수면정보 조회
+   */
+  private fun getSleepData(start: Long, end: Long, result: MethodChannel.Result) {
+    val request = ReadRequest.Builder()
+      .setDataType(Sleep.HEALTH_DATA_TYPE)
+      .setLocalTimeRange(Sleep.START_TIME, Sleep.TIME_OFFSET, start, end)
+      .setProperties(
+        arrayOf(
+          HealthConstants.Sleep.UUID,
+          HealthConstants.Sleep.START_TIME,
+          HealthConstants.Sleep.END_TIME,
+          HealthConstants.Sleep.TIME_OFFSET,
+        ))
+      .setSort(HealthConstants.Sleep.START_TIME, HealthDataResolver.SortOrder.DESC)
+      .build()
+    val resolver = HealthDataResolver(mStore, null)
+    val sleepList = mutableListOf<Map<String, Any>>()
+    resolver.read(request).setResultListener { dataResult ->
+      for (data in dataResult) {
+        sleepList.add(
+          mapOf(
+            "id" to data.getLong(HealthConstants.Sleep.UUID),
+            "start_time" to data.getLong(HealthConstants.Sleep.START_TIME),
+            "end_time" to data.getLong(HealthConstants.Sleep.END_TIME),
+            "time_offset" to data.getLong(HealthConstants.Sleep.TIME_OFFSET),
           )
         )
       }

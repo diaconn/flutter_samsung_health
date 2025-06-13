@@ -87,4 +87,15 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
         .map((item) => Map<String, dynamic>.from((item as Map).map((key, value) => MapEntry(key.toString(), value))))
         .toList();
   }
+
+  @override
+  Future<List<Map<String, dynamic>>> getSleepStageData(int start, int end) async {
+    final result = await methodChannel.invokeMethod<List>('getSleepStageData', {
+      'start': start,
+      'end': end,
+    });
+    return (result ?? [])
+        .map((item) => Map<String, dynamic>.from((item as Map).map((key, value) => MapEntry(key.toString(), value))))
+        .toList();
+  }
 }

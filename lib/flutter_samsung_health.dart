@@ -46,6 +46,14 @@ class FlutterSamsungHealth {
     return FlutterSamsungHealthPlatform.instance.getSleepData(start, end);
   }
 
+  /// 수면 단계 정보 조회
+  Future<List<Map<String, dynamic>>> getSleepStageData({
+    required int start,
+    required int end,
+  }) {
+    return FlutterSamsungHealthPlatform.instance.getSleepStageData(start, end);
+  }
+
   /// 식사 영양소 정보 조회
   Future<List<Map<String, dynamic>>> getNutritionData({
     required int start,
