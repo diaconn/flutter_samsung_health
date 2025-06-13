@@ -379,7 +379,7 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
     resolver.aggregate(request).setResultListener { dataResult ->
       for (data in dataResult) {
         val timeStr = data.getString("minute") ?: continue// "yyyy-MM-dd HH:min" 형식의 문자열
-        val step = data.getInt("total_step")
+        val steps = data.getInt("total_step")
         val calorie = data.getFloat("total_calorie")
         val distance = data.getFloat("total_distance")
         val speed = data.getFloat("avg_speed")
