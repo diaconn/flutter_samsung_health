@@ -379,7 +379,10 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
     resolver.aggregate(request).setResultListener { dataResult ->
       for (data in dataResult) {
         val timeStr = data.getString("minute") ?: continue// "yyyy-MM-dd HH:min" 형식의 문자열
-        val steps = data.getInt("total_step")
+        val step = data.getInt("total_step")
+        val calorie = data.getFloat("total_calorie")
+        val distance = data.getFloat("total_distance")
+        val speed = data.getFloat("avg_speed")
         val timestamp = try {
           sdf.parse(timeStr)?.time ?: continue
         } catch (e: Exception) {
@@ -388,7 +391,7 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
         }
         // 수정된 방식 (Flutter에서 이해 가능한 구조로 변환)
         Log.d(APP_TAG, "5분 누적 데이터 → 시간: $timestamp ($timeStr), 누적 걸음수: $steps")
-        hourlyStepList.add(mapOf("timestamp" to timestamp, "time_str" to timeStr, "steps" to steps))
+        hourlyStepList.add(mapOf("timestamp" to timestamp, "time_str" to timeStr, "steps" to steps, "calorie" to calorie, "distance" to distance, "speed" to speed))
       }
       result.success(hourlyStepList)
     }
