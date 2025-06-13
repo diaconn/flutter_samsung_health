@@ -79,7 +79,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
   /// 식사 영양소 조회
   @override
   Future<List<Map<String, dynamic>>> getNutritionData(int start, int end) async {
-    final result = await methodChannel.invokeMethod<List>('getNutrition', {
+    final result = await methodChannel.invokeMethod<List>('getNutritionData', {
       'start': start,
       'end': end,
     });
