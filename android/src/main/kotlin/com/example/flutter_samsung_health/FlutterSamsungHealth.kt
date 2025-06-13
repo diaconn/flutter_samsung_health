@@ -39,14 +39,6 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
   private lateinit var context: Context
   private val APP_TAG : String = "FlutterSamsungHealth"
   private lateinit var mStore : HealthDataStore
-  private val permissions = setOf(
-    PermissionKey(Exercise.HEALTH_DATA_TYPE, PermissionType.READ),
-    PermissionKey(StepCount.HEALTH_DATA_TYPE, PermissionType.READ),
-    PermissionKey(HeartRate.HEALTH_DATA_TYPE, PermissionType.READ),
-    PermissionKey(Sleep.HEALTH_DATA_TYPE, PermissionType.READ),
-    PermissionKey(SleepStage.HEALTH_DATA_TYPE, PermissionType.READ),
-    PermissionKey(Nutrition.HEALTH_DATA_TYPE, PermissionType.READ)
-  )
   private var activity: Activity? = null
 
   override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
@@ -70,7 +62,7 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
             getHeartRate5minSeries(start, end, result)
           },
           onDenied = {
-            requestPermission(result)
+            requestPermission(result, permission)
           }
         )
       }
@@ -83,7 +75,7 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
             getHeartRateData(start, end, result)
           },
           onDenied = {
-            requestPermission(result)
+            requestPermission(result, permission)
           }
         )
       }
@@ -96,7 +88,7 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
             getExerciseData(start, end, result)
           },
           onDenied = {
-            requestPermission(result)
+            requestPermission(result, permission)
           }
         )
       }
@@ -109,7 +101,7 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
             getStepCountData(start, end, result)
           },
           onDenied = {
-            requestPermission(result)
+            requestPermission(result, permission)
           }
         )
       }
@@ -122,7 +114,7 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
             getSleepData(start, end, result)
           },
           onDenied = {
-            requestPermission(result)
+            requestPermission(result, permission)
             //result.error("PERMISSION_DENIED", "수면 권한이 없습니다.", null)
           }
         )
@@ -136,7 +128,7 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
             getNutritionData(start, end, result)
           },
           onDenied = {
-            requestPermission(result)
+            requestPermission(result, permission)
 //            result.error("PERMISSION_DENIED", "심박수 권한이 없습니다.", null)
           }
         )
@@ -181,28 +173,12 @@ class FlutterSamsungHealth: FlutterPlugin, MethodCallHandler, ActivityAware {
     mStore.connectService()
   }
 
-  private fun isPermissionAcquired(result: MethodChannel.Result): Boolean {
-    val pmsManager = HealthPermissionManager(mStore)
-    return try {
-      // Check whether the permissions that this application needs are acquired
-      Log.d(APP_TAG, "permissions. $permissions")
-      val resultMap: Map<PermissionKey, Boolean> = pmsManager.isPermissionAcquired(permissions)
-      Log.d(APP_TAG, "isPermissionAcquired. $resultMap")
-
-      !resultMap.containsValue(false)
-
-    } catch (e: Exception) {
-      Log.d(APP_TAG, "Permission request fails. $e")
-      false
-    }
-  }
-
-  private fun requestPermission(result: MethodChannel.Result) {
+  private fun requestPermission(result: MethodChannel.Result, permissionKey: PermissionKey) {
     val pmsManager = HealthPermissionManager(mStore)
     try {
       Log.d(APP_TAG, "삼성헬스 권한요청 시작 ")
       // Show user permission UI for allowing user to change options
-      pmsManager.requestPermissions(permissions, activity!!).setResultListener({ res ->
+      pmsManager.requestPermissions(setOf(permissionKey), activity!!).setResultListener({ res ->
         val resultMap: Map<PermissionKey, Boolean> = res.resultMap
         if (resultMap.containsValue(false)) {
           Log.d(APP_TAG, "일부 권한 거부됨: $resultMap")
