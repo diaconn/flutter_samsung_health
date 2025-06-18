@@ -4,15 +4,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 class MockSamsungHealthPluginPlatform with MockPlatformInterfaceMixin implements FlutterSamsungHealthPlatform {
-  @override
-  Future<List<Map<String, dynamic>>> getHeartRate5minSeries(int start, int end) {
-    // TODO: implement getHeartRate5minSeries
-    throw UnimplementedError();
-  }
 
   @override
   Future<Map<String, dynamic>> connect() {
     // TODO: implement connect
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<Map<String, List<Map<String, dynamic>>>> getTotalData(int start, int end) {
+    // TODO: implement getTotalData
     throw UnimplementedError();
   }
 
@@ -23,8 +24,25 @@ class MockSamsungHealthPluginPlatform with MockPlatformInterfaceMixin implements
   }
 
   @override
+  Future<List<Map<String, dynamic>>> getHeartRateData(int start, int end) {
+    // TODO: implement getHeartRateData
+    throw UnimplementedError();
+  }
+  @override
+  Future<List<Map<String, dynamic>>> getHeartRate5minSeries(int start, int end) {
+    // TODO: implement getHeartRate5minSeries
+    throw UnimplementedError();
+  }
+
+  @override
   Future<List<Map<String, dynamic>>> getSleepData(int start, int end) {
     // TODO: implement getSleepData
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getSleepStageData(int start, int end) {
+    // TODO: implement getSleepStageData
     throw UnimplementedError();
   }
 
@@ -37,18 +55,6 @@ class MockSamsungHealthPluginPlatform with MockPlatformInterfaceMixin implements
   @override
   Future<List<Map<String, dynamic>>> getNutritionData(int start, int end) {
     // TODO: implement getNutritionData
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<List<Map<String, dynamic>>> getHeartRateData(int start, int end) {
-    // TODO: implement getHeartRateData
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<List<Map<String, dynamic>>> getSleepStageData(int start, int end) {
-    // TODO: implement getSleepStageData
     throw UnimplementedError();
   }
 }

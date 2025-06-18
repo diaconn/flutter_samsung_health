@@ -26,23 +26,26 @@ abstract class FlutterSamsungHealthPlatform extends PlatformInterface {
   ///  연결 (권한 확인 및 요청)
   Future<Map<String, dynamic>> connect();
 
-  /// 5분 심박
-  Future<List<Map<String, dynamic>>> getHeartRate5minSeries(int start, int end);
-
-  /// 심박 조회
-  Future<List<Map<String, dynamic>>> getHeartRateData(int start, int end);
+  /// 전체 데이터
+  Future<Map<String, List<Map<String, dynamic>>>> getTotalData(int start, int end);
 
   /// 운동
   Future<List<Map<String, dynamic>>> getExerciseSessions(int start, int end);
 
-  /// 걷기 수
-  Future<List<Map<String, dynamic>>> getStepCountSeries(int start, int end);
+  /// 심박
+  Future<List<Map<String, dynamic>>> getHeartRateData(int start, int end);
+
+  /// 5분 심박
+  Future<List<Map<String, dynamic>>> getHeartRate5minSeries(int start, int end);
 
   /// 수면
   Future<List<Map<String, dynamic>>> getSleepData(int start, int end);
 
   /// 수면 단계
   Future<List<Map<String, dynamic>>> getSleepStageData(int start, int end);
+
+  /// 걷기 수
+  Future<List<Map<String, dynamic>>> getStepCountSeries(int start, int end);
 
   /// 식사(영양소) 정보
   Future<List<Map<String, dynamic>>> getNutritionData(int start, int end);
