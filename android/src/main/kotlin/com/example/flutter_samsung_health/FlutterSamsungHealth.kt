@@ -400,7 +400,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     /**
      * 심박수 조회
      */
-    private fun getHeartRateData(start: Long, end: Long, result: MethodChannel.Result) 박{
+    private fun getHeartRateData(start: Long, end: Long, result: MethodChannel.Result) {
         Log.d(APP_TAG, "getHeartRateData 호출")
         val heartRateRequest = ReadRequest.Builder()
             .setDataType(HealthConstants.HeartRate.HEALTH_DATA_TYPE)
