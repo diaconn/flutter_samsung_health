@@ -376,56 +376,57 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
      * 운동 조회
      */
     suspend fun getExerciseDataAsync(start: Long, end: Long): List<Map<String, Any>> =
-        withContext(Dispatchers.Main) {
-            suspendCoroutine { cont ->
-                val request = ReadRequest.Builder()
-                    .setDataType(HealthConstants.Exercise.HEALTH_DATA_TYPE)
-                    .setLocalTimeRange(
+        suspendCoroutine { cont ->
+            Log.d(APP_TAG, "운동데이터 시작")
+            val request = ReadRequest.Builder()
+                .setDataType(HealthConstants.Exercise.HEALTH_DATA_TYPE)
+                .setLocalTimeRange(
+                    HealthConstants.Exercise.START_TIME,
+                    HealthConstants.Exercise.TIME_OFFSET,
+                    start,
+                    end
+                )
+                .setSort(HealthConstants.Exercise.START_TIME, HealthDataResolver.SortOrder.DESC)
+                .setProperties(
+                    arrayOf(
+                        HealthConstants.Exercise.EXERCISE_TYPE,
                         HealthConstants.Exercise.START_TIME,
-                        HealthConstants.Exercise.TIME_OFFSET,
-                        start,
-                        end
+                        HealthConstants.Exercise.END_TIME,
+                        HealthConstants.Exercise.DURATION,
+                        HealthConstants.Exercise.DISTANCE,
+                        HealthConstants.Exercise.CALORIE,
+                        HealthConstants.Exercise.MAX_HEART_RATE,
+                        HealthConstants.Exercise.MEAN_HEART_RATE,
+                        HealthConstants.Exercise.MIN_HEART_RATE,
+                        HealthConstants.Exercise.LIVE_DATA
                     )
-                    .setSort(HealthConstants.Exercise.START_TIME, HealthDataResolver.SortOrder.DESC)
-                    .setProperties(
-                        arrayOf(
-                            HealthConstants.Exercise.EXERCISE_TYPE,
-                            HealthConstants.Exercise.START_TIME,
-                            HealthConstants.Exercise.END_TIME,
-                            HealthConstants.Exercise.DURATION,
-                            HealthConstants.Exercise.DISTANCE,
-                            HealthConstants.Exercise.CALORIE,
-                            HealthConstants.Exercise.MAX_HEART_RATE,
-                            HealthConstants.Exercise.MEAN_HEART_RATE,
-                            HealthConstants.Exercise.MIN_HEART_RATE,
-                            HealthConstants.Exercise.LIVE_DATA
-                        )
-                    )
-                    .build()
+                )
+                .build()
 
-                val resolver = HealthDataResolver(mStore, null)
-                val resultList = mutableListOf<Map<String, Any>>()
-                resolver.read(request).setResultListener { result ->
-                    for (data in result) {
-                        resultList.add(
-                            mapOf(
-                                "exercise_type" to ExerciseTypeMapper.getName(data.getInt(HealthConstants.Exercise.EXERCISE_TYPE)),
-                                "start_time" to data.getLong(HealthConstants.Exercise.START_TIME),
-                                "end_time" to data.getLong(HealthConstants.Exercise.END_TIME),
-                                "duration" to data.getLong(HealthConstants.Exercise.DURATION),
-                                "distance" to data.getFloat(HealthConstants.Exercise.DISTANCE),
-                                "calories" to data.getFloat(HealthConstants.Exercise.CALORIE),
-                                "max_heart_rate" to data.getFloat(HealthConstants.Exercise.MAX_HEART_RATE),
-                                "mean_heart_rate" to data.getFloat(HealthConstants.Exercise.MEAN_HEART_RATE),
-                                "min_heart_rate" to data.getFloat(HealthConstants.Exercise.MIN_HEART_RATE),
-                                "liveData" to data.getString(HealthConstants.Exercise.LIVE_DATA)
-                            )
+            val resolver = HealthDataResolver(mStore, null)
+            val resultList = mutableListOf<Map<String, Any>>()
+            resolver.read(request).setResultListener { result ->
+                for (data in result) {
+                    resultList.add(
+                        mapOf(
+                            "exercise_type" to ExerciseTypeMapper.getName(data.getInt(HealthConstants.Exercise.EXERCISE_TYPE)),
+                            "start_time" to data.getLong(HealthConstants.Exercise.START_TIME),
+                            "end_time" to data.getLong(HealthConstants.Exercise.END_TIME),
+                            "duration" to data.getLong(HealthConstants.Exercise.DURATION),
+                            "distance" to data.getFloat(HealthConstants.Exercise.DISTANCE),
+                            "calories" to data.getFloat(HealthConstants.Exercise.CALORIE),
+                            "max_heart_rate" to data.getFloat(HealthConstants.Exercise.MAX_HEART_RATE),
+                            "mean_heart_rate" to data.getFloat(HealthConstants.Exercise.MEAN_HEART_RATE),
+                            "min_heart_rate" to data.getFloat(HealthConstants.Exercise.MIN_HEART_RATE),
+                            "liveData" to data.getString(HealthConstants.Exercise.LIVE_DATA)
                         )
-                    }
-                    cont.resume(resultList)
+                    )
                 }
+                Log.d(APP_TAG, "운동데이터 종료")
+                cont.resume(resultList)
             }
         }
+
 
     /**
      * 심박수 조회
@@ -433,7 +434,12 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     private fun getHeartRateData(start: Long, end: Long, result: MethodChannel.Result) {
         val heartRateRequest = ReadRequest.Builder()
             .setDataType(HealthConstants.HeartRate.HEALTH_DATA_TYPE)
-            .setLocalTimeRange(HealthConstants.HeartRate.START_TIME, HealthConstants.HeartRate.TIME_OFFSET, start, end)
+            .setLocalTimeRange(
+                HealthConstants.HeartRate.START_TIME,
+                HealthConstants.HeartRate.TIME_OFFSET,
+                start,
+                end
+            )
             .setSort(HealthConstants.HeartRate.START_TIME, HealthDataResolver.SortOrder.DESC)
             .setProperties(
                 arrayOf(
@@ -490,7 +496,12 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 HealthConstants.HeartRate.TIME_OFFSET,
                 "minute"
             )
-            .setLocalTimeRange(HealthConstants.HeartRate.START_TIME, HealthConstants.HeartRate.TIME_OFFSET, start, end)
+            .setLocalTimeRange(
+                HealthConstants.HeartRate.START_TIME,
+                HealthConstants.HeartRate.TIME_OFFSET,
+                start,
+                end
+            )
             .setSort(HealthConstants.HeartRate.START_TIME, HealthDataResolver.SortOrder.DESC)
             .build()
 
@@ -521,6 +532,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     private suspend fun getHeartRateDataAsync(start: Long, end: Long): List<Map<String, Any>> =
         withContext(Dispatchers.Main) {
             suspendCoroutine { cont ->
+                Log.d(APP_TAG, "심박데이터 시작")
                 val request = ReadRequest.Builder()
                     .setDataType(HealthConstants.HeartRate.HEALTH_DATA_TYPE)
                     .setLocalTimeRange(
@@ -561,6 +573,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                             )
                         )
                     }
+                    Log.d(APP_TAG, "심박데이터 종료")
                     cont.resume(resultList)
                 }
             }
@@ -644,10 +657,16 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
      */
     private suspend fun getSleepDataAsync(start: Long, end: Long): List<Map<String, Any>> =
         withContext(Dispatchers.Main) {
+            Log.d(APP_TAG, "수면데이터 시작")
             suspendCoroutine { cont ->
                 val request = ReadRequest.Builder()
                     .setDataType(HealthConstants.Sleep.HEALTH_DATA_TYPE)
-                    .setLocalTimeRange(HealthConstants.Sleep.START_TIME, HealthConstants.Sleep.TIME_OFFSET, start, end)
+                    .setLocalTimeRange(
+                        HealthConstants.Sleep.START_TIME,
+                        HealthConstants.Sleep.TIME_OFFSET,
+                        start,
+                        end
+                    )
                     .setSort(HealthConstants.Sleep.START_TIME, HealthDataResolver.SortOrder.DESC)
                     .setProperties(
                         arrayOf(
@@ -672,6 +691,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                             )
                         )
                     }
+                    Log.d(APP_TAG, "수면데이터 종료")
                     cont.resume(resultList)
                 }
             }
@@ -715,8 +735,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                     Log.e(APP_TAG, "날짜 파싱 오류: $timeStr", e)
                     continue
                 }
-                // 수정된 방식 (Flutter에서 이해 가능한 구조로 변환)
-                Log.d(APP_TAG, "5분 누적 데이터 → 시간: $timestamp ($timeStr), 누적 걸음수: $steps")
+
                 hourlyStepList.add(
                     mapOf(
                         "timestamp" to timestamp,
@@ -738,6 +757,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     private suspend fun getStepDataAsync(start: Long, end: Long): List<Map<String, Any>> =
         withContext(Dispatchers.Main) {
             suspendCoroutine { cont ->
+                Log.d(APP_TAG, "걷기데이터 시작")
                 val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
                 sdf.timeZone = TimeZone.getDefault()
 
@@ -775,8 +795,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                             continue
                         }
 
-                        Log.d(APP_TAG, "5분 누적 데이터 → 시간: $timestamp ($timeStr), 누적 걸음수: $steps")
-
                         hourlyStepList.add(
                             mapOf(
                                 "timestamp" to timestamp,
@@ -788,6 +806,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                             )
                         )
                     }
+                    Log.d(APP_TAG, "걷기데이터 종료")
                     cont.resume(hourlyStepList)
                 }
             }

@@ -19,18 +19,26 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
   /// 전체 데이터 조회
   @override
   Future<Map<String, List<Map<String, dynamic>>>> getTotalData(int start, int end) async {
-    final result = await methodChannel.invokeMethod<List>('getTotalData', {
+    final result = await methodChannel.invokeMethod<Map>('getTotalData', {
       'start': start,
       'end': end,
     });
-    final List<Map<String, dynamic>> dataList = (result ?? [])
-        .map((item) => Map<String, dynamic>.from((item as Map).map((key, value) => MapEntry(key.toString(), value))))
-        .toList();
+    if (result == null) return {};
+
     Map<String, List<Map<String, dynamic>>> groupedData = {};
-    for (var item in dataList) {
-      final key = item['category']?.toString() ?? 'unknown';
-      groupedData.putIfAbsent(key, () => []).add(item);
-    }
+
+    result.forEach((key, value) {
+      if (value is List) {
+        final List<Map<String, dynamic>> parsedList = value.map<Map<String, dynamic>>((item) {
+          if (item is Map) {
+            return Map<String, dynamic>.from(item.map((k, v) => MapEntry(k.toString(), v)));
+          }
+          return {}; // fallback
+        }).toList();
+
+        groupedData[key.toString()] = parsedList;
+      }
+    });
 
     return groupedData;
   }
