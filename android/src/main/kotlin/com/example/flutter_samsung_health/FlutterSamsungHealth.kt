@@ -376,57 +376,58 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
      * 운동 조회
      */
     suspend fun getExerciseDataAsync(start: Long, end: Long): List<Map<String, Any>> =
-        suspendCoroutine { cont ->
-            Log.d(APP_TAG, "운동데이터 시작")
-            val request = ReadRequest.Builder()
-                .setDataType(HealthConstants.Exercise.HEALTH_DATA_TYPE)
-                .setLocalTimeRange(
-                    HealthConstants.Exercise.START_TIME,
-                    HealthConstants.Exercise.TIME_OFFSET,
-                    start,
-                    end
-                )
-                .setSort(HealthConstants.Exercise.START_TIME, HealthDataResolver.SortOrder.DESC)
-                .setProperties(
-                    arrayOf(
-                        HealthConstants.Exercise.EXERCISE_TYPE,
+        withContext(Dispatchers.Main) {
+            suspendCoroutine { cont ->
+                Log.d(APP_TAG, "운동데이터 시작")
+                val request = ReadRequest.Builder()
+                    .setDataType(HealthConstants.Exercise.HEALTH_DATA_TYPE)
+                    .setLocalTimeRange(
                         HealthConstants.Exercise.START_TIME,
-                        HealthConstants.Exercise.END_TIME,
-                        HealthConstants.Exercise.DURATION,
-                        HealthConstants.Exercise.DISTANCE,
-                        HealthConstants.Exercise.CALORIE,
-                        HealthConstants.Exercise.MAX_HEART_RATE,
-                        HealthConstants.Exercise.MEAN_HEART_RATE,
-                        HealthConstants.Exercise.MIN_HEART_RATE,
-                        HealthConstants.Exercise.LIVE_DATA
+                        HealthConstants.Exercise.TIME_OFFSET,
+                        start,
+                        end
                     )
-                )
-                .build()
-
-            val resolver = HealthDataResolver(mStore, null)
-            val resultList = mutableListOf<Map<String, Any>>()
-            resolver.read(request).setResultListener { result ->
-                for (data in result) {
-                    resultList.add(
-                        mapOf(
-                            "exercise_type" to ExerciseTypeMapper.getName(data.getInt(HealthConstants.Exercise.EXERCISE_TYPE)),
-                            "start_time" to data.getLong(HealthConstants.Exercise.START_TIME),
-                            "end_time" to data.getLong(HealthConstants.Exercise.END_TIME),
-                            "duration" to data.getLong(HealthConstants.Exercise.DURATION),
-                            "distance" to data.getFloat(HealthConstants.Exercise.DISTANCE),
-                            "calories" to data.getFloat(HealthConstants.Exercise.CALORIE),
-                            "max_heart_rate" to data.getFloat(HealthConstants.Exercise.MAX_HEART_RATE),
-                            "mean_heart_rate" to data.getFloat(HealthConstants.Exercise.MEAN_HEART_RATE),
-                            "min_heart_rate" to data.getFloat(HealthConstants.Exercise.MIN_HEART_RATE),
-                            "liveData" to data.getString(HealthConstants.Exercise.LIVE_DATA)
+                    .setSort(HealthConstants.Exercise.START_TIME, HealthDataResolver.SortOrder.DESC)
+                    .setProperties(
+                        arrayOf(
+                            HealthConstants.Exercise.EXERCISE_TYPE,
+                            HealthConstants.Exercise.START_TIME,
+                            HealthConstants.Exercise.END_TIME,
+                            HealthConstants.Exercise.DURATION,
+                            HealthConstants.Exercise.DISTANCE,
+                            HealthConstants.Exercise.CALORIE,
+                            HealthConstants.Exercise.MAX_HEART_RATE,
+                            HealthConstants.Exercise.MEAN_HEART_RATE,
+                            HealthConstants.Exercise.MIN_HEART_RATE,
+                            HealthConstants.Exercise.LIVE_DATA
                         )
                     )
+                    .build()
+
+                val resolver = HealthDataResolver(mStore, null)
+                val resultList = mutableListOf<Map<String, Any>>()
+                resolver.read(request).setResultListener { result ->
+                    for (data in result) {
+                        resultList.add(
+                            mapOf(
+                                "exercise_type" to ExerciseTypeMapper.getName(data.getInt(HealthConstants.Exercise.EXERCISE_TYPE)),
+                                "start_time" to data.getLong(HealthConstants.Exercise.START_TIME),
+                                "end_time" to data.getLong(HealthConstants.Exercise.END_TIME),
+                                "duration" to data.getLong(HealthConstants.Exercise.DURATION),
+                                "distance" to data.getFloat(HealthConstants.Exercise.DISTANCE),
+                                "calories" to data.getFloat(HealthConstants.Exercise.CALORIE),
+                                "max_heart_rate" to data.getFloat(HealthConstants.Exercise.MAX_HEART_RATE),
+                                "mean_heart_rate" to data.getFloat(HealthConstants.Exercise.MEAN_HEART_RATE),
+                                "min_heart_rate" to data.getFloat(HealthConstants.Exercise.MIN_HEART_RATE),
+                                "liveData" to data.getString(HealthConstants.Exercise.LIVE_DATA)
+                            )
+                        )
+                    }
+                    Log.d(APP_TAG, "운동데이터 종료")
+                    cont.resume(resultList)
                 }
-                Log.d(APP_TAG, "운동데이터 종료")
-                cont.resume(resultList)
             }
         }
-
 
     /**
      * 심박수 조회
