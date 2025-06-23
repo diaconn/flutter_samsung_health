@@ -819,6 +819,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     private fun getNutritionData(start: Long, end: Long, result: MethodChannel.Result) {
         val request = ReadRequest.Builder()
             .setDataType(Nutrition.HEALTH_DATA_TYPE)
+            .setSort(HealthConstants.Nutrition.START_TIME, HealthDataResolver.SortOrder.DESC)
+            .setLocalTimeRange(HealthConstants.Nutrition.START_TIME, HealthConstants.Nutrition.TIME_OFFSET, start, end)
             .setProperties(
                 arrayOf(
                     HealthConstants.Nutrition.START_TIME,
@@ -844,7 +846,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                     HealthConstants.Nutrition.IRON
                 )
             )
-            .setSort(HealthConstants.Nutrition.START_TIME, HealthDataResolver.SortOrder.DESC)
             .build()
 
         val resolver = HealthDataResolver(mStore, null)
@@ -890,6 +891,13 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
             suspendCoroutine { cont ->
                 val request = ReadRequest.Builder()
                     .setDataType(Nutrition.HEALTH_DATA_TYPE)
+                    .setLocalTimeRange(
+                        HealthConstants.Nutrition.START_TIME,
+                        HealthConstants.Nutrition.TIME_OFFSET,
+                        start,
+                        end
+                    )
+                    .setSort(HealthConstants.Nutrition.START_TIME, HealthDataResolver.SortOrder.DESC)
                     .setProperties(
                         arrayOf(
                             HealthConstants.Nutrition.START_TIME,
@@ -915,7 +923,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                             HealthConstants.Nutrition.IRON
                         )
                     )
-                    .setSort(HealthConstants.Nutrition.START_TIME, HealthDataResolver.SortOrder.DESC)
                     .build()
 
                 val resolver = HealthDataResolver(mStore, null)
