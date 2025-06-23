@@ -417,7 +417,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                                 "distance" to data.getFloat(HealthConstants.Exercise.DISTANCE),
                                 "calorie" to data.getFloat(HealthConstants.Exercise.CALORIE),
                                 "max_heart_rate" to data.getFloat(HealthConstants.Exercise.MAX_HEART_RATE),
-                                "mean_heart_rate" to data.getFloat(HealthConstants.Exercise.MEAN_HEAㅇ원RT_RATE),
+                                "mean_heart_rate" to data.getFloat(HealthConstants.Exercise.MEAN_HEART_RATE),
                                 "min_heart_rate" to data.getFloat(HealthConstants.Exercise.MIN_HEART_RATE),
                                 "liveData" to data.getString(HealthConstants.Exercise.LIVE_DATA)
                             )
