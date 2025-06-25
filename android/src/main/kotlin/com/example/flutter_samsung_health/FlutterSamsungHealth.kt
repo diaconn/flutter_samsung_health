@@ -187,9 +187,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         mStore = HealthDataStore(context, object : HealthDataStore.ConnectionListener {
             override fun onConnected() {
                 Log.d(APP_TAG, "삼성 헬스 연결 성공")
-//        if (!isPermissionAcquired(result)) {
-//          requestPermission(result)
-//        }
+                if (!isPermissionAcquired(re중sult)) {
+                    requestPermission(result)
+                }
                 resultMap.put("isConnect", true)
                 result.success(resultMap)
             }
