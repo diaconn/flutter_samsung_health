@@ -6,6 +6,11 @@ class FlutterSamsungHealth {
     return FlutterSamsungHealthPlatform.instance.connect();
   }
 
+  /// 삼성 헬스 권한
+  Future<Map<String, dynamic>> requestPermissions() {
+    return FlutterSamsungHealthPlatform.instance.requestPermissions();
+  }
+
   /// 전체 데이터 조회
   Future<Map<String,List<Map<String, dynamic>>>> getTotalData({
     required int start,

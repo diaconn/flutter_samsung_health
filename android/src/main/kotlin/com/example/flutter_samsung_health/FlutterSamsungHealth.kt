@@ -67,7 +67,11 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         when (call.method) {
 
             "connect" -> {
-                connectSamsungHealth(result)
+                connectSamsungHealth(result, false)
+            }
+
+            "requestPermissions" -> {
+                connectSamsungHealth(result, true)
             }
 
             "getTotalData" -> {
@@ -181,14 +185,16 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     /**
      * 삼성헬스 연계 관련 함수 추가.
      */
-    private fun connectSamsungHealth(result: MethodChannel.Result) {
+    private fun connectSamsungHealth(result: MethodChannel.Result, onlyRequest: Boolean) {
         Log.d(APP_TAG, "connectSamsungHealth() 호출")
         val resultMap: MutableMap<String, Any> = mutableMapOf()
         mStore = HealthDataStore(context, object : HealthDataStore.ConnectionListener {
             override fun onConnected() {
                 Log.d(APP_TAG, "삼성 헬스 연결 성공")
-                requestPermissionTotal(result, permissions)
                 resultMap.put("isConnect", true)
+                if (onlyRequest) {
+                    requestPermissionsOnly(result, permissions)
+                }
                 result.success(resultMap)
             }
 
@@ -255,6 +261,38 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
             showPermissionAlarmDialog()
             Log.e(APP_TAG, "Permission request failed: $e")
             result.error("PERMISSION_ERROR", "권한 요청 실패", null)
+        }
+    }
+
+    private fun requestPermissionsOnly(
+        result: MethodChannel.Result,
+        permissions: Set<PermissionKey>
+    ) {
+        // 권한 요청 기록 체크
+        if (loadFromSharedPreferences()) {
+            result.success(mapOf("already_requested" to true))
+            return
+        }
+
+        val permissionManager = HealthPermissionManager(mStore)
+        try {
+            permissionManager.requestPermissions(permissions, activity!!).setResultListener { res ->
+                val resultMap = res.resultMap
+                val denied = permissions.filter { resultMap[it] != true }
+
+                saveToSharedPreferences(true)
+
+                if (denied.isNotEmpty()) {
+                    val deniedTypes = denied.map { it.dataType.toString() }
+                    result.success(mapOf("denied_permissions" to deniedTypes))
+                } else {
+                    result.success(mapOf("message" to "모든 권한 허용됨"))
+                }
+            }
+        } catch (e: Exception) {
+            showPermissionAlarmDialog()
+            Log.e(APP_TAG, "권한 요청 실패: $e")
+            result.error("PERMISSION_ERROR", "권한 요청 중 오류 발생", null)
         }
     }
 

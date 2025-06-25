@@ -26,6 +26,9 @@ abstract class FlutterSamsungHealthPlatform extends PlatformInterface {
   ///  연결 (권한 확인 및 요청)
   Future<Map<String, dynamic>> connect();
 
+  ///  권한
+  Future<Map<String, dynamic>> requestPermissions();
+
   /// 전체 데이터
   Future<Map<String, List<Map<String, dynamic>>>> getTotalData(int start, int end);
 
