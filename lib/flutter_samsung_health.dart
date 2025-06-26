@@ -11,6 +11,11 @@ class FlutterSamsungHealth {
     return FlutterSamsungHealthPlatform.instance.requestPermissions();
   }
 
+  /// 삼성 헬스 승인 권한
+  Future<Map<String, dynamic>> getGrantedPermissions() {
+    return FlutterSamsungHealthPlatform.instance.getGrantedPermissions();
+  }
+
   /// 전체 데이터 조회
   Future<Map<String,List<Map<String, dynamic>>>> getTotalData({
     required int start,

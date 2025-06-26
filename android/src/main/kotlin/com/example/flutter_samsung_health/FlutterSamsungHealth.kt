@@ -67,11 +67,15 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         when (call.method) {
 
             "connect" -> {
-                connectSamsungHealth(result, false)
+                connectSamsungHealth(result, onlyRequest = false)
             }
 
             "requestPermissions" -> {
-                connectSamsungHealth(result, true)
+                connectSamsungHealth(result, onlyRequest = true)
+            }
+
+            "getGrantedPermissions" -> {
+                getGrantedPermissions(result)
             }
 
             "getTotalData" -> {
@@ -212,6 +216,25 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         })
 
         mStore.connectService()
+    }
+
+    private fun getGrantedPermissions(result: MethodChannel.Result) {
+        if (!::mStore.isInitialized) {
+            result.error("STORE_NOT_READY", "Samsung Health 연결되지 않음", null)
+            return
+        }
+
+        try {
+            val permissionManager = HealthPermissionManager(mStore)
+            val resultMap = permissionManager.isPermissionAcquired(permissions)
+
+            val grantedList = resultMap.filterValues { it }.keys.map { it.dataType.toString() }
+
+            result.success(grantedList)
+        } catch (e: Exception) {
+            Log.e(APP_TAG, "권한 조회 중 오류", e)
+            result.error("PERMISSION_QUERY_ERROR", "권한 조회 실패", null)
+        }
     }
 
     private fun requestPermission(result: MethodChannel.Result, permissionKey: PermissionKey) {

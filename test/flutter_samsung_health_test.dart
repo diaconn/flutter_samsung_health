@@ -18,6 +18,12 @@ class MockSamsungHealthPluginPlatform with MockPlatformInterfaceMixin implements
   }
 
   @override
+  Future<Map<String, dynamic>> getGrantedPermissions() {
+    // TODO: implement getGrantedPermissions
+    throw UnimplementedError();
+  }
+
+  @override
   Future<Map<String, List<Map<String, dynamic>>>> getTotalData(int start, int end) {
     // TODO: implement getTotalData
     throw UnimplementedError();
