@@ -353,35 +353,47 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     private fun requestPermissionsOnly(
         result: MethodChannel.Result
     ) {
-        // 권한 요청 기록 체크
+        var isReplied = false
+
+        fun safeSuccess(response: Any) {
+            if (isReplied) {
+                Log.w(APP_TAG, "Reply already submitted (success)")
+                return
+            }
+            try {
+                result.success(response)
+                isReplied = true
+            } catch (e: IllegalStateException) {
+                Log.w(APP_TAG, "Reply already submitted exception on success: ${e.message}")
+            } catch (e: Exception) {
+                Log.e(APP_TAG, "Unexpected error on success reply", e)
+            }
+        }
+
         if (loadFromSharedPreferences()) {
-            result.success(mapOf("already_requested" to true))
+            safeSuccess(mapOf("already_requested" to true))
             return
         }
 
         val permissionManager = HealthPermissionManager(mStore)
         try {
             permissionManager.requestPermissions(permissions, activity!!).setResultListener { res ->
-                try {
-                    val grantedMap = res.resultMap
-                    val denied = permissions.filter { grantedMap[it] != true }
+                val grantedMap = res.resultMap
+                val denied = permissions.filter { grantedMap[it] != true }
 
-                    saveToSharedPreferences(true)
+                saveToSharedPreferences(true)
 
-                    if (denied.isNotEmpty()) {
-                        val deniedTypes = denied.map { it.dataType.toString() }
-                        result.success(mapOf("denied_permissions" to deniedTypes))
-                    } else {
-                        result.success(mapOf("message" to "모든 권한 허용됨"))
-                    }
-                } catch (e : Exception) {
-                    Log.e(APP_TAG, "권한 처리중 오류: $e")
-                    safeFlutterError(result, "PERMISSION_ERROR", "권한 요청 중 오류 발생", null)
+                if (denied.isNotEmpty()) {
+                    val deniedTypes = denied.map { it.dataType.toString() }
+                    safeSuccess(mapOf("denied_permissions" to deniedTypes))
+                } else {
+                    safeSuccess(mapOf("message" to "모든 권한 허용됨"))
                 }
             }
         } catch (e: Exception) {
-            Log.e(APP_TAG, "권한 요청 실패: $e")
-            safeFlutterError(result, "PERMISSION_ERROR", "권한 요청 중 오류 발생", null)
+            safeFlutterError(result, "PERMISSION_ERROR", "권한 요청 중 오류 발생", e.message,
+                { isReplied }, { isReplied = it })
+            showPermissionAlarmDialog()
         }
     }
 
@@ -440,11 +452,26 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         return prefs.getBoolean("permission_requested", false)
     }
 
-    private fun safeFlutterError(result: MethodChannel.Result, code: String, message: String, details: Any?) {
+    private fun safeFlutterError(
+        result: MethodChannel.Result?,
+        errorCode: String,
+        errorMessage: String,
+        errorDetails: Any? = null,
+        isRepliedFlag: () -> Boolean,
+        setRepliedFlag: (Boolean) -> Unit
+    ) {
+        if (isRepliedFlag()) {
+            // 이미 응답 완료된 경우 무시
+            Log.w(APP_TAG, "Flutter error reply already submitted: $errorMessage")
+            return
+        }
         try {
-            result.error(code, message, details)
+            result?.error(errorCode, errorMessage, errorDetails)
+            setRepliedFlag(true)
         } catch (e: IllegalStateException) {
-            Log.w(APP_TAG, "Flutter 응답 중복 에러 방지됨: ${e.message}")
+            Log.w(APP_TAG, "Flutter error reply already submitted: $errorMessage")
+        } catch (e: Exception) {
+            Log.e(APP_TAG, "Unexpected error sending Flutter error response", e)
         }
     }
 
