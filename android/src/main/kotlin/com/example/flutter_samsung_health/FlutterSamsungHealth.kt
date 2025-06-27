@@ -2,7 +2,11 @@ package com.example.flutter_samsung_health
 
 import android.app.Activity
 import android.content.Context
+import android.content.DialogInterface
+import android.content.Intent
+import android.net.Uri
 import android.util.Log
+import androidx.appcompat.app.AlertDialog
 import com.samsung.android.sdk.healthdata.HealthConnectionErrorResult
 import com.samsung.android.sdk.healthdata.HealthConstants
 import com.samsung.android.sdk.healthdata.HealthConstants.Exercise
@@ -65,7 +69,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
 
     override fun onMethodCall(call: MethodCall, result: Result) {
         when (call.method) {
-
             "connect" -> {
                 connectSamsungHealth(result, onlyRequest = false)
             }
@@ -192,12 +195,18 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     private fun connectSamsungHealth(result: MethodChannel.Result, onlyRequest: Boolean) {
         Log.d(APP_TAG, "connectSamsungHealth() 호출")
         val resultMap: MutableMap<String, Any> = mutableMapOf()
+
+        if (!isSamsungHealthInstalled(context)) {
+            showInstallDialog(context, result)
+            return
+        }
+
         mStore = HealthDataStore(context, object : HealthDataStore.ConnectionListener {
             override fun onConnected() {
                 Log.d(APP_TAG, "삼성 헬스 연결 성공")
                 resultMap.put("isConnect", true)
                 if (onlyRequest) {
-                    requestPermissionsOnly(result, permissions)
+                    requestPermissionsOnly(result)
                 }
                 result.success(resultMap)
             }
@@ -288,8 +297,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     }
 
     private fun requestPermissionsOnly(
-        result: MethodChannel.Result,
-        permissions: Set<PermissionKey>
+        result: MethodChannel.Result
     ) {
         // 권한 요청 기록 체크
         if (loadFromSharedPreferences()) {
@@ -300,8 +308,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         val permissionManager = HealthPermissionManager(mStore)
         try {
             permissionManager.requestPermissions(permissions, activity!!).setResultListener { res ->
-                val resultMap = res.resultMap
-                val denied = permissions.filter { resultMap[it] != true }
+                val grantedMap = res.resultMap
+                val denied = permissions.filter { grantedMap[it] != true }
 
                 saveToSharedPreferences(true)
 
@@ -319,18 +327,109 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         }
     }
 
+    private fun checkPermissionAndExecute(
+        permissionKey: PermissionKey,
+        onGranted: () -> Unit,
+        onDenied: () -> Unit
+    ) {
+        val permissionManager = HealthPermissionManager(mStore)
+        try {
+            val resultMap = permissionManager.isPermissionAcquired(setOf(permissionKey))
+            if (resultMap[permissionKey] == true) {
+                onGranted()
+            } else {
+                onDenied()
+            }
+        } catch (e: Exception) {
+            Log.e(APP_TAG, "권한 확인 중 오류", e)
+            onDenied()
+        }
+    }
+
+    private fun checkPermissionAndExecuteTotal(
+        permissionKeys: Set<PermissionKey>,
+        onGranted: (Set<PermissionKey>) -> Unit,
+        onDenied: (Set<PermissionKey>) -> Unit
+    ) {
+        val permissionManager = HealthPermissionManager(mStore)
+        try {
+            val resultMap = permissionManager.isPermissionAcquired(permissionKeys)
+            val granted = resultMap.filterValues { it }.keys
+            val denied = permissionKeys - granted
+
+            if (granted.isNotEmpty()) {
+                onGranted(granted)
+            } else {
+                onDenied(denied)
+            }
+        } catch (e: Exception) {
+            Log.e(APP_TAG, "권한 확인 중 오류", e)
+            onDenied(permissionKeys)
+        }
+    }
+
+    private fun showInstallDialog(context: Context, result: MethodChannel.Result) {
+        val currentActivity = this.activity ?: run {
+            Log.e(APP_TAG, "Activity가 null입니다.")
+            result.success(mapOf("isConnect" to false))
+            return
+        }
+
+        currentActivity.runOnUiThread {
+            AlertDialog.Builder(currentActivity)
+                .setTitle("삼성 헬스 미설치")
+                .setMessage("삼성 헬스 앱이 설치되어 있지 않습니다.\n설치하시겠습니까?")
+                .setPositiveButton("확인") { dialog: DialogInterface, which: Int ->
+                    openSamsungHealthInStore(context)
+                    result.success(mapOf("isConnect" to false))
+                }
+                .setNegativeButton("취소") { dialog: DialogInterface, which: Int ->
+                    result.success(mapOf("isConnect" to false))
+                }
+                .setCancelable(false)
+                .show()
+        }
+    }
+
     private fun showPermissionAlarmDialog() {
         Log.d(APP_TAG, "showPermissionAlarmDialog 호출")
+
+        val currentActivity = activity ?: return
+        currentActivity.runOnUiThread {
+            AlertDialog.Builder(currentActivity)
+                .setTitle("권한 요청 실패")
+                .setMessage("권한 요청 중 문제가 발생했습니다.\n설정에서 수동으로 권한을 허용해주세요.")
+                .setPositiveButton("확인", null)
+                .show()
+        }
     }
 
     private fun saveToSharedPreferences(requested: Boolean) {
-        val prefs = activity!!.getSharedPreferences("health_pref", Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences("samsung_health_prefs", Context.MODE_PRIVATE)
         prefs.edit().putBoolean("permission_requested", requested).apply()
     }
 
     private fun loadFromSharedPreferences(): Boolean {
-        val prefs = activity!!.getSharedPreferences("health_pref", Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences("samsung_health_prefs", Context.MODE_PRIVATE)
         return prefs.getBoolean("permission_requested", false)
+    }
+
+    private fun isSamsungHealthInstalled(context: Context): Boolean {
+        return try {
+            context.packageManager.getPackageInfo("com.sec.android.app.shealth", 0)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun openSamsungHealthInStore(context: Context) {
+        val uri = Uri.parse("market://details?id=com.sec.android.app.shealth")
+        val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+            setPackage("com.android.vending")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
     }
 
     private fun getTotalData(
@@ -1034,47 +1133,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
 
     override fun onDetachedFromActivityForConfigChanges() {
         activity = null
-    }
-
-    private fun checkPermissionAndExecute(
-        permissionKey: PermissionKey,
-        onGranted: () -> Unit,
-        onDenied: () -> Unit
-    ) {
-        val permissionManager = HealthPermissionManager(mStore)
-        try {
-            val resultMap = permissionManager.isPermissionAcquired(setOf(permissionKey))
-            if (resultMap[permissionKey] == true) {
-                onGranted()
-            } else {
-                onDenied()
-            }
-        } catch (e: Exception) {
-            Log.e(APP_TAG, "권한 확인 중 오류", e)
-            onDenied()
-        }
-    }
-
-    private fun checkPermissionAndExecuteTotal(
-        permissionKeys: Set<PermissionKey>,
-        onGranted: (Set<PermissionKey>) -> Unit,
-        onDenied: (Set<PermissionKey>) -> Unit
-    ) {
-        val permissionManager = HealthPermissionManager(mStore)
-        try {
-            val resultMap = permissionManager.isPermissionAcquired(permissionKeys)
-            val granted = resultMap.filterValues { it }.keys
-            val denied = permissionKeys - granted
-
-            if (granted.isNotEmpty()) {
-                onGranted(granted)
-            } else {
-                onDenied(denied)
-            }
-        } catch (e: Exception) {
-            Log.e(APP_TAG, "권한 확인 중 오류", e)
-            onDenied(permissionKeys)
-        }
     }
 
 }

@@ -55,6 +55,7 @@ android {
         testImplementation("org.mockito:mockito-core:5.0.0")
         // Note: samsung-health-data.aar 은 사용하는 앱 쪽에서 직접 추가해야 합니다.
         compileOnly(name: "samsung-health-data-1.5.1", ext: "aar")
+        implementation 'androidx.appcompat:appcompat:1.6.1'
     }
 
     testOptions {
