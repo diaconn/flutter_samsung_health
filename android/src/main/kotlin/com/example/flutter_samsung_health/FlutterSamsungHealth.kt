@@ -69,6 +69,14 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
 
     override fun onMethodCall(call: MethodCall, result: Result) {
         when (call.method) {
+            "isSamsungHealthInstalled" -> {
+                isSamsungHealthInstalled(result, context)
+            }
+
+            "openSamsungHealth" -> {
+                openSamsungHealthInStore(context)
+            }
+
             "connect" -> {
                 connectSamsungHealth(result, onlyRequest = false)
             }
@@ -185,8 +193,53 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         }
     }
 
-    override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-        channel.setMethodCallHandler(null)
+
+
+    private fun isSamsungHealthInstalled(result: MethodChannel.Result, context: Context) {
+        Log.d(APP_TAG, "isSamsungHealthInstalled() 호출")
+        val resultMap: MutableMap<String, Any> = mutableMapOf()
+
+        try {
+            context.packageManager.getPackageInfo("com.sec.android.app.shealth", 0)
+            resultMap.put("isInstalled", true)
+            result.success(resultMap)
+        } catch (e: Exception) {
+            resultMap.put("isInstalled", false)
+            result.success(resultMap)
+        }
+    }
+
+    private fun openSamsungHealthInStore(context: Context) {
+        Log.d(APP_TAG, "openSamsungHealthInStore() 호출")
+        val resultMap: MutableMap<String, Any> = mutableMapOf()
+        val packageName = "com.sec.android.app.shealth"
+        val packageManager = context.packageManager
+
+        try {
+            packageManager.getPackageInfo(packageName, 0)
+
+            // 삼성 헬스 실행
+            val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+            if (launchIntent != null) {
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(launchIntent)
+            } else {
+                Log.e(APP_TAG, "삼성 헬스 실행 인텐트 없음")
+            }
+
+        } catch (e: Exception) {
+            // Play 스토어로 이동
+            try {
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    data = Uri.parse("market://details?id=$packageName")
+                    setPackage("com.android.vending")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                Log.e(APP_TAG, "Play 스토어 이동 실패: $e")
+            }
+        }
     }
 
     /**
@@ -195,11 +248,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     private fun connectSamsungHealth(result: MethodChannel.Result, onlyRequest: Boolean) {
         Log.d(APP_TAG, "connectSamsungHealth() 호출")
         val resultMap: MutableMap<String, Any> = mutableMapOf()
-
-        if (!isSamsungHealthInstalled(context)) {
-            showInstallDialog(context, result)
-            return
-        }
 
         mStore = HealthDataStore(context, object : HealthDataStore.ConnectionListener {
             override fun onConnected() {
@@ -412,24 +460,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     private fun loadFromSharedPreferences(): Boolean {
         val prefs = context.getSharedPreferences("samsung_health_prefs", Context.MODE_PRIVATE)
         return prefs.getBoolean("permission_requested", false)
-    }
-
-    private fun isSamsungHealthInstalled(context: Context): Boolean {
-        return try {
-            context.packageManager.getPackageInfo("com.sec.android.app.shealth", 0)
-            true
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    private fun openSamsungHealthInStore(context: Context) {
-        val uri = Uri.parse("market://details?id=com.sec.android.app.shealth")
-        val intent = Intent(Intent.ACTION_VIEW, uri).apply {
-            setPackage("com.android.vending")
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        context.startActivity(intent)
     }
 
     private fun getTotalData(
@@ -1118,6 +1148,10 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 }
             }
         }
+
+    override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        channel.setMethodCallHandler(null)
+    }
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
