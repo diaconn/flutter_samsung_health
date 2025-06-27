@@ -362,22 +362,26 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         val permissionManager = HealthPermissionManager(mStore)
         try {
             permissionManager.requestPermissions(permissions, activity!!).setResultListener { res ->
-                val grantedMap = res.resultMap
-                val denied = permissions.filter { grantedMap[it] != true }
+                try {
+                    val grantedMap = res.resultMap
+                    val denied = permissions.filter { grantedMap[it] != true }
 
-                saveToSharedPreferences(true)
+                    saveToSharedPreferences(true)
 
-                if (denied.isNotEmpty()) {
-                    val deniedTypes = denied.map { it.dataType.toString() }
-                    result.success(mapOf("denied_permissions" to deniedTypes))
-                } else {
-                    result.success(mapOf("message" to "모든 권한 허용됨"))
+                    if (denied.isNotEmpty()) {
+                        val deniedTypes = denied.map { it.dataType.toString() }
+                        result.success(mapOf("denied_permissions" to deniedTypes))
+                    } else {
+                        result.success(mapOf("message" to "모든 권한 허용됨"))
+                    }
+                } catch (e : Exception) {
+                    Log.e(APP_TAG, "권한 처리중 오류: $e")
+                    safeFlutterError(result, "PERMISSION_ERROR", "권한 요청 중 오류 발생", null)
                 }
             }
         } catch (e: Exception) {
-            showPermissionAlarmDialog()
             Log.e(APP_TAG, "권한 요청 실패: $e")
-            result.error("PERMISSION_ERROR", "권한 요청 중 오류 발생", null)
+            safeFlutterError(result, "PERMISSION_ERROR", "권한 요청 중 오류 발생", null)
         }
     }
 
@@ -434,6 +438,14 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     private fun loadFromSharedPreferences(): Boolean {
         val prefs = context.getSharedPreferences("samsung_health_prefs", Context.MODE_PRIVATE)
         return prefs.getBoolean("permission_requested", false)
+    }
+
+    private fun safeFlutterError(result: MethodChannel.Result, code: String, message: String, details: Any?) {
+        try {
+            result.error(code, message, details)
+        } catch (e: IllegalStateException) {
+            Log.w(APP_TAG, "Flutter 응답 중복 에러 방지됨: ${e.message}")
+        }
     }
 
     private fun getTotalData(
