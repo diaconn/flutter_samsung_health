@@ -9,6 +9,20 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
   @visibleForTesting
   final methodChannel = const MethodChannel('flutter_samsung_health');
 
+  /// 삼성 헬스 설치 여부 체크
+  @override
+  Future<Map<String, dynamic>> isSamsungHealthInstalled() async {
+    final result = await methodChannel.invokeMethod<Map>('isSamsungHealthInstalled', {});
+    return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {'isInstalled': false};
+  }
+
+  /// 삼성 헬스 앱 열기
+  @override
+  Future<Map<String, dynamic>> openSamsungHealth() async {
+    final result = await methodChannel.invokeMethod<Map>('openSamsungHealth', {});
+    return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {'action': "failed"};
+  }
+
   /// 삼성 헬스 연결
   @override
   Future<Map<String, dynamic>> connect() async {

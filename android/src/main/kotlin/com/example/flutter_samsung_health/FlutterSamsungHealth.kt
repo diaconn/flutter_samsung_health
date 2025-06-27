@@ -1,9 +1,7 @@
 package com.example.flutter_samsung_health
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Context
-import android.content.DialogInterface
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
@@ -74,7 +72,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
             }
 
             "openSamsungHealth" -> {
-                openSamsungHealthInStore(context)
+                openSamsungHealthInStore(result, context)
             }
 
             "connect" -> {
@@ -209,7 +207,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         }
     }
 
-    private fun openSamsungHealthInStore(context: Context) {
+    private fun openSamsungHealthInStore(result: MethodChannel.Result, context: Context) {
         Log.d(APP_TAG, "openSamsungHealthInStore() 호출")
         val resultMap: MutableMap<String, Any> = mutableMapOf()
         val packageName = "com.sec.android.app.shealth"
@@ -223,8 +221,12 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
             if (launchIntent != null) {
                 launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(launchIntent)
+                resultMap.put("action", "launched")
+                result.success(resultMap)
             } else {
                 Log.e(APP_TAG, "삼성 헬스 실행 인텐트 없음")
+                resultMap.put("action", "launch_failed")
+                result.success(resultMap)
             }
 
         } catch (e: Exception) {
@@ -236,8 +238,12 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 context.startActivity(intent)
+                resultMap.put("action", "move_to_store")
+                result.success(resultMap)
             } catch (e: Exception) {
                 Log.e(APP_TAG, "Play 스토어 이동 실패: $e")
+                resultMap.put("action", "store_failed")
+                result.success(resultMap)
             }
         }
     }
@@ -416,40 +422,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         }
     }
 
-    private fun showInstallDialog(context: Context, result: MethodChannel.Result) {
-        val currentActivity = this.activity ?: run {
-            Log.e(APP_TAG, "Activity가 null입니다.")
-            result.success(mapOf("isConnect" to false))
-            return
-        }
-
-        currentActivity.runOnUiThread {
-            AlertDialog.Builder(currentActivity)
-                .setTitle("삼성 헬스 미설치")
-                .setMessage("삼성 헬스 앱이 설치되어 있지 않습니다.\n설치하시겠습니까?")
-                .setPositiveButton("확인") { _: DialogInterface, _: Int ->
-                    openSamsungHealthInStore(context)
-                    result.success(mapOf("isConnect" to false))
-                }
-                .setNegativeButton("취소") { _: DialogInterface, _: Int ->
-                    result.success(mapOf("isConnect" to false))
-                }
-                .setCancelable(false)
-                .show()
-        }
-    }
-
     private fun showPermissionAlarmDialog() {
         Log.d(APP_TAG, "showPermissionAlarmDialog 호출")
-
-        val currentActivity = activity ?: return
-        currentActivity.runOnUiThread {
-            AlertDialog.Builder(currentActivity)
-                .setTitle("권한 요청 실패")
-                .setMessage("권한 요청 중 문제가 발생했습니다.\n설정에서 수동으로 권한을 허용해주세요.")
-                .setPositiveButton("확인", null)
-                .show()
-        }
     }
 
     private fun saveToSharedPreferences(requested: Boolean) {

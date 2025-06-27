@@ -23,13 +23,19 @@ abstract class FlutterSamsungHealthPlatform extends PlatformInterface {
     _instance = instance;
   }
 
-  ///  연결 (권한 확인 및 요청)
+  /// 설치 여부 체크
+  Future<Map<String, dynamic>> isSamsungHealthInstalled();
+
+  /// 앱 실행
+  Future<Map<String, dynamic>> openSamsungHealth();
+
+  /// 연결 (권한 확인 및 요청)
   Future<Map<String, dynamic>> connect();
 
-  ///  권한
+  /// 권한
   Future<Map<String, dynamic>> requestPermissions();
 
-  ///  승인 권한
+  /// 승인 권한
   Future<Map<String, dynamic>> getGrantedPermissions();
 
   /// 전체 데이터

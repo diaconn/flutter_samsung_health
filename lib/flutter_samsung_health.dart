@@ -1,6 +1,16 @@
 import 'flutter_samsung_health_platform_interface.dart';
 
 class FlutterSamsungHealth {
+  /// 삼성 헬스 설치 유무 체크
+  Future<Map<String, dynamic>> isSamsungHealthInstalled() {
+    return FlutterSamsungHealthPlatform.instance.isSamsungHealthInstalled();
+  }
+
+  /// 삼성 헬스 앱 실행
+  Future<Map<String, dynamic>> openSamsungHealth() {
+    return FlutterSamsungHealthPlatform.instance.openSamsungHealth();
+  }
+
   /// 삼성 헬스 SDK 연결
   Future<Map<String, dynamic>> connect() {
     return FlutterSamsungHealthPlatform.instance.connect();
