@@ -1,12 +1,12 @@
 package com.example.flutter_samsung_health
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
-import androidx.appcompat.app.AlertDialog
 import com.samsung.android.sdk.healthdata.HealthConnectionErrorResult
 import com.samsung.android.sdk.healthdata.HealthConstants
 import com.samsung.android.sdk.healthdata.HealthConstants.Exercise
@@ -379,11 +379,11 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
             AlertDialog.Builder(currentActivity)
                 .setTitle("삼성 헬스 미설치")
                 .setMessage("삼성 헬스 앱이 설치되어 있지 않습니다.\n설치하시겠습니까?")
-                .setPositiveButton("확인") { dialog: DialogInterface, which: Int ->
+                .setPositiveButton("확인") { _: DialogInterface, _: Int ->
                     openSamsungHealthInStore(context)
                     result.success(mapOf("isConnect" to false))
                 }
-                .setNegativeButton("취소") { dialog: DialogInterface, which: Int ->
+                .setNegativeButton("취소") { _: DialogInterface, _: Int ->
                     result.success(mapOf("isConnect" to false))
                 }
                 .setCancelable(false)
