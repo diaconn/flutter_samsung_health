@@ -192,7 +192,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     }
 
 
-
     private fun isSamsungHealthInstalled(result: MethodChannel.Result, context: Context) {
         Log.d(APP_TAG, "isSamsungHealthInstalled() 호출")
         val resultMap: MutableMap<String, Any> = mutableMapOf()
@@ -261,8 +260,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 resultMap.put("isConnect", true)
                 if (onlyRequest) {
                     requestPermissionsOnly(result)
+                } else {
+                    result.success(resultMap)
                 }
-                result.success(resultMap)
             }
 
             override fun onConnectionFailed(error: HealthConnectionErrorResult?) {
