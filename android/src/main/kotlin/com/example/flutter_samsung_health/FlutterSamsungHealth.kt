@@ -47,6 +47,8 @@ private val permissions = setOf(
     PermissionKey(StepCount.HEALTH_DATA_TYPE, PermissionType.READ),
     PermissionKey(Nutrition.HEALTH_DATA_TYPE, PermissionType.READ)
 )
+private const val PREF_NAME = "samsung_health_preferences"
+private const val PREF_KEY_PERMISSION_REQUESTED = "permission_requested"
 
 /** FlutterSamsungHealth */
 class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
@@ -356,10 +358,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         var isReplied = false
 
         fun safeSuccess(response: Any) {
-            if (isReplied) {
-                Log.w(APP_TAG, "Reply already submitted (success)")
-                return
-            }
+            if (isReplied) return
             try {
                 result.success(response)
                 isReplied = true
@@ -370,10 +369,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
             }
         }
 
-        if (loadFromSharedPreferences()) {
-            safeSuccess(mapOf("already_requested" to true))
-            return
-        }
+        clearPermissionRequestRecordInternal()
 
         val permissionManager = HealthPermissionManager(mStore)
         try {
@@ -450,6 +446,16 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     private fun loadFromSharedPreferences(): Boolean {
         val prefs = context.getSharedPreferences("samsung_health_prefs", Context.MODE_PRIVATE)
         return prefs.getBoolean("permission_requested", false)
+    }
+
+    private fun clearPermissionRequestRecordInternal() {
+        try {
+            val sharedPref = activity?.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            sharedPref?.edit()?.remove(PREF_KEY_PERMISSION_REQUESTED)?.apply()
+            Log.d(APP_TAG, "Permission request record cleared")
+        } catch (e: Exception) {
+            Log.e(APP_TAG, "Failed to clear permission request record", e)
+        }
     }
 
     private fun safeFlutterError(
