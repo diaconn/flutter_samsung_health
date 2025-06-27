@@ -35,6 +35,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
@@ -490,20 +491,31 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         /// 각 데이터들 비동기로 호출하고 결과값 맵에 담아 반환
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val exercise =
+                val exercise = async {
                     if (grantedPermissions.contains(PermissionKey(Exercise.HEALTH_DATA_TYPE, PermissionType.READ)))
-                        async { getExerciseDataAsync(start, end) } else async { emptyList() }
-                val heartRate =
+                        getExerciseDataAsync(start, end)
+                    else emptyList()
+                }
+                val heartRate = async {
                     if (grantedPermissions.contains(PermissionKey(HeartRate.HEALTH_DATA_TYPE, PermissionType.READ)))
-                        async { getHeartRateDataAsync(start, end) } else async { emptyList() }
-                val sleep = if (grantedPermissions.contains(PermissionKey(Sleep.HEALTH_DATA_TYPE, PermissionType.READ)))
-                    async { getSleepDataAsync(start, end) } else async { emptyList() }
-                val steps =
+                        getHeartRateDataAsync(start, end)
+                    else emptyList()
+                }
+                val sleep = async {
+                    if (grantedPermissions.contains(PermissionKey(Sleep.HEALTH_DATA_TYPE, PermissionType.READ)))
+                        getSleepDataAsync(start, end)
+                    else emptyList()
+                }
+                val steps = async {
                     if (grantedPermissions.contains(PermissionKey(StepCount.HEALTH_DATA_TYPE, PermissionType.READ)))
-                        async { getStepDataAsync(start, end) } else async { emptyList() }
-                val nutrition =
+                        getStepDataAsync(start, end)
+                    else emptyList()
+                }
+                val nutrition = async {
                     if (grantedPermissions.contains(PermissionKey(Nutrition.HEALTH_DATA_TYPE, PermissionType.READ)))
-                        async { getNutritionDataAsync(start, end) } else async { emptyList() }
+                        getNutritionDataAsync(start, end)
+                    else emptyList()
+                }
 
                 val totalResult = mapOf(
                     "exercise" to exercise.await(),
@@ -512,7 +524,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                     "steps" to steps.await(),
                     "nutrition" to nutrition.await()
                 )
-
                 withContext(Dispatchers.Main) {
                     result.success(totalResult)
                 }
@@ -521,6 +532,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                     result.error("TOTAL_DATA_ERROR", "데이터 수집 실패: ${e.message}", null)
                 }
             }
+
         }
     }
 
@@ -530,7 +542,12 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     private fun getExerciseData(start: Long, end: Long, result: MethodChannel.Result) {
         val exerciseRequest = ReadRequest.Builder()
             .setDataType(HealthConstants.Exercise.HEALTH_DATA_TYPE)
-            .setLocalTimeRange(HealthConstants.Exercise.START_TIME, HealthConstants.Exercise.TIME_OFFSET, start, end)
+            .setLocalTimeRange(
+                HealthConstants.Exercise.START_TIME,
+                HealthConstants.Exercise.TIME_OFFSET,
+                start,
+                end
+            )
             .setSort(HealthConstants.Exercise.START_TIME, HealthDataResolver.SortOrder.DESC)
             .setProperties(
                 arrayOf(
@@ -585,53 +602,58 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     suspend fun getExerciseDataAsync(start: Long, end: Long): List<Map<String, Any>> =
         withContext(Dispatchers.Main) {
             suspendCoroutine { cont ->
-                Log.d(APP_TAG, "운동데이터 시작")
-                val request = ReadRequest.Builder()
-                    .setDataType(HealthConstants.Exercise.HEALTH_DATA_TYPE)
-                    .setLocalTimeRange(
-                        HealthConstants.Exercise.START_TIME,
-                        HealthConstants.Exercise.TIME_OFFSET,
-                        start,
-                        end
-                    )
-                    .setSort(HealthConstants.Exercise.START_TIME, HealthDataResolver.SortOrder.DESC)
-                    .setProperties(
-                        arrayOf(
-                            HealthConstants.Exercise.EXERCISE_TYPE,
+                try {
+                    Log.d(APP_TAG, "운동 데이터 시작")
+                    val request = ReadRequest.Builder()
+                        .setDataType(HealthConstants.Exercise.HEALTH_DATA_TYPE)
+                        .setLocalTimeRange(
                             HealthConstants.Exercise.START_TIME,
-                            HealthConstants.Exercise.END_TIME,
-                            HealthConstants.Exercise.DURATION,
-                            HealthConstants.Exercise.DISTANCE,
-                            HealthConstants.Exercise.CALORIE,
-                            HealthConstants.Exercise.MAX_HEART_RATE,
-                            HealthConstants.Exercise.MEAN_HEART_RATE,
-                            HealthConstants.Exercise.MIN_HEART_RATE,
-                            HealthConstants.Exercise.LIVE_DATA
+                            HealthConstants.Exercise.TIME_OFFSET,
+                            start,
+                            end
                         )
-                    )
-                    .build()
-
-                val resolver = HealthDataResolver(mStore, null)
-                val resultList = mutableListOf<Map<String, Any>>()
-                resolver.read(request).setResultListener { result ->
-                    for (data in result) {
-                        resultList.add(
-                            mapOf(
-                                "exercise_type" to ExerciseTypeMapper.getName(data.getInt(HealthConstants.Exercise.EXERCISE_TYPE)),
-                                "start_time" to data.getLong(HealthConstants.Exercise.START_TIME),
-                                "end_time" to data.getLong(HealthConstants.Exercise.END_TIME),
-                                "duration" to data.getLong(HealthConstants.Exercise.DURATION),
-                                "distance" to data.getFloat(HealthConstants.Exercise.DISTANCE),
-                                "calorie" to data.getFloat(HealthConstants.Exercise.CALORIE),
-                                "max_heart_rate" to data.getFloat(HealthConstants.Exercise.MAX_HEART_RATE),
-                                "mean_heart_rate" to data.getFloat(HealthConstants.Exercise.MEAN_HEART_RATE),
-                                "min_heart_rate" to data.getFloat(HealthConstants.Exercise.MIN_HEART_RATE),
-                                "liveData" to data.getString(HealthConstants.Exercise.LIVE_DATA)
+                        .setSort(HealthConstants.Exercise.START_TIME, HealthDataResolver.SortOrder.DESC)
+                        .setProperties(
+                            arrayOf(
+                                HealthConstants.Exercise.EXERCISE_TYPE,
+                                HealthConstants.Exercise.START_TIME,
+                                HealthConstants.Exercise.END_TIME,
+                                HealthConstants.Exercise.DURATION,
+                                HealthConstants.Exercise.DISTANCE,
+                                HealthConstants.Exercise.CALORIE,
+                                HealthConstants.Exercise.MAX_HEART_RATE,
+                                HealthConstants.Exercise.MEAN_HEART_RATE,
+                                HealthConstants.Exercise.MIN_HEART_RATE,
+                                HealthConstants.Exercise.LIVE_DATA
                             )
                         )
+                        .build()
+
+                    val resolver = HealthDataResolver(mStore, null)
+                    val resultList = mutableListOf<Map<String, Any>>()
+                    resolver.read(request).setResultListener { result ->
+                        for (data in result) {
+                            resultList.add(
+                                mapOf(
+                                    "exercise_type" to ExerciseTypeMapper.getName(data.getInt(HealthConstants.Exercise.EXERCISE_TYPE)),
+                                    "start_time" to data.getLong(HealthConstants.Exercise.START_TIME),
+                                    "end_time" to data.getLong(HealthConstants.Exercise.END_TIME),
+                                    "duration" to data.getLong(HealthConstants.Exercise.DURATION),
+                                    "distance" to data.getFloat(HealthConstants.Exercise.DISTANCE),
+                                    "calorie" to data.getFloat(HealthConstants.Exercise.CALORIE),
+                                    "max_heart_rate" to data.getFloat(HealthConstants.Exercise.MAX_HEART_RATE),
+                                    "mean_heart_rate" to data.getFloat(HealthConstants.Exercise.MEAN_HEART_RATE),
+                                    "min_heart_rate" to data.getFloat(HealthConstants.Exercise.MIN_HEART_RATE),
+                                    "liveData" to data.getString(HealthConstants.Exercise.LIVE_DATA)
+                                )
+                            )
+                        }
+                        Log.d(APP_TAG, "운동데이터 종료")
+                        cont.resume(resultList)
                     }
-                    Log.d(APP_TAG, "운동데이터 종료")
-                    cont.resume(resultList)
+                } catch (e: Exception) {
+                    Log.e(APP_TAG, "운동 데이터 Exception: ${e.message}")
+                    cont.resume(emptyList())
                 }
             }
         }
@@ -740,49 +762,54 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     private suspend fun getHeartRateDataAsync(start: Long, end: Long): List<Map<String, Any>> =
         withContext(Dispatchers.Main) {
             suspendCoroutine { cont ->
-                Log.d(APP_TAG, "심박데이터 시작")
-                val request = ReadRequest.Builder()
-                    .setDataType(HealthConstants.HeartRate.HEALTH_DATA_TYPE)
-                    .setLocalTimeRange(
-                        HealthConstants.HeartRate.START_TIME,
-                        HealthConstants.HeartRate.TIME_OFFSET,
-                        start,
-                        end
-                    )
-                    .setSort(HealthConstants.HeartRate.START_TIME, HealthDataResolver.SortOrder.DESC)
-                    .setProperties(
-                        arrayOf(
+                try {
+                    Log.d(APP_TAG, "심박 데이터 시작")
+                    val request = ReadRequest.Builder()
+                        .setDataType(HealthConstants.HeartRate.HEALTH_DATA_TYPE)
+                        .setLocalTimeRange(
                             HealthConstants.HeartRate.START_TIME,
-                            HealthConstants.HeartRate.END_TIME,
                             HealthConstants.HeartRate.TIME_OFFSET,
-                            HealthConstants.HeartRate.HEART_RATE,
-                            HealthConstants.HeartRate.HEART_BEAT_COUNT,
-                            HealthConstants.HeartRate.MIN,
-                            HealthConstants.HeartRate.MAX,
-                            HealthConstants.HeartRate.BINNING_DATA
+                            start,
+                            end
                         )
-                    )
-                    .build()
-
-                val resolver = HealthDataResolver(mStore, null)
-                val resultList = mutableListOf<Map<String, Any>>()
-
-                resolver.read(request).setResultListener { result ->
-                    for (data in result) {
-                        resultList.add(
-                            mapOf(
-                                "start_time" to data.getLong(HealthConstants.HeartRate.START_TIME),
-                                "end_time" to data.getLong(HealthConstants.HeartRate.END_TIME),
-                                "time_offset" to data.getLong(HealthConstants.HeartRate.TIME_OFFSET),
-                                "heart_rate" to data.getFloat(HealthConstants.HeartRate.HEART_RATE),
-                                "heart_beat_count" to data.getLong(HealthConstants.HeartRate.HEART_BEAT_COUNT),
-                                "min" to data.getFloat(HealthConstants.HeartRate.MIN),
-                                "max" to data.getFloat(HealthConstants.HeartRate.MAX)
+                        .setSort(HealthConstants.HeartRate.START_TIME, HealthDataResolver.SortOrder.DESC)
+                        .setProperties(
+                            arrayOf(
+                                HealthConstants.HeartRate.START_TIME,
+                                HealthConstants.HeartRate.END_TIME,
+                                HealthConstants.HeartRate.TIME_OFFSET,
+                                HealthConstants.HeartRate.HEART_RATE,
+                                HealthConstants.HeartRate.HEART_BEAT_COUNT,
+                                HealthConstants.HeartRate.MIN,
+                                HealthConstants.HeartRate.MAX,
+                                HealthConstants.HeartRate.BINNING_DATA
                             )
                         )
+                        .build()
+
+                    val resolver = HealthDataResolver(mStore, null)
+                    val resultList = mutableListOf<Map<String, Any>>()
+
+                    resolver.read(request).setResultListener { result ->
+                        for (data in result) {
+                            resultList.add(
+                                mapOf(
+                                    "start_time" to data.getLong(HealthConstants.HeartRate.START_TIME),
+                                    "end_time" to data.getLong(HealthConstants.HeartRate.END_TIME),
+                                    "time_offset" to data.getLong(HealthConstants.HeartRate.TIME_OFFSET),
+                                    "heart_rate" to data.getFloat(HealthConstants.HeartRate.HEART_RATE),
+                                    "heart_beat_count" to data.getLong(HealthConstants.HeartRate.HEART_BEAT_COUNT),
+                                    "min" to data.getFloat(HealthConstants.HeartRate.MIN),
+                                    "max" to data.getFloat(HealthConstants.HeartRate.MAX)
+                                )
+                            )
+                        }
+                        Log.d(APP_TAG, "심박데이터 종료")
+                        cont.resume(resultList)
                     }
-                    Log.d(APP_TAG, "심박데이터 종료")
-                    cont.resume(resultList)
+                } catch (e: Exception) {
+                    Log.e(APP_TAG, "심박 데이터 Exception: ${e.message}")
+                    cont.resume(emptyList())
                 }
             }
         }
@@ -865,42 +892,47 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
      */
     private suspend fun getSleepDataAsync(start: Long, end: Long): List<Map<String, Any>> =
         withContext(Dispatchers.Main) {
-            Log.d(APP_TAG, "수면데이터 시작")
             suspendCoroutine { cont ->
-                val request = ReadRequest.Builder()
-                    .setDataType(HealthConstants.Sleep.HEALTH_DATA_TYPE)
-                    .setLocalTimeRange(
-                        HealthConstants.Sleep.START_TIME,
-                        HealthConstants.Sleep.TIME_OFFSET,
-                        start,
-                        end
-                    )
-                    .setSort(HealthConstants.Sleep.START_TIME, HealthDataResolver.SortOrder.DESC)
-                    .setProperties(
-                        arrayOf(
-                            HealthConstants.Sleep.UUID,
+                try {
+                    Log.d(APP_TAG, "수면 데이터 시작")
+                    val request = ReadRequest.Builder()
+                        .setDataType(HealthConstants.Sleep.HEALTH_DATA_TYPE)
+                        .setLocalTimeRange(
                             HealthConstants.Sleep.START_TIME,
-                            HealthConstants.Sleep.END_TIME,
-                            HealthConstants.Sleep.TIME_OFFSET
+                            HealthConstants.Sleep.TIME_OFFSET,
+                            start,
+                            end
                         )
-                    )
-                    .build()
-
-                val resolver = HealthDataResolver(mStore, null)
-                val resultList = mutableListOf<Map<String, Any>>()
-                resolver.read(request).setResultListener { result ->
-                    for (data in result) {
-                        resultList.add(
-                            mapOf(
-                                "id" to data.getLong(HealthConstants.Sleep.UUID),
-                                "start_time" to data.getLong(HealthConstants.Sleep.START_TIME),
-                                "end_time" to data.getLong(HealthConstants.Sleep.END_TIME),
-                                "time_offset" to data.getLong(HealthConstants.Sleep.TIME_OFFSET)
+                        .setSort(HealthConstants.Sleep.START_TIME, HealthDataResolver.SortOrder.DESC)
+                        .setProperties(
+                            arrayOf(
+                                HealthConstants.Sleep.UUID,
+                                HealthConstants.Sleep.START_TIME,
+                                HealthConstants.Sleep.END_TIME,
+                                HealthConstants.Sleep.TIME_OFFSET
                             )
                         )
+                        .build()
+
+                    val resolver = HealthDataResolver(mStore, null)
+                    val resultList = mutableListOf<Map<String, Any>>()
+                    resolver.read(request).setResultListener { result ->
+                        for (data in result) {
+                            resultList.add(
+                                mapOf(
+                                    "id" to data.getLong(HealthConstants.Sleep.UUID),
+                                    "start_time" to data.getLong(HealthConstants.Sleep.START_TIME),
+                                    "end_time" to data.getLong(HealthConstants.Sleep.END_TIME),
+                                    "time_offset" to data.getLong(HealthConstants.Sleep.TIME_OFFSET)
+                                )
+                            )
+                        }
+                        Log.d(APP_TAG, "수면데이터 종료")
+                        cont.resume(resultList)
                     }
-                    Log.d(APP_TAG, "수면데이터 종료")
-                    cont.resume(resultList)
+                } catch (e: Exception) {
+                    Log.e(APP_TAG, "수면 데이터 Exception: ${e.message}")
+                    cont.resume(emptyList())
                 }
             }
         }
@@ -965,58 +997,64 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     private suspend fun getStepDataAsync(start: Long, end: Long): List<Map<String, Any>> =
         withContext(Dispatchers.Main) {
             suspendCoroutine { cont ->
-                Log.d(APP_TAG, "걷기데이터 시작")
-                val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-                sdf.timeZone = TimeZone.getDefault()
+                try {
+                    Log.d(APP_TAG, "걷기 데이터 시작")
+                    val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+                    sdf.timeZone = TimeZone.getDefault()
 
-                val request: AggregateRequest = AggregateRequest.Builder()
-                    .setDataType(StepCount.HEALTH_DATA_TYPE)
-                    .addFunction(AggregateFunction.SUM, StepCount.COUNT, "total_step")
-                    .addFunction(AggregateFunction.SUM, StepCount.CALORIE, "total_calorie")
-                    .addFunction(AggregateFunction.SUM, StepCount.DISTANCE, "total_distance")
-                    .addFunction(AggregateFunction.AVG, StepCount.SPEED, "avg_speed")
-                    .setLocalTimeRange(StepCount.START_TIME, StepCount.TIME_OFFSET, start, end)
-                    .setTimeGroup(
-                        AggregateRequest.TimeGroupUnit.MINUTELY,
-                        5,
-                        HealthConstants.StepCount.START_TIME,
-                        StepCount.TIME_OFFSET,
-                        "minute"
-                    )
-                    .setSort(HealthConstants.StepCount.START_TIME, HealthDataResolver.SortOrder.DESC)
-                    .build()
-
-                val resolver = HealthDataResolver(mStore, null)
-                val hourlyStepList = mutableListOf<Map<String, Any>>()
-                resolver.aggregate(request).setResultListener { dataResult ->
-                    for (data in dataResult) {
-                        val timeStr = data.getString("minute") ?: continue
-                        val steps = data.getInt("total_step")
-                        val calorie = data.getFloat("total_calorie")
-                        val distance = data.getFloat("total_distance")
-                        val speed = data.getFloat("avg_speed")
-
-                        val timestamp = try {
-                            sdf.parse(timeStr)?.time ?: continue
-                        } catch (e: Exception) {
-                            Log.e(APP_TAG, "날짜 파싱 오류: $timeStr", e)
-                            continue
-                        }
-
-                        hourlyStepList.add(
-                            mapOf(
-                                "timestamp" to timestamp,
-                                "time_str" to timeStr,
-                                "steps" to steps,
-                                "calorie" to calorie,
-                                "distance" to distance,
-                                "speed" to speed
-                            )
+                    val request: AggregateRequest = AggregateRequest.Builder()
+                        .setDataType(StepCount.HEALTH_DATA_TYPE)
+                        .addFunction(AggregateFunction.SUM, StepCount.COUNT, "total_step")
+                        .addFunction(AggregateFunction.SUM, StepCount.CALORIE, "total_calorie")
+                        .addFunction(AggregateFunction.SUM, StepCount.DISTANCE, "total_distance")
+                        .addFunction(AggregateFunction.AVG, StepCount.SPEED, "avg_speed")
+                        .setLocalTimeRange(StepCount.START_TIME, StepCount.TIME_OFFSET, start, end)
+                        .setTimeGroup(
+                            AggregateRequest.TimeGroupUnit.MINUTELY,
+                            5,
+                            HealthConstants.StepCount.START_TIME,
+                            StepCount.TIME_OFFSET,
+                            "minute"
                         )
+                        .setSort(HealthConstants.StepCount.START_TIME, HealthDataResolver.SortOrder.DESC)
+                        .build()
+
+                    val resolver = HealthDataResolver(mStore, null)
+                    val hourlyStepList = mutableListOf<Map<String, Any>>()
+                    resolver.aggregate(request).setResultListener { dataResult ->
+                        for (data in dataResult) {
+                            val timeStr = data.getString("minute") ?: continue
+                            val steps = data.getInt("total_step")
+                            val calorie = data.getFloat("total_calorie")
+                            val distance = data.getFloat("total_distance")
+                            val speed = data.getFloat("avg_speed")
+
+                            val timestamp = try {
+                                sdf.parse(timeStr)?.time ?: continue
+                            } catch (e: Exception) {
+                                Log.e(APP_TAG, "날짜 파싱 오류: $timeStr", e)
+                                continue
+                            }
+
+                            hourlyStepList.add(
+                                mapOf(
+                                    "timestamp" to timestamp,
+                                    "time_str" to timeStr,
+                                    "steps" to steps,
+                                    "calorie" to calorie,
+                                    "distance" to distance,
+                                    "speed" to speed
+                                )
+                            )
+                        }
+                        Log.d(APP_TAG, "걷기데이터 종료")
+                        cont.resume(hourlyStepList)
                     }
-                    Log.d(APP_TAG, "걷기데이터 종료")
-                    cont.resume(hourlyStepList)
+                } catch (e: Exception) {
+                    Log.e(APP_TAG, "걷기 데이터 Exception: ${e.message}")
+                    cont.resume(emptyList())
                 }
+
             }
         }
 
@@ -1027,7 +1065,12 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         val request = ReadRequest.Builder()
             .setDataType(Nutrition.HEALTH_DATA_TYPE)
             .setSort(HealthConstants.Nutrition.START_TIME, HealthDataResolver.SortOrder.DESC)
-            .setLocalTimeRange(HealthConstants.Nutrition.START_TIME, HealthConstants.Nutrition.TIME_OFFSET, start, end)
+            .setLocalTimeRange(
+                HealthConstants.Nutrition.START_TIME,
+                HealthConstants.Nutrition.TIME_OFFSET,
+                start,
+                end
+            )
             .setProperties(
                 arrayOf(
                     HealthConstants.Nutrition.START_TIME,
@@ -1096,74 +1139,80 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     private suspend fun getNutritionDataAsync(start: Long, end: Long): List<Map<String, Any>> =
         withContext(Dispatchers.Main) {
             suspendCoroutine { cont ->
-                val request = ReadRequest.Builder()
-                    .setDataType(Nutrition.HEALTH_DATA_TYPE)
-                    .setLocalTimeRange(
-                        HealthConstants.Nutrition.START_TIME,
-                        HealthConstants.Nutrition.TIME_OFFSET,
-                        start,
-                        end
-                    )
-                    .setSort(HealthConstants.Nutrition.START_TIME, HealthDataResolver.SortOrder.DESC)
-                    .setProperties(
-                        arrayOf(
+                try {
+                    Log.d(APP_TAG, "영양소 데이터 시작")
+                    val request = ReadRequest.Builder()
+                        .setDataType(Nutrition.HEALTH_DATA_TYPE)
+                        .setLocalTimeRange(
                             HealthConstants.Nutrition.START_TIME,
                             HealthConstants.Nutrition.TIME_OFFSET,
-                            HealthConstants.Nutrition.MEAL_TYPE,
-                            HealthConstants.Nutrition.TITLE,
-                            HealthConstants.Nutrition.CALORIE,
-                            HealthConstants.Nutrition.TOTAL_FAT,
-                            HealthConstants.Nutrition.SATURATED_FAT,
-                            HealthConstants.Nutrition.POLYSATURATED_FAT,
-                            HealthConstants.Nutrition.MONOSATURATED_FAT,
-                            HealthConstants.Nutrition.TRANS_FAT,
-                            HealthConstants.Nutrition.CARBOHYDRATE,
-                            HealthConstants.Nutrition.DIETARY_FIBER,
-                            HealthConstants.Nutrition.SUGAR,
-                            HealthConstants.Nutrition.PROTEIN,
-                            HealthConstants.Nutrition.CHOLESTEROL,
-                            HealthConstants.Nutrition.SODIUM,
-                            HealthConstants.Nutrition.POTASSIUM,
-                            HealthConstants.Nutrition.VITAMIN_A,
-                            HealthConstants.Nutrition.VITAMIN_C,
-                            HealthConstants.Nutrition.CALCIUM,
-                            HealthConstants.Nutrition.IRON
+                            start,
+                            end
                         )
-                    )
-                    .build()
-
-                val resolver = HealthDataResolver(mStore, null)
-                val nutritionList = mutableListOf<Map<String, Any>>()
-                resolver.read(request).setResultListener { dataResult ->
-                    for (data in dataResult) {
-                        nutritionList.add(
-                            mapOf(
-                                "start_time" to data.getLong(HealthConstants.Nutrition.START_TIME),
-                                "time_offset" to data.getLong(HealthConstants.Nutrition.TIME_OFFSET),
-                                "meal_type" to data.getInt(HealthConstants.Nutrition.MEAL_TYPE),
-                                "meal_type_name" to MealTypeMapper.getName(data.getInt(HealthConstants.Nutrition.MEAL_TYPE)),
-                                "title" to data.getString(HealthConstants.Nutrition.TITLE),
-                                "calorie" to data.getFloat(HealthConstants.Nutrition.CALORIE),
-                                "total_fat" to data.getFloat(HealthConstants.Nutrition.TOTAL_FAT),
-                                "saturated_fat" to data.getFloat(HealthConstants.Nutrition.SATURATED_FAT),
-                                "polysaturated_fat" to data.getFloat(HealthConstants.Nutrition.POLYSATURATED_FAT),
-                                "monosaturated_fat" to data.getFloat(HealthConstants.Nutrition.MONOSATURATED_FAT),
-                                "trans_fat" to data.getFloat(HealthConstants.Nutrition.TRANS_FAT),
-                                "carbohydrate" to data.getFloat(HealthConstants.Nutrition.CARBOHYDRATE),
-                                "dietary_fiber" to data.getFloat(HealthConstants.Nutrition.DIETARY_FIBER),
-                                "sugar" to data.getFloat(HealthConstants.Nutrition.SUGAR),
-                                "protein" to data.getFloat(HealthConstants.Nutrition.PROTEIN),
-                                "cholesterol" to data.getFloat(HealthConstants.Nutrition.CHOLESTEROL),
-                                "sodium" to data.getFloat(HealthConstants.Nutrition.SODIUM),
-                                "potassium" to data.getFloat(HealthConstants.Nutrition.POTASSIUM),
-                                "vitamin_a" to data.getFloat(HealthConstants.Nutrition.VITAMIN_A),
-                                "vitamin_c" to data.getFloat(HealthConstants.Nutrition.VITAMIN_C),
-                                "calcium" to data.getFloat(HealthConstants.Nutrition.CALCIUM),
-                                "iron" to data.getFloat(HealthConstants.Nutrition.IRON)
+                        .setSort(HealthConstants.Nutrition.START_TIME, HealthDataResolver.SortOrder.DESC)
+                        .setProperties(
+                            arrayOf(
+                                HealthConstants.Nutrition.START_TIME,
+                                HealthConstants.Nutrition.TIME_OFFSET,
+                                HealthConstants.Nutrition.MEAL_TYPE,
+                                HealthConstants.Nutrition.TITLE,
+                                HealthConstants.Nutrition.CALORIE,
+                                HealthConstants.Nutrition.TOTAL_FAT,
+                                HealthConstants.Nutrition.SATURATED_FAT,
+                                HealthConstants.Nutrition.POLYSATURATED_FAT,
+                                HealthConstants.Nutrition.MONOSATURATED_FAT,
+                                HealthConstants.Nutrition.TRANS_FAT,
+                                HealthConstants.Nutrition.CARBOHYDRATE,
+                                HealthConstants.Nutrition.DIETARY_FIBER,
+                                HealthConstants.Nutrition.SUGAR,
+                                HealthConstants.Nutrition.PROTEIN,
+                                HealthConstants.Nutrition.CHOLESTEROL,
+                                HealthConstants.Nutrition.SODIUM,
+                                HealthConstants.Nutrition.POTASSIUM,
+                                HealthConstants.Nutrition.VITAMIN_A,
+                                HealthConstants.Nutrition.VITAMIN_C,
+                                HealthConstants.Nutrition.CALCIUM,
+                                HealthConstants.Nutrition.IRON
                             )
                         )
+                        .build()
+
+                    val resolver = HealthDataResolver(mStore, null)
+                    val nutritionList = mutableListOf<Map<String, Any>>()
+                    resolver.read(request).setResultListener { dataResult ->
+                        for (data in dataResult) {
+                            nutritionList.add(
+                                mapOf(
+                                    "start_time" to data.getLong(HealthConstants.Nutrition.START_TIME),
+                                    "time_offset" to data.getLong(HealthConstants.Nutrition.TIME_OFFSET),
+                                    "meal_type" to data.getInt(HealthConstants.Nutrition.MEAL_TYPE),
+                                    "meal_type_name" to MealTypeMapper.getName(data.getInt(HealthConstants.Nutrition.MEAL_TYPE)),
+                                    "title" to data.getString(HealthConstants.Nutrition.TITLE),
+                                    "calorie" to data.getFloat(HealthConstants.Nutrition.CALORIE),
+                                    "total_fat" to data.getFloat(HealthConstants.Nutrition.TOTAL_FAT),
+                                    "saturated_fat" to data.getFloat(HealthConstants.Nutrition.SATURATED_FAT),
+                                    "polysaturated_fat" to data.getFloat(HealthConstants.Nutrition.POLYSATURATED_FAT),
+                                    "monosaturated_fat" to data.getFloat(HealthConstants.Nutrition.MONOSATURATED_FAT),
+                                    "trans_fat" to data.getFloat(HealthConstants.Nutrition.TRANS_FAT),
+                                    "carbohydrate" to data.getFloat(HealthConstants.Nutrition.CARBOHYDRATE),
+                                    "dietary_fiber" to data.getFloat(HealthConstants.Nutrition.DIETARY_FIBER),
+                                    "sugar" to data.getFloat(HealthConstants.Nutrition.SUGAR),
+                                    "protein" to data.getFloat(HealthConstants.Nutrition.PROTEIN),
+                                    "cholesterol" to data.getFloat(HealthConstants.Nutrition.CHOLESTEROL),
+                                    "sodium" to data.getFloat(HealthConstants.Nutrition.SODIUM),
+                                    "potassium" to data.getFloat(HealthConstants.Nutrition.POTASSIUM),
+                                    "vitamin_a" to data.getFloat(HealthConstants.Nutrition.VITAMIN_A),
+                                    "vitamin_c" to data.getFloat(HealthConstants.Nutrition.VITAMIN_C),
+                                    "calcium" to data.getFloat(HealthConstants.Nutrition.CALCIUM),
+                                    "iron" to data.getFloat(HealthConstants.Nutrition.IRON)
+                                )
+                            )
+                        }
+                        cont.resume(nutritionList)
                     }
-                    cont.resume(nutritionList)
+                } catch (e: Exception) {
+                    Log.e(APP_TAG, "영양소 데이터 Exception: ${e.message}")
+                    cont.resume(emptyList())
                 }
             }
         }
@@ -1188,59 +1237,59 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         activity = null
     }
 
-}
 
-object ExerciseTypeMapper {
-    private val typeMap = mapOf(
-        1001 to "Walking",
-        1002 to "Running",
-        1003 to "Cycling",
-        1004 to "Hiking",
-        1005 to "Mountain Biking",
-        1006 to "Treadmill",
-        1007 to "Elliptical Trainer",
-        1008 to "Pilates",
-        1009 to "Rowing Machine",
-        1010 to "Spinning",
-        1011 to "Stair Climber",
-        1012 to "Yoga",
-        1013 to "Aerobics",
-        1014 to "Dancing",
-        1015 to "Strength Training",
-        1016 to "Swimming",
-        1017 to "Circuit Training",
-        1018 to "Other"
-    )
+    object ExerciseTypeMapper {
+        private val typeMap = mapOf(
+            1001 to "Walking",
+            1002 to "Running",
+            1003 to "Cycling",
+            1004 to "Hiking",
+            1005 to "Mountain Biking",
+            1006 to "Treadmill",
+            1007 to "Elliptical Trainer",
+            1008 to "Pilates",
+            1009 to "Rowing Machine",
+            1010 to "Spinning",
+            1011 to "Stair Climber",
+            1012 to "Yoga",
+            1013 to "Aerobics",
+            1014 to "Dancing",
+            1015 to "Strength Training",
+            1016 to "Swimming",
+            1017 to "Circuit Training",
+            1018 to "Other"
+        )
 
-    fun getName(type: Int): String {
-        return typeMap[type] ?: "Unknown"
+        fun getName(type: Int): String {
+            return typeMap[type] ?: "Unknown"
+        }
     }
-}
 
-object SleepTypeMapper {
-    private val map = mapOf(
-        40001 to "Awake",
-        40002 to "Light",
-        40003 to "Deep",
-        40004 to "REM"
-    )
+    object SleepTypeMapper {
+        private val map = mapOf(
+            40001 to "Awake",
+            40002 to "Light",
+            40003 to "Deep",
+            40004 to "REM"
+        )
 
-    fun getName(type: Int): String {
-        return map[type] ?: "Unknown"
+        fun getName(type: Int): String {
+            return map[type] ?: "Unknown"
+        }
     }
-}
 
-object MealTypeMapper {
-    private val map = mapOf(
-        100001 to "Breakfast",
-        100002 to "Lunch",
-        100003 to "Dinner",
-        100004 to "Morning Snack",
-        100005 to "Afternoon Snack",
-        100006 to "Evening Snack"
-    )
+    object MealTypeMapper {
+        private val map = mapOf(
+            100001 to "Breakfast",
+            100002 to "Lunch",
+            100003 to "Dinner",
+            100004 to "Morning Snack",
+            100005 to "Afternoon Snack",
+            100006 to "Evening Snack"
+        )
 
-    fun getName(type: Int): String {
-        return map[type] ?: "Unknown"
+        fun getName(type: Int): String {
+            return map[type] ?: "Unknown"
+        }
     }
 }
