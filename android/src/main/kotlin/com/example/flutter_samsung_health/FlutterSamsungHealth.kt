@@ -224,7 +224,18 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 val permission = PermissionKey(Weight.HEALTH_DATA_TYPE, PermissionType.READ)
                 checkPermissionAndExecute(permission,
                     onGranted = {
-                        getWeightDataAsync(start, end, result)
+                        CoroutineScope(Dispatchers.Default).launch {
+                            try {
+                                val data = getWeightDataAsync(start, end)
+                                withContext(Dispatchers.Main) {
+                                    result.success(data)
+                                }
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) {
+                                    result.error("GET_WEIGHT_ERROR", e.message, null)
+                                }
+                            }
+                        }
                     },
                     onDenied = {
                         requestPermission(result, permission)
@@ -238,7 +249,18 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 val permission = PermissionKey(OxygenSaturation.HEALTH_DATA_TYPE, PermissionType.READ)
                 checkPermissionAndExecute(permission,
                     onGranted = {
-                        getOxygenSaturationDataAsync(start, end, result)
+                        CoroutineScope(Dispatchers.Default).launch {
+                            try {
+                                val data = getOxygenSaturationDataAsync(start, end)
+                                withContext(Dispatchers.Main) {
+                                    result.success(data)
+                                }
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) {
+                                    result.error("GET_OXYGENSATURATION_ERROR", e.message, null)
+                                }
+                            }
+                        }
                     },
                     onDenied = {
                         requestPermission(result, permission)
