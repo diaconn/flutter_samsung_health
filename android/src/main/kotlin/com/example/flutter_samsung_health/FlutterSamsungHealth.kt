@@ -128,7 +128,18 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 val permission = PermissionKey(Exercise.HEALTH_DATA_TYPE, PermissionType.READ)
                 checkPermissionAndExecute(permission,
                     onGranted = {
-                        getExerciseDataAsync(start, end, result)
+                        CoroutineScope(Dispatchers.Default).launch {
+                            try {
+                                val data = getExerciseDataAsync(start, end)
+                                withContext(Dispatchers.Main) {
+                                    result.success(data)
+                                }
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) {
+                                    result.error("GET_EXERCISE_ERROR", e.message, null)
+                                }
+                            }
+                        }
                     },
                     onDenied = {
                         requestPermission(result, permission)
@@ -659,7 +670,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         }
     }
 
-    /**동
+    /**
      * 운동 조회
      */
     suspend fun getExerciseDataAsync(start: Long, end: Long): List<Map<String, Any>> =
