@@ -89,6 +89,18 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
         .toList();
   }
 
+  /// 운동 조회
+  @override
+  Future<List<Map<String, dynamic>>> getExerciseSessionsAsync(int start, int end) async {
+    final result = await methodChannel.invokeMethod<List>('getExerciseSessionsAsync', {
+      'start': start,
+      'end': end,
+    });
+    return (result ?? [])
+        .map((item) => Map<String, dynamic>.from((item as Map).map((key, value) => MapEntry(key.toString(), value))))
+        .toList();
+  }
+
   /// 심박 조회
   @override
   Future<List<Map<String, dynamic>>> getHeartRateData(int start, int end) async {

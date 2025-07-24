@@ -42,6 +42,14 @@ class FlutterSamsungHealth {
     return FlutterSamsungHealthPlatform.instance.getExerciseSessions(start, end);
   }
 
+  /// 운동 조회
+  Future<List<Map<String, dynamic>>> getExerciseSessionsAsync({
+    required int start,
+    required int end,
+  }) {
+    return FlutterSamsungHealthPlatform.instance.getExerciseSessionsAsync(start, end);
+  }
+
   /// 심박수 조회
   Future<List<Map<String, dynamic>>> getHeartRateData({
     required int start,

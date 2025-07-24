@@ -122,6 +122,20 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 )
             }
 
+            "getExerciseSessionsAsync" -> {
+                val start = call.argument<Long>("start")!!
+                val end = call.argument<Long>("end")!!
+                val permission = PermissionKey(Exercise.HEALTH_DATA_TYPE, PermissionType.READ)
+                checkPermissionAndExecute(permission,
+                    onGranted = {
+                        getExerciseDataAsync(start, end, result)
+                    },
+                    onDenied = {
+                        requestPermission(result, permission)
+                    }
+                )
+            }
+
             "getHeartRateData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
@@ -189,7 +203,34 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                     },
                     onDenied = {
                         requestPermission(result, permission)
-//            result.error("PERMISSION_DENIED", "심박수 권한이 없습니다.", null)
+                    }
+                )
+            }
+
+            "getWeightData" -> {
+                val start = call.argument<Long>("start")!!
+                val end = call.argument<Long>("end")!!
+                val permission = PermissionKey(Weight.HEALTH_DATA_TYPE, PermissionType.READ)
+                checkPermissionAndExecute(permission,
+                    onGranted = {
+                        getWeightDataAsync(start, end, result)
+                    },
+                    onDenied = {
+                        requestPermission(result, permission)
+                    }
+                )
+            }
+
+            "getOxygenSaturationData" -> {
+                val start = call.argument<Long>("start")!!
+                val end = call.argument<Long>("end")!!
+                val permission = PermissionKey(OxygenSaturation.HEALTH_DATA_TYPE, PermissionType.READ)
+                checkPermissionAndExecute(permission,
+                    onGranted = {
+                        getOxygenSaturationDataAsync(start, end, result)
+                    },
+                    onDenied = {
+                        requestPermission(result, permission)
                     }
                 )
             }
@@ -526,7 +567,13 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                     else emptyList()
                 }
                 val oxygenSaturation = async {
-                    if (grantedPermissions.contains(PermissionKey(OxygenSaturation.HEALTH_DATA_TYPE, PermissionType.READ)))
+                    if (grantedPermissions.contains(
+                            PermissionKey(
+                                OxygenSaturation.HEALTH_DATA_TYPE,
+                                PermissionType.READ
+                            )
+                        )
+                    )
                         getOxygenSaturationDataAsync(start, end)
                     else emptyList()
                 }
@@ -612,7 +659,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         }
     }
 
-    /**
+    /**동
      * 운동 조회
      */
     suspend fun getExerciseDataAsync(start: Long, end: Long): List<Map<String, Any>> =
