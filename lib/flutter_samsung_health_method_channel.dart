@@ -77,7 +77,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     return groupedData;
   }
 
-  /// 운동 세션 조회
+  /// 운동 조회
   @override
   Future<List<Map<String, dynamic>>> getExerciseSessions(int start, int end) async {
     final result = await methodChannel.invokeMethod<List>('getExerciseSessions', {
@@ -137,7 +137,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
         .toList();
   }
 
-  /// 걷기수 조회 (5분 누적)
+  /// 걷기 조회(5분 누적)
   @override
   Future<List<Map<String, dynamic>>> getStepCountSeries(int start, int end) async {
     final result = await methodChannel.invokeMethod<List>('getStepCountSeries', {
@@ -149,10 +149,34 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
         .toList();
   }
 
-  /// 식사 영양소 조회
+  /// 영양소 조회
   @override
   Future<List<Map<String, dynamic>>> getNutritionData(int start, int end) async {
     final result = await methodChannel.invokeMethod<List>('getNutritionData', {
+      'start': start,
+      'end': end,
+    });
+    return (result ?? [])
+        .map((item) => Map<String, dynamic>.from((item as Map).map((key, value) => MapEntry(key.toString(), value))))
+        .toList();
+  }
+
+  /// 무게 조회
+  @override
+  Future<List<Map<String, dynamic>>> getWeightData(int start, int end) async {
+    final result = await methodChannel.invokeMethod<List>('getWeightData', {
+      'start': start,
+      'end': end,
+    });
+    return (result ?? [])
+        .map((item) => Map<String, dynamic>.from((item as Map).map((key, value) => MapEntry(key.toString(), value))))
+        .toList();
+  }
+
+  /// 산소 포화도 조회
+  @override
+  Future<List<Map<String, dynamic>>> getOxygenSaturationData(int start, int end) async {
+    final result = await methodChannel.invokeMethod<List>('getOxygenSaturationData', {
       'start': start,
       'end': end,
     });
