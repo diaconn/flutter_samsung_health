@@ -630,7 +630,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                     "exercise" to exercise.await(),
                     "heart_rate" to heartRate.await(),
                     "sleep" to sleep.await(),
-                    "steps" to steps.await(),
+                    "step" to steps.await(),
                     "nutrition" to nutrition.await(),
                     "weight" to weight.await(),
                     "oxygen_saturation" to oxygenSaturation.await(),
@@ -822,7 +822,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     /**
      * 수면 단계 조회
      */
-    private fun getSleepStageData(start: Long, end: Long, result: MethodChannel.Result) {
+    private fun getSleepStageData(start: Long, end: Long, result: MethodChannel.Result) 면{
         val request = ReadRequest.Builder()
             .setDataType(SleepStage.HEALTH_DATA_TYPE)
             .setLocalTimeRange(SleepStage.START_TIME, SleepStage.TIME_OFFSET, start, end)
