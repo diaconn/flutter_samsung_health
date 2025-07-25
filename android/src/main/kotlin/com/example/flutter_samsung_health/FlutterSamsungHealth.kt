@@ -108,7 +108,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 )
             }
 
-            "getExerciseSessions" -> {
+            "getExerciseData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
                 val permission = PermissionKey(Exercise.HEALTH_DATA_TYPE, PermissionType.READ)
@@ -122,7 +122,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 )
             }
 
-            "getExerciseSessionsAsync" -> {
+            "getExerciseDataAsync" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
                 val permission = PermissionKey(Exercise.HEALTH_DATA_TYPE, PermissionType.READ)
@@ -161,6 +161,31 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 )
             }
 
+            "getHeartRateDataAsync" -> {
+                val start = call.argument<Long>("start")!!
+                val end = call.argument<Long>("end")!!
+                val permission = PermissionKey(HeartRate.HEALTH_DATA_TYPE, PermissionType.READ)
+                checkPermissionAndExecute(permission,
+                    onGranted = {
+                        CoroutineScope(Dispatchers.Default).launch {
+                            try {
+                                val data = getHeartRateDataAsync(start, end)
+                                withContext(Dispatchers.Main) {
+                                    result.success(data)
+                                }
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) {
+                                    result.error("GET_HEART_RATE_ERROR", e.message, null)
+                                }
+                            }
+                        }
+                    },
+                    onDenied = {
+                        requestPermission(result, permission)
+                    }
+                )
+            }
+
             "getHeartRate5minSeries" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
@@ -190,13 +215,63 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 )
             }
 
-            "getStepCountSeries" -> {
+            "getSleepDataAsync" -> {
+                val start = call.argument<Long>("start")!!
+                val end = call.argument<Long>("end")!!
+                val permission = PermissionKey(Sleep.HEALTH_DATA_TYPE, PermissionType.READ)
+                checkPermissionAndExecute(permission,
+                    onGranted = {
+                        CoroutineScope(Dispatchers.Default).launch {
+                            try {
+                                val data = getSleepDataAsync(start, end)
+                                withContext(Dispatchers.Main) {
+                                    result.success(data)
+                                }
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) {
+                                    result.error("GET_SLEEP_ERROR", e.message, null)
+                                }
+                            }
+                        }
+                    },
+                    onDenied = {
+                        requestPermission(result, permission)
+                    }
+                )
+            }
+
+            "getStepData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
                 val permission = PermissionKey(StepCount.HEALTH_DATA_TYPE, PermissionType.READ)
                 checkPermissionAndExecute(permission,
                     onGranted = {
                         getStepCountData(start, end, result)
+                    },
+                    onDenied = {
+                        requestPermission(result, permission)
+                    }
+                )
+            }
+
+            "getStepDataAsync" -> {
+                val start = call.argument<Long>("start")!!
+                val end = call.argument<Long>("end")!!
+                val permission = PermissionKey(StepCount.HEALTH_DATA_TYPE, PermissionType.READ)
+                checkPermissionAndExecute(permission,
+                    onGranted = {
+                        CoroutineScope(Dispatchers.Default).launch {
+                            try {
+                                val data = getStepDataAsync(start, end)
+                                withContext(Dispatchers.Main) {
+                                    result.success(data)
+                                }
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) {
+                                    result.error("GET_STEP_ERROR", e.message, null)
+                                }
+                            }
+                        }
                     },
                     onDenied = {
                         requestPermission(result, permission)
@@ -211,6 +286,31 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 checkPermissionAndExecute(permission,
                     onGranted = {
                         getNutritionData(start, end, result)
+                    },
+                    onDenied = {
+                        requestPermission(result, permission)
+                    }
+                )
+            }
+
+            "getNutritionDataAsync" -> {
+                val start = call.argument<Long>("start")!!
+                val end = call.argument<Long>("end")!!
+                val permission = PermissionKey(Nutrition.HEALTH_DATA_TYPE, PermissionType.READ)
+                checkPermissionAndExecute(permission,
+                    onGranted = {
+                        CoroutineScope(Dispatchers.Default).launch {
+                            try {
+                                val data = getNutritionDataAsync(start, end)
+                                withContext(Dispatchers.Main) {
+                                    result.success(data)
+                                }
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) {
+                                    result.error("GET_NUTRITION_ERROR", e.message, null)
+                                }
+                            }
+                        }
                     },
                     onDenied = {
                         requestPermission(result, permission)
@@ -687,7 +787,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                     )
                 )
             }
-            Log.d(APP_TAG, "운동조회 결과. $exercisesList")
             result.success(exercisesList)
         }
     }
@@ -744,7 +843,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                                 )
                             )
                         }
-                        Log.d(APP_TAG, "운동데이터 종료")
+                        Log.d(APP_TAG, "운동 데이터 종료")
                         cont.resume(resultList)
                     }
                 } catch (e: Exception) {
@@ -900,7 +999,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                                 )
                             )
                         }
-                        Log.d(APP_TAG, "심박데이터 종료")
+                        Log.d(APP_TAG, "심박 데이터 종료")
                         cont.resume(resultList)
                     }
                 } catch (e: Exception) {
@@ -1023,7 +1122,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                                 )
                             )
                         }
-                        Log.d(APP_TAG, "수면데이터 종료")
+                        Log.d(APP_TAG, "수면 데이터 종료")
                         cont.resume(resultList)
                     }
                 } catch (e: Exception) {
@@ -1044,7 +1143,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
             .addFunction(AggregateFunction.SUM, StepCount.COUNT, "total_step")
             .addFunction(AggregateFunction.SUM, StepCount.CALORIE, "total_calorie")
             .addFunction(AggregateFunction.SUM, StepCount.DISTANCE, "total_distance")
-            .addFunction(AggregateFunction.AVG, StepCount.SPEED, "avg_speed")
             .setLocalTimeRange(StepCount.START_TIME, StepCount.TIME_OFFSET, start, end)
             .setTimeGroup(
                 AggregateRequest.TimeGroupUnit.MINUTELY,
@@ -1064,7 +1162,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 val steps = data.getInt("total_step")
                 val calorie = data.getFloat("total_calorie")
                 val distance = data.getFloat("total_distance")
-                val speed = data.getFloat("avg_speed")
                 val timestamp = try {
                     sdf.parse(timeStr)?.time ?: continue
                 } catch (e: Exception) {
@@ -1078,8 +1175,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                         "time_str" to timeStr,
                         "steps" to steps,
                         "calorie" to calorie,
-                        "distance" to distance,
-                        "speed" to speed
+                        "distance" to distance
                     )
                 )
             }
@@ -1103,7 +1199,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                         .addFunction(AggregateFunction.SUM, StepCount.COUNT, "total_step")
                         .addFunction(AggregateFunction.SUM, StepCount.CALORIE, "total_calorie")
                         .addFunction(AggregateFunction.SUM, StepCount.DISTANCE, "total_distance")
-                        .addFunction(AggregateFunction.AVG, StepCount.SPEED, "avg_speed")
                         .setLocalTimeRange(StepCount.START_TIME, StepCount.TIME_OFFSET, start, end)
                         .setTimeGroup(
                             AggregateRequest.TimeGroupUnit.MINUTELY,
@@ -1123,7 +1218,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                             val steps = data.getInt("total_step")
                             val calorie = data.getFloat("total_calorie")
                             val distance = data.getFloat("total_distance")
-                            val speed = data.getFloat("avg_speed")
 
                             val timestamp = try {
                                 sdf.parse(timeStr)?.time ?: continue
@@ -1138,12 +1232,11 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                                     "time_str" to timeStr,
                                     "steps" to steps,
                                     "calorie" to calorie,
-                                    "distance" to distance,
-                                    "speed" to speed
+                                    "distance" to distance
                                 )
                             )
                         }
-                        Log.d(APP_TAG, "걷기데이터 종료")
+                        Log.d(APP_TAG, "걷기 데이터 종료")
                         cont.resume(hourlyStepList)
                     }
                 } catch (e: Exception) {
@@ -1304,6 +1397,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                                 )
                             )
                         }
+                        Log.d(APP_TAG, "영양소 데이터 종료")
                         cont.resume(nutritionList)
                     }
                 } catch (e: Exception) {
@@ -1371,6 +1465,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                                 )
                             )
                         }
+                        Log.d(APP_TAG, "무 데이터 종료")
                         cont.resume(weightList)
                     }
                 } catch (e: Exception) {
@@ -1422,6 +1517,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                                 )
                             )
                         }
+                        Log.d(APP_TAG, "산소 포화도 데이터 종료")
                         cont.resume(oxygenSaturationList)
                     }
                 } catch (e: Exception) {

@@ -42,13 +42,16 @@ abstract class FlutterSamsungHealthPlatform extends PlatformInterface {
   Future<Map<String, List<Map<String, dynamic>>>> getTotalData(int start, int end);
 
   /// 운동
-  Future<List<Map<String, dynamic>>> getExerciseSessions(int start, int end);
+  Future<List<Map<String, dynamic>>> getExerciseData(int start, int end);
 
   /// 운동
-  Future<List<Map<String, dynamic>>> getExerciseSessionsAsync(int start, int end);
+  Future<List<Map<String, dynamic>>> getExerciseDataAsync(int start, int end);
 
   /// 심박
   Future<List<Map<String, dynamic>>> getHeartRateData(int start, int end);
+
+  /// 심박
+  Future<List<Map<String, dynamic>>> getHeartRateDataAsync(int start, int end);
 
   /// 5분 심박
   Future<List<Map<String, dynamic>>> getHeartRate5minSeries(int start, int end);
@@ -56,14 +59,23 @@ abstract class FlutterSamsungHealthPlatform extends PlatformInterface {
   /// 수면
   Future<List<Map<String, dynamic>>> getSleepData(int start, int end);
 
+  /// 수면
+  Future<List<Map<String, dynamic>>> getSleepDataAsync(int start, int end);
+
   /// 수면 단계
   Future<List<Map<String, dynamic>>> getSleepStageData(int start, int end);
 
   /// 걷기 조회(5분 누적)
-  Future<List<Map<String, dynamic>>> getStepCountSeries(int start, int end);
+  Future<List<Map<String, dynamic>>> getStepData(int start, int end);
+
+  /// 걷기 조회(5분 누적)
+  Future<List<Map<String, dynamic>>> getStepDataAsync(int start, int end);
 
   /// 영양소 정보
   Future<List<Map<String, dynamic>>> getNutritionData(int start, int end);
+
+  /// 영양소 정보
+  Future<List<Map<String, dynamic>>> getNutritionDataAsync(int start, int end);
 
   /// 무게 정보
   Future<List<Map<String, dynamic>>> getWeightData(int start, int end);

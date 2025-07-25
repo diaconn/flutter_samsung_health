@@ -35,19 +35,19 @@ class FlutterSamsungHealth {
   }
 
   /// 운동 조회
-  Future<List<Map<String, dynamic>>> getExerciseSessions({
+  Future<List<Map<String, dynamic>>> getExerciseData({
     required int start,
     required int end,
   }) {
-    return FlutterSamsungHealthPlatform.instance.getExerciseSessions(start, end);
+    return FlutterSamsungHealthPlatform.instance.getExerciseData(start, end);
   }
 
   /// 운동 조회
-  Future<List<Map<String, dynamic>>> getExerciseSessionsAsync({
+  Future<List<Map<String, dynamic>>> getExerciseDataAsync({
     required int start,
     required int end,
   }) {
-    return FlutterSamsungHealthPlatform.instance.getExerciseSessionsAsync(start, end);
+    return FlutterSamsungHealthPlatform.instance.getExerciseDataAsync(start, end);
   }
 
   /// 심박수 조회
@@ -56,6 +56,14 @@ class FlutterSamsungHealth {
     required int end,
   }) {
     return FlutterSamsungHealthPlatform.instance.getHeartRateData(start, end);
+  }
+
+  /// 심박수 조회
+  Future<List<Map<String, dynamic>>> getHeartRateDataAsync({
+    required int start,
+    required int end,
+  }) {
+    return FlutterSamsungHealthPlatform.instance.getHeartRateDataAsync(start, end);
   }
 
   /// 심박수 조회(5분 평균)
@@ -67,11 +75,19 @@ class FlutterSamsungHealth {
   }
 
   /// 걷기 조회(5분 누적)
-  Future<List<Map<String, dynamic>>> getStepCountSeries({
+  Future<List<Map<String, dynamic>>> getStepData({
     required int start,
     required int end,
   }) {
-    return FlutterSamsungHealthPlatform.instance.getStepCountSeries(start, end);
+    return FlutterSamsungHealthPlatform.instance.getStepData(start, end);
+  }
+
+  /// 걷기 조회(5분 누적)
+  Future<List<Map<String, dynamic>>> getStepDataAsync({
+    required int start,
+    required int end,
+  }) {
+    return FlutterSamsungHealthPlatform.instance.getStepDataAsync(start, end);
   }
 
   /// 수면 조회
@@ -80,6 +96,14 @@ class FlutterSamsungHealth {
     required int end,
   }) {
     return FlutterSamsungHealthPlatform.instance.getSleepData(start, end);
+  }
+
+  /// 수면 조회
+  Future<List<Map<String, dynamic>>> getSleepDataAsync({
+    required int start,
+    required int end,
+  }) {
+    return FlutterSamsungHealthPlatform.instance.getSleepDataAsync(start, end);
   }
 
   /// 수면 단계 조회
@@ -96,6 +120,14 @@ class FlutterSamsungHealth {
     required int end,
   }) {
     return FlutterSamsungHealthPlatform.instance.getNutritionData(start, end);
+  }
+
+  /// 영양소 조회
+  Future<List<Map<String, dynamic>>> getNutritionDataAsync({
+    required int start,
+    required int end,
+  }) {
+    return FlutterSamsungHealthPlatform.instance.getNutritionDataAsync(start, end);
   }
 
   /// 무게 조회

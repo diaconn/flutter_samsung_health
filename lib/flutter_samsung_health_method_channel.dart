@@ -79,8 +79,8 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
 
   /// 운동 조회
   @override
-  Future<List<Map<String, dynamic>>> getExerciseSessions(int start, int end) async {
-    final result = await methodChannel.invokeMethod<List>('getExerciseSessions', {
+  Future<List<Map<String, dynamic>>> getExerciseData(int start, int end) async {
+    final result = await methodChannel.invokeMethod<List>('getExerciseData', {
       'start': start,
       'end': end,
     });
@@ -91,8 +91,8 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
 
   /// 운동 조회
   @override
-  Future<List<Map<String, dynamic>>> getExerciseSessionsAsync(int start, int end) async {
-    final result = await methodChannel.invokeMethod<List>('getExerciseSessionsAsync', {
+  Future<List<Map<String, dynamic>>> getExerciseDataAsync(int start, int end) async {
+    final result = await methodChannel.invokeMethod<List>('getExerciseDataAsync', {
       'start': start,
       'end': end,
     });
@@ -105,6 +105,18 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
   @override
   Future<List<Map<String, dynamic>>> getHeartRateData(int start, int end) async {
     final result = await methodChannel.invokeMethod<List>('getHeartRateData', {
+      'start': start,
+      'end': end,
+    });
+    return (result ?? [])
+        .map((item) => Map<String, dynamic>.from((item as Map).map((key, value) => MapEntry(key.toString(), value))))
+        .toList();
+  }
+
+  /// 심박 조회
+  @override
+  Future<List<Map<String, dynamic>>> getHeartRateDataAsync(int start, int end) async {
+    final result = await methodChannel.invokeMethod<List>('getHeartRateDataAsync', {
       'start': start,
       'end': end,
     });
@@ -137,6 +149,18 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
         .toList();
   }
 
+  /// 수면 조회
+  @override
+  Future<List<Map<String, dynamic>>> getSleepDataAsync(int start, int end) async {
+    final result = await methodChannel.invokeMethod<List>('getSleepDataAsync', {
+      'start': start,
+      'end': end,
+    });
+    return (result ?? [])
+        .map((item) => Map<String, dynamic>.from((item as Map).map((key, value) => MapEntry(key.toString(), value))))
+        .toList();
+  }
+
   /// 수면 단계 조회
   @override
   Future<List<Map<String, dynamic>>> getSleepStageData(int start, int end) async {
@@ -151,8 +175,20 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
 
   /// 걷기 조회(5분 누적)
   @override
-  Future<List<Map<String, dynamic>>> getStepCountSeries(int start, int end) async {
-    final result = await methodChannel.invokeMethod<List>('getStepCountSeries', {
+  Future<List<Map<String, dynamic>>> getStepData(int start, int end) async {
+    final result = await methodChannel.invokeMethod<List>('getStepData', {
+      'start': start,
+      'end': end,
+    });
+    return (result ?? [])
+        .map((item) => Map<String, dynamic>.from((item as Map).map((key, value) => MapEntry(key.toString(), value))))
+        .toList();
+  }
+
+  /// 걷기 조회(5분 누적)
+  @override
+  Future<List<Map<String, dynamic>>> getStepDataAsync(int start, int end) async {
+    final result = await methodChannel.invokeMethod<List>('getStepDataAsync', {
       'start': start,
       'end': end,
     });
@@ -165,6 +201,18 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
   @override
   Future<List<Map<String, dynamic>>> getNutritionData(int start, int end) async {
     final result = await methodChannel.invokeMethod<List>('getNutritionData', {
+      'start': start,
+      'end': end,
+    });
+    return (result ?? [])
+        .map((item) => Map<String, dynamic>.from((item as Map).map((key, value) => MapEntry(key.toString(), value))))
+        .toList();
+  }
+
+  /// 영양소 조회
+  @override
+  Future<List<Map<String, dynamic>>> getNutritionDataAsync(int start, int end) async {
+    final result = await methodChannel.invokeMethod<List>('getNutritionDataAsync', {
       'start': start,
       'end': end,
     });
