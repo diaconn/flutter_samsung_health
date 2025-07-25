@@ -158,20 +158,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 )
             }
 
-            "getHeartRate5minSeries" -> {
-                val start = call.argument<Long>("start")!!
-                val end = call.argument<Long>("end")!!
-                val permission = PermissionKey(HeartRate.HEALTH_DATA_TYPE, PermissionType.READ)
-                checkPermissionAndExecute(permission,
-                    onGranted = {
-                        getHeartRate5minSeries(start, end, result)
-                    },
-                    onDenied = {
-                        requestPermission(result, permission)
-                    }
-                )
-            }
-
             "getSleepData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
@@ -715,6 +701,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                                 )
                             )
                         }
+                        Log.d(APP_TAG, $resultList)
                         Log.d(APP_TAG, "운동 데이터 종료")
                         cont.resume(resultList)
                     }
@@ -724,53 +711,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 }
             }
         }
-
-
-    /**
-     * 심박수 5분 집계 조회
-     */
-    private fun getHeartRate5minSeries(start: Long, end: Long, result: MethodChannel.Result) {
-        Log.d(APP_TAG, "getHeartRate5minSeries 호출")
-        val resolver = HealthDataResolver(mStore, null)
-        val request: AggregateRequest = AggregateRequest.Builder()
-            .setDataType(HealthConstants.HeartRate.HEALTH_DATA_TYPE)
-            .addFunction(AggregateFunction.AVG, HealthConstants.HeartRate.HEART_RATE, "avg_hr")
-            .setTimeGroup(
-                AggregateRequest.TimeGroupUnit.MINUTELY,
-                5,
-                HealthConstants.HeartRate.START_TIME,
-                HealthConstants.HeartRate.TIME_OFFSET,
-                "minute"
-            )
-            .setLocalTimeRange(
-                HealthConstants.HeartRate.START_TIME,
-                HealthConstants.HeartRate.TIME_OFFSET,
-                start,
-                end
-            )
-            .setSort(HealthConstants.HeartRate.START_TIME, HealthDataResolver.SortOrder.DESC)
-            .build()
-
-        resolver.aggregate(request).setResultListener { readResult ->
-            Log.d(APP_TAG, "5분 단위 집계 결과 수: ${readResult.count}")
-            val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-            sdf.timeZone = TimeZone.getDefault() // 또는 "UTC"로 설정
-            val heartRateList = mutableListOf<Map<String, Any>>()  // <timestamp, avg_hr>
-            for (data in readResult) {
-                val avgHr = data.getFloat("avg_hr").toDouble()
-                val timeStr = data.getString("minute") ?: continue
-                val timestamp = try {
-                    sdf.parse(timeStr)?.time ?: continue
-                } catch (e: Exception) {
-                    Log.e(APP_TAG, "날짜 파싱 오류: $timeStr", e)
-                    continue
-                }
-                Log.d(APP_TAG, "5분 데이터 → 시간: $timestamp ($timeStr), 평균 심박수: $avgHr")
-                heartRateList.add(mapOf("timestamp" to timestamp, "time_str" to timeStr, "avg_hr" to avgHr))
-            }
-            result.success(heartRateList)
-        }
-    }
 
     /**
      * 심박 조회
@@ -805,7 +745,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
 
                     val resolver = HealthDataResolver(mStore, null)
                     val resultList = mutableListOf<Map<String, Any>>()
-
                     resolver.read(request).setResultListener { result ->
                         for (data in result) {
                             resultList.add(
@@ -820,11 +759,61 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                                 )
                             )
                         }
+                        Log.d(APP_TAG, $resultList)
                         Log.d(APP_TAG, "심박 데이터 종료")
                         cont.resume(resultList)
                     }
                 } catch (e: Exception) {
                     Log.e(APP_TAG, "심박 데이터 Exception: ${e.message}")
+                    cont.resume(emptyList())
+                }
+            }
+        }
+
+    /**
+     * 수면 조회
+     */
+    private suspend fun getSleepData(start: Long, end: Long): List<Map<String, Any>> =
+        withContext(Dispatchers.Main) {
+            suspendCoroutine { cont ->
+                try {
+                    Log.d(APP_TAG, "수면 데이터 시작")
+                    val request = ReadRequest.Builder()
+                        .setDataType(HealthConstants.Sleep.HEALTH_DATA_TYPE)
+                        .setLocalTimeRange(
+                            HealthConstants.Sleep.START_TIME,
+                            HealthConstants.Sleep.TIME_OFFSET,
+                            start,
+                            end
+                        )
+                        .setSort(HealthConstants.Sleep.START_TIME, HealthDataResolver.SortOrder.DESC)
+                        .setProperties(
+                            arrayOf(
+                                HealthConstants.Sleep.START_TIME,
+                                HealthConstants.Sleep.END_TIME,
+                                HealthConstants.Sleep.TIME_OFFSET
+                            )
+                        )
+                        .build()
+
+                    val resolver = HealthDataResolver(mStore, null)
+                    val resultList = mutableListOf<Map<String, Any>>()
+                    resolver.read(request).setResultListener { result ->
+                        for (data in result) {
+                            resultList.add(
+                                mapOf(
+                                    "start_time" to data.getLong(HealthConstants.Sleep.START_TIME),
+                                    "end_time" to data.getLong(HealthConstants.Sleep.END_TIME),
+                                    "time_offset" to data.getLong(HealthConstants.Sleep.TIME_OFFSET)
+                                )
+                            )
+                        }
+                        Log.d(APP_TAG, $resultList)
+                        Log.d(APP_TAG, "수면 데이터 종료")
+                        cont.resume(resultList)
+                    }
+                } catch (e: Exception) {
+                    Log.e(APP_TAG, "수면 데이터 Exception: ${e.message}")
                     cont.resume(emptyList())
                 }
             }
@@ -869,57 +858,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     }
 
     /**
-     * 수면 조회
-     */
-    private suspend fun getSleepData(start: Long, end: Long): List<Map<String, Any>> =
-        withContext(Dispatchers.Main) {
-            suspendCoroutine { cont ->
-                try {
-                    Log.d(APP_TAG, "수면 데이터 시작")
-                    val request = ReadRequest.Builder()
-                        .setDataType(HealthConstants.Sleep.HEALTH_DATA_TYPE)
-                        .setLocalTimeRange(
-                            HealthConstants.Sleep.START_TIME,
-                            HealthConstants.Sleep.TIME_OFFSET,
-                            start,
-                            end
-                        )
-                        .setSort(HealthConstants.Sleep.START_TIME, HealthDataResolver.SortOrder.DESC)
-                        .setProperties(
-                            arrayOf(
-                                HealthConstants.Sleep.UUID,
-                                HealthConstants.Sleep.START_TIME,
-                                HealthConstants.Sleep.END_TIME,
-                                HealthConstants.Sleep.TIME_OFFSET
-                            )
-                        )
-                        .build()
-
-                    val resolver = HealthDataResolver(mStore, null)
-                    val resultList = mutableListOf<Map<String, Any>>()
-                    resolver.read(request).setResultListener { result ->
-                        for (data in result) {
-                            resultList.add(
-                                mapOf(
-                                    "id" to data.getLong(HealthConstants.Sleep.UUID),
-                                    "start_time" to data.getLong(HealthConstants.Sleep.START_TIME),
-                                    "end_time" to data.getLong(HealthConstants.Sleep.END_TIME),
-                                    "time_offset" to data.getLong(HealthConstants.Sleep.TIME_OFFSET)
-                                )
-                            )
-                        }
-                        Log.d(APP_TAG, "수면 데이터 종료")
-                        cont.resume(resultList)
-                    }
-                } catch (e: Exception) {
-                    Log.e(APP_TAG, "수면 데이터 Exception: ${e.message}")
-                    cont.resume(emptyList())
-                }
-            }
-        }
-
-    /**
-     * 걷기 집계 조회
+     * 걷기 조회(5분 누적)
      */
     private suspend fun getStepData(start: Long, end: Long): List<Map<String, Any>> =
         withContext(Dispatchers.Main) {
@@ -971,6 +910,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                                 )
                             )
                         }
+                        Log.d(APP_TAG, $resultList)
                         Log.d(APP_TAG, "걷기 데이터 종료")
                         cont.resume(hourlyStepList)
                     }
@@ -1057,6 +997,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                                 )
                             )
                         }
+                        Log.d(APP_TAG, $resultList)
                         Log.d(APP_TAG, "영양소 데이터 종료")
                         cont.resume(nutritionList)
                     }
