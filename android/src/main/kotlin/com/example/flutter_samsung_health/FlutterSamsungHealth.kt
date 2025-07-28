@@ -39,8 +39,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.*
 import java.text.SimpleDateFormat
-import java.util.Locale
-import java.util.TimeZone
+import java.util.*
 
 private val permissions = setOf(
     PermissionKey(Exercise.HEALTH_DATA_TYPE, PermissionType.READ),
@@ -719,6 +718,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
             suspendCoroutine { cont ->
                 try {
                     Log.d(APP_TAG, "심박 데이터 시작")
+                    Log.d(APP_TAG, "start : $start, end : $end, ${convertMillisToDateString(start)} ~ ${convertMillisToDateString(end)}")
                     val request = ReadRequest.Builder()
                         .setDataType(HealthConstants.HeartRate.HEALTH_DATA_TYPE)
                         .setLocalTimeRange(
@@ -1123,6 +1123,11 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
             }
         }
 
+    fun convertMillisToDateString(millis: Long): String {
+        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        sdf.timeZone = TimeZone.getTimeZone("Asia/Seoul") // KST로 명시
+        return sdf.format(Date(millis))
+    }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
