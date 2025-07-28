@@ -776,6 +776,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
             suspendCoroutine { cont ->
                 try {
                     Log.d(APP_TAG, "수면 데이터 시작")
+                    Log.d(APP_TAG, "start : $start, end : $end, ${convertMillisToDateString(start)} ~ ${convertMillisToDateString(end)}")
                     val request = ReadRequest.Builder()
                         .setDataType(HealthConstants.Sleep.HEALTH_DATA_TYPE)
                         .setLocalTimeRange(
@@ -862,6 +863,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
             suspendCoroutine { cont ->
                 try {
                     Log.d(APP_TAG, "걷기 데이터 시작")
+                    Log.d(APP_TAG, "start : $start, end : $end, ${convertMillisToDateString(start)} ~ ${convertMillisToDateString(end)}")
                     val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
                     sdf.timeZone = TimeZone.getDefault()
 
