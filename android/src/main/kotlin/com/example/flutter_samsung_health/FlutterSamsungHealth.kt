@@ -701,7 +701,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                                 )
                             )
                         }
-                        Log.d(APP_TAG, $resultList)
                         Log.d(APP_TAG, "운동 데이터 종료")
                         cont.resume(resultList)
                     }
@@ -759,7 +758,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                                 )
                             )
                         }
-                        Log.d(APP_TAG, $resultList)
                         Log.d(APP_TAG, "심박 데이터 종료")
                         cont.resume(resultList)
                     }
@@ -808,7 +806,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                                 )
                             )
                         }
-                        Log.d(APP_TAG, $resultList)
                         Log.d(APP_TAG, "수면 데이터 종료")
                         cont.resume(resultList)
                     }
@@ -822,7 +819,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     /**
      * 수면 단계 조회
      */
-    private fun getSleepStageData(start: Long, end: Long, result: MethodChannel.Result) 면{
+    private fun getSleepStageData(start: Long, end: Long, result: MethodChannel.Result) {
         val request = ReadRequest.Builder()
             .setDataType(SleepStage.HEALTH_DATA_TYPE)
             .setLocalTimeRange(SleepStage.START_TIME, SleepStage.TIME_OFFSET, start, end)
@@ -910,7 +907,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                                 )
                             )
                         }
-                        Log.d(APP_TAG, $resultList)
                         Log.d(APP_TAG, "걷기 데이터 종료")
                         cont.resume(hourlyStepList)
                     }
@@ -997,7 +993,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                                 )
                             )
                         }
-                        Log.d(APP_TAG, $resultList)
                         Log.d(APP_TAG, "영양소 데이터 종료")
                         cont.resume(nutritionList)
                     }
