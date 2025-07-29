@@ -54,6 +54,8 @@ private val permissions = setOf(
 private const val PREF_NAME = "samsung_health_preferences"
 private const val PREF_KEY_PERMISSION_REQUESTED = "permission_requested"
 
+private const val timeOffset = TimeZone.getDefault().rawOffset // KST = 9시간 = 32400000 ms
+
 /** FlutterSamsungHealth */
 class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     /// The MethodChannel that will the communication between Flutter and native Android
@@ -719,13 +721,16 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 try {
                     Log.d(APP_TAG, "심박 데이터 시작")
                     Log.d(APP_TAG, "start : $start, end : $end, ${convertMillisToDateString(start)} ~ ${convertMillisToDateString(end)}")
+                    val fixedStart = start - timeOffset
+                    val fixedEnd = end - timeOffset
+                    Log.d(APP_TAG, "fixedStart : $fixedStart, end : $fixedEnd, ${convertMillisToDateString(fixedStart)} ~ ${convertMillisToDateString(fixedEnd)}")
                     val request = ReadRequest.Builder()
                         .setDataType(HealthConstants.HeartRate.HEALTH_DATA_TYPE)
                         .setLocalTimeRange(
                             HealthConstants.HeartRate.START_TIME,
                             HealthConstants.HeartRate.TIME_OFFSET,
-                            start,
-                            end
+                            fixedStart,
+                            fixedEnd
                         )
                         .setSort(HealthConstants.HeartRate.START_TIME, HealthDataResolver.SortOrder.DESC)
                         .setProperties(
@@ -777,13 +782,16 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 try {
                     Log.d(APP_TAG, "수면 데이터 시작")
                     Log.d(APP_TAG, "start : $start, end : $end, ${convertMillisToDateString(start)} ~ ${convertMillisToDateString(end)}")
+                    val fixedStart = start - timeOffset
+                    val fixedEnd = end - timeOffset
+                    Log.d(APP_TAG, "fixedStart : $fixedStart, end : $fixedEnd, ${convertMillisToDateString(fixedStart)} ~ ${convertMillisToDateString(fixedEnd)}")
                     val request = ReadRequest.Builder()
                         .setDataType(HealthConstants.Sleep.HEALTH_DATA_TYPE)
                         .setLocalTimeRange(
                             HealthConstants.Sleep.START_TIME,
                             HealthConstants.Sleep.TIME_OFFSET,
-                            start,
-                            end
+                            fixedStart,
+                            fixedEnd
                         )
                         .setSort(HealthConstants.Sleep.START_TIME, HealthDataResolver.SortOrder.DESC)
                         .setProperties(
@@ -864,6 +872,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 try {
                     Log.d(APP_TAG, "걷기 데이터 시작")
                     Log.d(APP_TAG, "start : $start, end : $end, ${convertMillisToDateString(start)} ~ ${convertMillisToDateString(end)}")
+                    val fixedStart = start - timeOffset
+                    val fixedEnd = end - timeOffset
+                    Log.d(APP_TAG, "fixedStart : $fixedStart, end : $fixedEnd, ${convertMillisToDateString(fixedStart)} ~ ${convertMillisToDateString(fixedEnd)}")
                     val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
                     sdf.timeZone = TimeZone.getDefault()
 
@@ -872,7 +883,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                         .addFunction(AggregateFunction.SUM, StepCount.COUNT, "total_step")
                         .addFunction(AggregateFunction.SUM, StepCount.CALORIE, "total_calorie")
                         .addFunction(AggregateFunction.SUM, StepCount.DISTANCE, "total_distance")
-                        .setLocalTimeRange(StepCount.START_TIME, StepCount.TIME_OFFSET, start, end)
+                        .setLocalTimeRange(StepCount.START_TIME, StepCount.TIME_OFFSET, fixedStart, fixedEnd)
                         .setTimeGroup(
                             AggregateRequest.TimeGroupUnit.MINUTELY,
                             5,
