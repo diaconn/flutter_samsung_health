@@ -54,8 +54,6 @@ private val permissions = setOf(
 private const val PREF_NAME = "samsung_health_preferences"
 private const val PREF_KEY_PERMISSION_REQUESTED = "permission_requested"
 
-private const val timeOffset = TimeZone.getDefault().rawOffset // KST = 9시간 = 32400000 ms
-
 /** FlutterSamsungHealth */
 class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     /// The MethodChannel that will the communication between Flutter and native Android
@@ -66,6 +64,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     private val APP_TAG: String = "FlutterSamsungHealth"
     private lateinit var mStore: HealthDataStore
     private var activity: Activity? = null
+    private val timeOffset = TimeZone.getDefault().rawOffset // KST = 9시간 = 32400000 ms
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         context = flutterPluginBinding.applicationContext
