@@ -64,4 +64,7 @@ abstract class FlutterSamsungHealthPlatform extends PlatformInterface {
 
   /// 산소 포화도 정보
   Future<List<Map<String, dynamic>>> getOxygenSaturationData(int start, int end);
+
+  /// 체온 정보
+  Future<List<Map<String, dynamic>>> getBodyTemperatureData(int start, int end);
 }

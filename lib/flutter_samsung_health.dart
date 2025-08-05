@@ -97,4 +97,12 @@ class FlutterSamsungHealth {
   }) {
     return FlutterSamsungHealthPlatform.instance.getOxygenSaturationData(start, end);
   }
+
+  /// 체온 조회
+  Future<List<Map<String, dynamic>>> getBodyTemperatureData({
+    required int start,
+    required int end,
+  }) {
+    return FlutterSamsungHealthPlatform.instance.getBodyTemperatureData(start, end);
+  }
 }

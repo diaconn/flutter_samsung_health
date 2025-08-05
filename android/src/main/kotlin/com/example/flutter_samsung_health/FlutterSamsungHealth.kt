@@ -7,6 +7,7 @@ import android.net.Uri
 import android.util.Log
 import com.samsung.android.sdk.healthdata.HealthConnectionErrorResult
 import com.samsung.android.sdk.healthdata.HealthConstants
+import com.samsung.android.sdk.healthdata.HealthConstants.BodyTemperature
 import com.samsung.android.sdk.healthdata.HealthConstants.Exercise
 import com.samsung.android.sdk.healthdata.HealthConstants.HeartRate
 import com.samsung.android.sdk.healthdata.HealthConstants.Sleep
@@ -19,6 +20,7 @@ import com.samsung.android.sdk.healthdata.HealthDataResolver
 import com.samsung.android.sdk.healthdata.HealthDataResolver.ReadRequest
 import com.samsung.android.sdk.healthdata.HealthDataResolver.AggregateRequest
 import com.samsung.android.sdk.healthdata.HealthDataResolver.AggregateRequest.AggregateFunction
+import com.samsung.android.sdk.healthdata.HealthDataObserver
 import com.samsung.android.sdk.healthdata.HealthDataStore
 import com.samsung.android.sdk.healthdata.HealthPermissionManager
 import com.samsung.android.sdk.healthdata.HealthPermissionManager.PermissionKey
@@ -26,6 +28,7 @@ import com.samsung.android.sdk.healthdata.HealthPermissionManager.PermissionType
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
@@ -50,21 +53,24 @@ private val permissions = setOf(
     PermissionKey(Nutrition.HEALTH_DATA_TYPE, PermissionType.READ),
     PermissionKey(Weight.HEALTH_DATA_TYPE, PermissionType.READ),
     PermissionKey(OxygenSaturation.HEALTH_DATA_TYPE, PermissionType.READ),
+    PermissionKey(BodyTemperature.HEALTH_DATA_TYPE, PermissionType.READ),
 )
 private const val PREF_NAME = "samsung_health_preferences"
 private const val PREF_KEY_PERMISSION_REQUESTED = "permission_requested"
 
 /** FlutterSamsungHealth */
-class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
+class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, EventChannel.StreamHandler {
     /// The MethodChannel that will the communication between Flutter and native Android
     /// This local reference serves to register the plugin with the Flutter Engine and unregister it
     /// when the Flutter Engine is detached from the Activity
     private lateinit var channel: MethodChannel
     private lateinit var context: Context
-    private val APP_TAG: String = "FlutterSamsungHealth"
     private lateinit var mStore: HealthDataStore
+    private val APP_TAG: String = "FlutterSamsungHealth"
     private var activity: Activity? = null
-    private val timeOffset = TimeZone.getDefault().rawOffset // KST = 9시간 = 32400000 ms
+
+    private val observers = mutableSetOf<HealthDataObserver>()
+    private val eventSinks = mutableListOf<EventChannel.EventSink>()
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         context = flutterPluginBinding.applicationContext
@@ -273,6 +279,31 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                             } catch (e: Exception) {
                                 withContext(Dispatchers.Main) {
                                     result.error("GET_OXYGENSATURATION_ERROR", e.message, null)
+                                }
+                            }
+                        }
+                    },
+                    onDenied = {
+                        requestPermission(result, permission)
+                    }
+                )
+            }
+
+            "getBodyTemperatureData" -> {
+                val start = call.argument<Long>("start")!!
+                val end = call.argument<Long>("end")!!
+                val permission = PermissionKey(BodyTemperature.HEALTH_DATA_TYPE, PermissionType.READ)
+                checkPermissionAndExecute(permission,
+                    onGranted = {
+                        CoroutineScope(Dispatchers.Default).launch {
+                            try {
+                                val data = getBodyTemperatureData(start, end)
+                                withContext(Dispatchers.Main) {
+                                    result.success(data)
+                                }
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) {
+                                    result.error("GET_BODYTEMPERATURE_ERROR", e.message, null)
                                 }
                             }
                         }
@@ -528,6 +559,30 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         }
     }
 
+//    fun registerExerciseObserver(context: Context) {
+//        val observer = object : HealthDataObserver.OnChangeListener {
+//            override fun onChange(dataTypeName: String?) {
+//                if (dataTypeName == Exercise.HEALTH_DATA_TYPE) {
+//                    CoroutineScope(Dispatchers.Main).launch {
+//                        for (sink in eventSinks) {
+//                            sink.success("exercise_updated")
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//
+//        HealthDataObserver.addOver(mStore, Exercise.HEALTH_DATA_TYPE, observer)
+//        observers.add(observer)
+//    }
+//
+//    fun unregisterExerciseObserver() {
+//        observers.forEach {
+//            HealthDataObserver.removeObserver(mStore, it)
+//        }
+//        observers.clear()
+//    }
+
     private fun showPermissionAlarmDialog() {
         Log.d(APP_TAG, "showPermissionAlarmDialog 호출")
     }
@@ -626,6 +681,12 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                     else emptyList()
                 }
 
+                val bodyTemperature = async {
+                    if (grantedPermissions.contains(PermissionKey(BodyTemperature.HEALTH_DATA_TYPE, PermissionType.READ)))
+                        getBodyTemperatureData(start, end)
+                    else emptyList()
+                }
+
                 val totalResult = mapOf(
                     "exercise" to exercise.await(),
                     "heart_rate" to heartRate.await(),
@@ -634,6 +695,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                     "nutrition" to nutrition.await(),
                     "weight" to weight.await(),
                     "oxygen_saturation" to oxygenSaturation.await(),
+                    "body_temperature" to bodyTemperature.await(),
                 )
                 withContext(Dispatchers.Main) {
                     result.success(totalResult)
@@ -720,16 +782,13 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 try {
                     Log.d(APP_TAG, "심박 데이터 시작")
                     Log.d(APP_TAG, "start : $start, end : $end, ${convertMillisToDateString(start)} ~ ${convertMillisToDateString(end)}")
-                    val fixedStart = start - timeOffset
-                    val fixedEnd = end - timeOffset
-                    Log.d(APP_TAG, "fixedStart : $fixedStart, end : $fixedEnd, ${convertMillisToDateString(fixedStart)} ~ ${convertMillisToDateString(fixedEnd)}")
                     val request = ReadRequest.Builder()
                         .setDataType(HealthConstants.HeartRate.HEALTH_DATA_TYPE)
                         .setLocalTimeRange(
                             HealthConstants.HeartRate.START_TIME,
                             HealthConstants.HeartRate.TIME_OFFSET,
-                            fixedStart,
-                            fixedEnd
+                            start,
+                            end
                         )
                         .setSort(HealthConstants.HeartRate.START_TIME, HealthDataResolver.SortOrder.DESC)
                         .setProperties(
@@ -781,16 +840,13 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 try {
                     Log.d(APP_TAG, "수면 데이터 시작")
                     Log.d(APP_TAG, "start : $start, end : $end, ${convertMillisToDateString(start)} ~ ${convertMillisToDateString(end)}")
-                    val fixedStart = start - timeOffset
-                    val fixedEnd = end - timeOffset
-                    Log.d(APP_TAG, "fixedStart : $fixedStart, end : $fixedEnd, ${convertMillisToDateString(fixedStart)} ~ ${convertMillisToDateString(fixedEnd)}")
                     val request = ReadRequest.Builder()
                         .setDataType(HealthConstants.Sleep.HEALTH_DATA_TYPE)
                         .setLocalTimeRange(
                             HealthConstants.Sleep.START_TIME,
                             HealthConstants.Sleep.TIME_OFFSET,
-                            fixedStart,
-                            fixedEnd
+                            start,
+                            end
                         )
                         .setSort(HealthConstants.Sleep.START_TIME, HealthDataResolver.SortOrder.DESC)
                         .setProperties(
@@ -871,9 +927,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 try {
                     Log.d(APP_TAG, "걷기 데이터 시작")
                     Log.d(APP_TAG, "start : $start, end : $end, ${convertMillisToDateString(start)} ~ ${convertMillisToDateString(end)}")
-                    val fixedStart = start - timeOffset
-                    val fixedEnd = end - timeOffset
-                    Log.d(APP_TAG, "fixedStart : $fixedStart, end : $fixedEnd, ${convertMillisToDateString(fixedStart)} ~ ${convertMillisToDateString(fixedEnd)}")
                     val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
                     sdf.timeZone = TimeZone.getDefault()
 
@@ -882,7 +935,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                         .addFunction(AggregateFunction.SUM, StepCount.COUNT, "total_step")
                         .addFunction(AggregateFunction.SUM, StepCount.CALORIE, "total_calorie")
                         .addFunction(AggregateFunction.SUM, StepCount.DISTANCE, "total_distance")
-                        .setLocalTimeRange(StepCount.START_TIME, StepCount.TIME_OFFSET, fixedStart, fixedEnd)
+                        .setLocalTimeRange(StepCount.START_TIME, StepCount.TIME_OFFSET, start, end)
                         .setTimeGroup(
                             AggregateRequest.TimeGroupUnit.MINUTELY,
                             5,
@@ -1135,6 +1188,64 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
             }
         }
 
+    /**
+     * 체온 조회
+     */
+    private suspend fun getBodyTemperatureData(start: Long, end: Long): List<Map<String, Any>> =
+        withContext(Dispatchers.Main) {
+            suspendCoroutine { cont ->
+                try {
+                    Log.d(APP_TAG, "체온 데이터 시작")
+                    val request = ReadRequest.Builder()
+                        .setDataType(BodyTemperature.HEALTH_DATA_TYPE)
+                        .setLocalTimeRange(
+                            HealthConstants.BodyTemperature.START_TIME,
+                            HealthConstants.BodyTemperature.TIME_OFFSET,
+                            start,
+                            end
+                        )
+                        .setSort(HealthConstants.BodyTemperature.START_TIME, HealthDataResolver.SortOrder.DESC)
+                        .setProperties(
+                            arrayOf(
+                                HealthConstants.BodyTemperature.START_TIME,
+                                HealthConstants.BodyTemperature.TIME_OFFSET,
+                                HealthConstants.BodyTemperature.TEMPERATURE,
+                            )
+                        )
+                        .build()
+
+                    val resolver = HealthDataResolver(mStore, null)
+                    val bodyTemperatureList = mutableListOf<Map<String, Any>>()
+                    resolver.read(request).setResultListener { dataResult ->
+                        for (data in dataResult) {
+                            bodyTemperatureList.add(
+                                mapOf(
+                                    "start_time" to data.getLong(HealthConstants.BodyTemperature.START_TIME),
+                                    "time_offset" to data.getLong(HealthConstants.BodyTemperature.TIME_OFFSET),
+                                    "temperature" to data.getFloat(HealthConstants.BodyTemperature.TEMPERATURE),
+                                )
+                            )
+                        }
+                        Log.d(APP_TAG, "체온 데이터 종료")
+                        cont.resume(bodyTemperatureList)
+                    }
+                } catch (e: Exception) {
+                    Log.e(APP_TAG, "체온 데이터 Exception: ${e.message}")
+                    cont.resume(emptyList())
+                }
+            }
+        }
+
+    override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+        events?.let {
+            eventSinks.add(it)
+        }
+    }
+
+    override fun onCancel(arguments: Any?) {
+        eventSinks.clear()
+    }
+
     fun convertMillisToDateString(millis: Long): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
         sdf.timeZone = TimeZone.getTimeZone("Asia/Seoul") // KST로 명시
@@ -1160,7 +1271,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     override fun onDetachedFromActivityForConfigChanges() {
         activity = null
     }
-
 
     object ExerciseTypeMapper {
         private val typeMap = mapOf(
