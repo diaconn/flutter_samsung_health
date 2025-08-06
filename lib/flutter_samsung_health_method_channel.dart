@@ -8,17 +8,6 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
   /// The method channel used to interact with the native platform.
   @visibleForTesting
   final methodChannel = const MethodChannel('flutter_samsung_health');
-  final _eventChannel = const EventChannel('flutter_samsung_health_event');
-
-  Stream<String>? _healthStream;
-
-  @override
-  Stream<String> get healthDataChanges {
-    _healthStream ??= _eventChannel.receiveBroadcastStream().map((event) {
-      return event['type']?.toString() ?? 'unknown';
-    });
-    return _healthStream!;
-  }
 
   /// 삼성 헬스 설치 여부 체크
   @override

@@ -23,9 +23,6 @@ abstract class FlutterSamsungHealthPlatform extends PlatformInterface {
     _instance = instance;
   }
 
-  /// 헬스 데이터 변경 감지 스트림
-  Stream<String> get healthDataChanges;
-
   /// 설치 여부 체크
   Future<Map<String, dynamic>> isSamsungHealthInstalled();
 
