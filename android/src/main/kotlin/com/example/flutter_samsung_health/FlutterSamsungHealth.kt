@@ -889,35 +889,52 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     /**
      * 수면 단계 조회
      */
-    private fun getSleepStageData(start: Long, end: Long, result: MethodChannel.Result) {
-        val request = ReadRequest.Builder().setDataType(SleepStage.HEALTH_DATA_TYPE)
-            .setLocalTimeRange(SleepStage.START_TIME, SleepStage.TIME_OFFSET, start, end)
-            .setSort(HealthConstants.SleepStage.START_TIME, HealthDataResolver.SortOrder.DESC).setProperties(
-                arrayOf(
-                    HealthConstants.SleepStage.START_TIME,
-                    HealthConstants.SleepStage.END_TIME,
-                    HealthConstants.SleepStage.TIME_OFFSET,
-                    HealthConstants.SleepStage.SLEEP_ID,
-                    HealthConstants.SleepStage.STAGE
-                )
-            ).build()
+    private suspend fun getSleepStageData(start: Long, end: Long): List<Map<String, Any>> = withContext(Dispatchers.Main) {
+        suspendCoroutine { cont ->
+            try {
+                Log.d(APP_TAG, "수면 단계 데이터 시작")
+                Log.d(APP_TAG, "start : $start, end : $end, ${convertMillisToDateString(start)} ~ ${convertMillisToDateString(end)}")
+                val request =
+                    ReadRequest.Builder()
+                        .setDataType(HealthConstants.SleepStage.HEALTH_DATA_TYPE)
+                        .setLocalTimeRange(
+                            HealthConstants.SleepStage.START_TIME,
+                            HealthConstants.SleepStage.TIME_OFFSET,
+                            start,
+                            end
+                        )
+                        .setSort(HealthConstants.SleepStage.START_TIME, HealthDataResolver.SortOrder.DESC)
+                        .setProperties(
+                            arrayOf(
+                                HealthConstants.SleepStage.START_TIME,
+                                HealthConstants.SleepStage.END_TIME,
+                                HealthConstants.SleepStage.TIME_OFFSET
+                            )
+                        )
+                        .build()
 
-        val resolver = HealthDataResolver(mStore, null)
-        val sleepList = mutableListOf<Map<String, Any>>()
-        resolver.read(request).setResultListener { dataResult ->
-            for (data in dataResult) {
-                sleepList.add(
-                    mapOf(
-                        "start_time" to data.getLong(HealthConstants.SleepStage.START_TIME),
-                        "end_time" to data.getLong(HealthConstants.SleepStage.END_TIME),
-                        "time_offset" to data.getLong(HealthConstants.SleepStage.TIME_OFFSET),
-                        "sleep_id" to data.getString(HealthConstants.SleepStage.SLEEP_ID),
-                        "stage" to data.getInt(HealthConstants.SleepStage.STAGE),
-                        "stage_type_name" to SleepTypeMapper.getName(data.getInt(HealthConstants.SleepStage.STAGE))
-                    )
-                )
+                val resolver = HealthDataResolver(mStore, null)
+                val resultList = mutableListOf<Map<String, Any>>()
+                resolver.read(request).setResultListener { result ->
+                    for (data in result) {
+                        resultList.add(
+                            mapOf(
+                                "start_time" to data.getLong(HealthConstants.SleepStage.START_TIME),
+                                "end_time" to data.getLong(HealthConstants.SleepStage.END_TIME),
+                                "time_offset" to data.getLong(HealthConstants.SleepStage.TIME_OFFSET),
+                                "sleep_id" to data.getString(HealthConstants.SleepStage.SLEEP_ID),
+                                "stage" to data.getInt(HealthConstants.SleepStage.STAGE),
+                                "stage_type_name" to SleepTypeMapper.getName(data.getInt(HealthConstants.SleepStage.STAGE))
+                            )
+                        )
+                    }
+                    Log.d(APP_TAG, "수면 단계 데이터 종료")
+                    cont.resume(resultList)
+                }
+            } catch (e: Exception) {
+                Log.e(APP_TAG, "수면 단계 데이터 Exception: ${e.message}")
+                cont.resume(emptyList())
             }
-            result.success(sleepList)
         }
     }
 
