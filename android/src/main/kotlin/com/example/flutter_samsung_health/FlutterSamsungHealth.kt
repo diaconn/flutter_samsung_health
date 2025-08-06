@@ -84,7 +84,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         Nutrition.HEALTH_DATA_TYPE,
         Weight.HEALTH_DATA_TYPE,
         OxygenSaturation.HEALTH_DATA_TYPE,
-        BodyTemperature.HEALTH_DATA_TYPE,
+//        BodyTemperature.HEALTH_DATA_TYPE,
     )
 
     private val mObserver: HealthDataObserver = object : HealthDataObserver(Handler(Looper.getMainLooper())) {
