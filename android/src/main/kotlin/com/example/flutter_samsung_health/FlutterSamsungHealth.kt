@@ -1126,7 +1126,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                                 )
                             )
                         }
-                        Log.d(APP_TAG, "무 데이터 종료")
+                        Log.d(APP_TAG, "무게 데이터 종료")
                         cont.resume(weightList)
                     }
                 } catch (e: Exception) {
