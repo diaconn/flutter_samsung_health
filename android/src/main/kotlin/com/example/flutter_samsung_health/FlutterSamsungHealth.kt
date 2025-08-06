@@ -95,53 +95,24 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             val start = end - 5 * 60 * 1000  // 5분 내 데이터
 
             CoroutineScope(Dispatchers.IO).launch {
-                when (dataTypeName) {
-                    HealthConstants.Exercise.HEALTH_DATA_TYPE -> {
-                        val data = getExerciseData(start, end)
-                        notifyFlutter(dataTypeName, data)
+                val data = when (dataTypeName) {
+                    HealthConstants.Exercise.HEALTH_DATA_TYPE -> getExerciseData(start, end)
+                    HealthConstants.HeartRate.HEALTH_DATA_TYPE -> getHeartRateData(start, end)
+                    HealthConstants.Sleep.HEALTH_DATA_TYPE -> getSleepData(start, end)
+                    HealthConstants.SleepStage.HEALTH_DATA_TYPE -> getSleepStageData(start, end)
+                    HealthConstants.StepCount.HEALTH_DATA_TYPE -> getStepData(start, end)
+                    HealthConstants.Nutrition.HEALTH_DATA_TYPE -> getNutritionData(start, end)
+                    HealthConstants.Weight.HEALTH_DATA_TYPE -> getWeightData(start, end)
+                    HealthConstants.OxygenSaturation.HEALTH_DATA_TYPE -> getOxygenSaturationData(start, end)
+                    HealthConstants.BodyTemperature.HEALTH_DATA_TYPE -> getBodyTemperatureData(start, end)
+                    else -> {
+                        Log.w(APP_TAG, "옵저버 처리 안된 타입: $dataTypeName")
+                        null
                     }
+                }
 
-                    HealthConstants.HeartRate.HEALTH_DATA_TYPE -> {
-                        val data = getHeartRateData(start, end)
-                        notifyFlutter(dataTypeName, data)
-                    }
-
-                    HealthConstants.Sleep.HEALTH_DATA_TYPE -> {
-                        val data = getSleepData(start, end)
-                        notifyFlutter(dataTypeName, data)
-                    }
-
-                    HealthConstants.SleepStage.HEALTH_DATA_TYPE -> {
-                        val data = getSleepStageData(start, end)
-                        notifyFlutter(dataTypeName, data)
-                    }
-
-                    HealthConstants.StepCount.HEALTH_DATA_TYPE -> {
-                        val data = getStepData(start, end)
-                        notifyFlutter(dataTypeName, data)
-                    }
-
-                    HealthConstants.Nutrition.HEALTH_DATA_TYPE -> {
-                        val data = getNutritionData(start, end)
-                        notifyFlutter(dataTypeName, data)
-                    }
-
-                    HealthConstants.Weight.HEALTH_DATA_TYPE -> {
-                        val data = getWeightData(start, end)
-                        notifyFlutter(dataTypeName, data)
-                    }
-
-                    HealthConstants.OxygenSaturation.HEALTH_DATA_TYPE -> {
-                        val data = getOxygenSaturationData(start, end)
-                        notifyFlutter(dataTypeName, data)
-                    }
-
-                    HealthConstants.BodyTemperature.HEALTH_DATA_TYPE -> {
-                        val data = getBodyTemperatureData(start, end)
-                        notifyFlutter(dataTypeName, data)
-                    }
-
-                    else -> Log.w(APP_TAG, "옵저버 처리 안된 타입: $dataTypeName")
+                if (data != null) {
+                    notifyFlutter(dataTypeName, data)
                 }
             }
         }
@@ -663,8 +634,10 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             "type" to dataType,
             "data" to dataList
         )
-        eventSinks.forEach { sink ->
-            sink.success(payload)
+        Handler(Looper.getMainLooper()).post {
+            eventSinks.forEach { sink ->
+                sink.success(payload)
+            }
         }
     }
 
