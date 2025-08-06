@@ -112,6 +112,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 }
 
                 if (data != null) {
+                    Log.d(APP_TAG, "dataTypeName: $dataTypeName, data: $data");
                     notifyFlutter(dataTypeName, data)
                 }
             }
