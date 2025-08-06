@@ -3,6 +3,8 @@ package com.example.flutter_samsung_health
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import android.net.Uri
 import android.util.Log
 import com.samsung.android.sdk.healthdata.HealthConnectionErrorResult
@@ -44,17 +46,6 @@ import kotlinx.coroutines.*
 import java.text.SimpleDateFormat
 import java.util.*
 
-private val permissions = setOf(
-    PermissionKey(Exercise.HEALTH_DATA_TYPE, PermissionType.READ),
-    PermissionKey(HeartRate.HEALTH_DATA_TYPE, PermissionType.READ),
-    PermissionKey(Sleep.HEALTH_DATA_TYPE, PermissionType.READ),
-    PermissionKey(SleepStage.HEALTH_DATA_TYPE, PermissionType.READ),
-    PermissionKey(StepCount.HEALTH_DATA_TYPE, PermissionType.READ),
-    PermissionKey(Nutrition.HEALTH_DATA_TYPE, PermissionType.READ),
-    PermissionKey(Weight.HEALTH_DATA_TYPE, PermissionType.READ),
-    PermissionKey(OxygenSaturation.HEALTH_DATA_TYPE, PermissionType.READ),
-    PermissionKey(BodyTemperature.HEALTH_DATA_TYPE, PermissionType.READ),
-)
 private const val PREF_NAME = "samsung_health_preferences"
 private const val PREF_KEY_PERMISSION_REQUESTED = "permission_requested"
 
@@ -69,13 +60,47 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     private val APP_TAG: String = "FlutterSamsungHealth"
     private var activity: Activity? = null
 
+    private val permissions = setOf(
+        PermissionKey(Exercise.HEALTH_DATA_TYPE, PermissionType.READ),
+        PermissionKey(HeartRate.HEALTH_DATA_TYPE, PermissionType.READ),
+        PermissionKey(Sleep.HEALTH_DATA_TYPE, PermissionType.READ),
+        PermissionKey(SleepStage.HEALTH_DATA_TYPE, PermissionType.READ),
+        PermissionKey(StepCount.HEALTH_DATA_TYPE, PermissionType.READ),
+        PermissionKey(Nutrition.HEALTH_DATA_TYPE, PermissionType.READ),
+        PermissionKey(Weight.HEALTH_DATA_TYPE, PermissionType.READ),
+        PermissionKey(OxygenSaturation.HEALTH_DATA_TYPE, PermissionType.READ),
+        PermissionKey(BodyTemperature.HEALTH_DATA_TYPE, PermissionType.READ),
+    )
+
     private val observers = mutableSetOf<HealthDataObserver>()
     private val eventSinks = mutableListOf<EventChannel.EventSink>()
+
+    private val observedDataTypes = setOf(
+        Exercise.HEALTH_DATA_TYPE,
+        HeartRate.HEALTH_DATA_TYPE,
+        Sleep.HEALTH_DATA_TYPE,
+        SleepStage.HEALTH_DATA_TYPE,
+        StepCount.HEALTH_DATA_TYPE,
+        Nutrition.HEALTH_DATA_TYPE,
+        Weight.HEALTH_DATA_TYPE,
+        OxygenSaturation.HEALTH_DATA_TYPE,
+        BodyTemperature.HEALTH_DATA_TYPE,
+    )
+
+    private val mObserver: HealthDataObserver = object : HealthDataObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(dataTypeName: String) {
+            Log.d(APP_TAG, "Health data changed: $dataTypeName")
+            notifyFlutterDataChanged(dataTypeName)
+        }
+    }
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         context = flutterPluginBinding.applicationContext
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "flutter_samsung_health")
         channel.setMethodCallHandler(this)
+
+        val eventChannel = EventChannel(flutterPluginBinding.binaryMessenger, "flutter_samsung_health_event")
+        eventChannel.setStreamHandler(this)
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
@@ -380,6 +405,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             override fun onConnected() {
                 Log.d(APP_TAG, "삼성 헬스 연결 성공")
                 resultMap.put("isConnect", true)
+                registerObservers()
+
                 if (onlyRequest) {
                     requestPermissionsOnly(result)
                 } else {
@@ -549,30 +576,33 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             onDenied(permissionKeys)
         }
     }
+    private fun registerObservers() {
+        for (dataType in observedDataTypes) {
+            try {
+                HealthDataObserver.addObserver(mStore, dataType, mObserver)
+                Log.d(APP_TAG, "Observer registered: $dataType")
+            } catch (e: Exception) {
+                Log.e(APP_TAG, "Failed to register observer for $dataType", e)
+            }
+        }
+    }
 
-//    fun registerExerciseObserver(context: Context) {
-//        val observer = object : HealthDataObserver.OnChangeListener {
-//            override fun onChange(dataTypeName: String?) {
-//                if (dataTypeName == Exercise.HEALTH_DATA_TYPE) {
-//                    CoroutineScope(Dispatchers.Main).launch {
-//                        for (sink in eventSinks) {
-//                            sink.success("exercise_updated")
-//                        }
-//                    }
-//                }
-//            }
-//        }
-//
-//        HealthDataObserver.addOver(mStore, Exercise.HEALTH_DATA_TYPE, observer)
-//        observers.add(observer)
-//    }
-//
-//    fun unregisterExerciseObserver() {
-//        observers.forEach {
-//            HealthDataObserver.removeObserver(mStore, it)
-//        }
-//        observers.clear()
-//    }
+    private fun unregisterObservers() {
+        for (dataType in observedDataTypes) {
+            try {
+                HealthDataObserver.removeObserver(mStore, mObserver)
+                Log.d(APP_TAG, "Observer removed: $dataType")
+            } catch (e: Exception) {
+                Log.e(APP_TAG, "Failed to remove observer for $dataType", e)
+            }
+        }
+    }
+
+    private fun notifyFlutterDataChanged(dataTypeName: String) {
+        for (sink in eventSinks) {
+            sink.success(mapOf("type" to dataTypeName))
+        }
+    }
 
     private fun showPermissionAlarmDialog() {
         Log.d(APP_TAG, "showPermissionAlarmDialog 호출")
@@ -889,54 +919,60 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     /**
      * 수면 단계 조회
      */
-    private suspend fun getSleepStageData(start: Long, end: Long): List<Map<String, Any>> = withContext(Dispatchers.Main) {
-        suspendCoroutine { cont ->
-            try {
-                Log.d(APP_TAG, "수면 단계 데이터 시작")
-                Log.d(APP_TAG, "start : $start, end : $end, ${convertMillisToDateString(start)} ~ ${convertMillisToDateString(end)}")
-                val request =
-                    ReadRequest.Builder()
-                        .setDataType(HealthConstants.SleepStage.HEALTH_DATA_TYPE)
-                        .setLocalTimeRange(
-                            HealthConstants.SleepStage.START_TIME,
-                            HealthConstants.SleepStage.TIME_OFFSET,
-                            start,
-                            end
-                        )
-                        .setSort(HealthConstants.SleepStage.START_TIME, HealthDataResolver.SortOrder.DESC)
-                        .setProperties(
-                            arrayOf(
+    private suspend fun getSleepStageData(start: Long, end: Long): List<Map<String, Any>> =
+        withContext(Dispatchers.Main) {
+            suspendCoroutine { cont ->
+                try {
+                    Log.d(APP_TAG, "수면 단계 데이터 시작")
+                    Log.d(
+                        APP_TAG,
+                        "start : $start, end : $end, ${convertMillisToDateString(start)} ~ ${
+                            convertMillisToDateString(end)
+                        }"
+                    )
+                    val request =
+                        ReadRequest.Builder()
+                            .setDataType(HealthConstants.SleepStage.HEALTH_DATA_TYPE)
+                            .setLocalTimeRange(
                                 HealthConstants.SleepStage.START_TIME,
-                                HealthConstants.SleepStage.END_TIME,
-                                HealthConstants.SleepStage.TIME_OFFSET
+                                HealthConstants.SleepStage.TIME_OFFSET,
+                                start,
+                                end
                             )
-                        )
-                        .build()
+                            .setSort(HealthConstants.SleepStage.START_TIME, HealthDataResolver.SortOrder.DESC)
+                            .setProperties(
+                                arrayOf(
+                                    HealthConstants.SleepStage.START_TIME,
+                                    HealthConstants.SleepStage.END_TIME,
+                                    HealthConstants.SleepStage.TIME_OFFSET
+                                )
+                            )
+                            .build()
 
-                val resolver = HealthDataResolver(mStore, null)
-                val resultList = mutableListOf<Map<String, Any>>()
-                resolver.read(request).setResultListener { result ->
-                    for (data in result) {
-                        resultList.add(
-                            mapOf(
-                                "start_time" to data.getLong(HealthConstants.SleepStage.START_TIME),
-                                "end_time" to data.getLong(HealthConstants.SleepStage.END_TIME),
-                                "time_offset" to data.getLong(HealthConstants.SleepStage.TIME_OFFSET),
-                                "sleep_id" to data.getString(HealthConstants.SleepStage.SLEEP_ID),
-                                "stage" to data.getInt(HealthConstants.SleepStage.STAGE),
-                                "stage_type_name" to SleepTypeMapper.getName(data.getInt(HealthConstants.SleepStage.STAGE))
+                    val resolver = HealthDataResolver(mStore, null)
+                    val resultList = mutableListOf<Map<String, Any>>()
+                    resolver.read(request).setResultListener { result ->
+                        for (data in result) {
+                            resultList.add(
+                                mapOf(
+                                    "start_time" to data.getLong(HealthConstants.SleepStage.START_TIME),
+                                    "end_time" to data.getLong(HealthConstants.SleepStage.END_TIME),
+                                    "time_offset" to data.getLong(HealthConstants.SleepStage.TIME_OFFSET),
+                                    "sleep_id" to data.getString(HealthConstants.SleepStage.SLEEP_ID),
+                                    "stage" to data.getInt(HealthConstants.SleepStage.STAGE),
+                                    "stage_type_name" to SleepTypeMapper.getName(data.getInt(HealthConstants.SleepStage.STAGE))
+                                )
                             )
-                        )
+                        }
+                        Log.d(APP_TAG, "수면 단계 데이터 종료")
+                        cont.resume(resultList)
                     }
-                    Log.d(APP_TAG, "수면 단계 데이터 종료")
-                    cont.resume(resultList)
+                } catch (e: Exception) {
+                    Log.e(APP_TAG, "수면 단계 데이터 Exception: ${e.message}")
+                    cont.resume(emptyList())
                 }
-            } catch (e: Exception) {
-                Log.e(APP_TAG, "수면 단계 데이터 Exception: ${e.message}")
-                cont.resume(emptyList())
             }
         }
-    }
 
     /**
      * 걷기 조회(5분 누적)
@@ -1232,20 +1268,28 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             }
         }
 
+    fun convertMillisToDateString(millis: Long): String {
+        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        sdf.timeZone = TimeZone.getTimeZone("Asia/Seoul") // KST로 명시
+        return sdf.format(Date(millis))
+    }
+
     override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
         events?.let {
             eventSinks.add(it)
+            if (::mStore.isInitialized) {
+                registerObservers()
+            } else {
+                Log.w(APP_TAG, "Store not initialized yet, observer not registered")
+            }
         }
     }
 
     override fun onCancel(arguments: Any?) {
         eventSinks.clear()
-    }
-
-    fun convertMillisToDateString(millis: Long): String {
-        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-        sdf.timeZone = TimeZone.getTimeZone("Asia/Seoul") // KST로 명시
-        return sdf.format(Date(millis))
+        if (::mStore.isInitialized) {
+            unregisterObservers()
+        }
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
