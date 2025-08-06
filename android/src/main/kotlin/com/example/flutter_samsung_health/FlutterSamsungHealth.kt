@@ -92,7 +92,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             Log.d(APP_TAG, "Health data changed: $dataTypeName")
 
             val end = System.currentTimeMillis()
-            val start = end - 5 * 60 * 1000  // 5분 내 데이터
+            val start = end - 30 * 60 * 1000  // 5분 내 데이터
 
             CoroutineScope(Dispatchers.IO).launch {
                 val data = when (dataTypeName) {
@@ -111,10 +111,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     }
                 }
 
-                if (data != null) {
-                    Log.d(APP_TAG, "dataTypeName: $dataTypeName, data: $data");
-                    notifyFlutter(dataTypeName, data)
-                }
+                Log.d(APP_TAG, "dataTypeName: $dataTypeName, data: $data");
+                notifyFlutter(dataTypeName, data)
             }
         }
     }
