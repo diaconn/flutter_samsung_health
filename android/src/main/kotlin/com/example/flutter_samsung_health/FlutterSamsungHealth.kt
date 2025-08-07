@@ -59,6 +59,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     private lateinit var mStore: HealthDataStore
     private val APP_TAG: String = "FlutterSamsungHealth"
     private var activity: Activity? = null
+    private var isObserverRegistered = false
 
     private val permissions = setOf(
         PermissionKey(Exercise.HEALTH_DATA_TYPE, PermissionType.READ),
@@ -607,6 +608,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     }
 
     private fun registerObservers() {
+        if (isObserverRegistered) return
+
         for (dataType in observedDataTypes) {
             try {
                 HealthDataObserver.addObserver(mStore, dataType, mObserver)
@@ -615,6 +618,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 Log.e(APP_TAG, "Failed to register observer for $dataType", e)
             }
         }
+        isObserverRegistered = true
     }
 
     private fun unregisterObservers() {
