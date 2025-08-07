@@ -1005,7 +1005,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                                 arrayOf(
                                     HealthConstants.SleepStage.START_TIME,
                                     HealthConstants.SleepStage.END_TIME,
-                                    HealthConstants.SleepStage.TIME_OFFSET
+                                    HealthConstants.SleepStage.TIME_OFFSET,
+                                    HealthConstants.SleepStage.SLEEP_ID,
+                                    HealthConstants.SleepStage.STAGE,
                                 )
                             )
                             .build()
