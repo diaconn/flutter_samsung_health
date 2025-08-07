@@ -60,6 +60,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     private val APP_TAG: String = "FlutterSamsungHealth"
     private var activity: Activity? = null
     private var isObserverRegistered = false
+    private val lastEventTimes = mutableMapOf<String, Long>()
+    private val debounceMillis = 5_000L // 5초
 
     private val permissions = setOf(
         PermissionKey(Exercise.HEALTH_DATA_TYPE, PermissionType.READ),
@@ -90,10 +92,19 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
 
     private val mObserver: HealthDataObserver = object : HealthDataObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(dataTypeName: String) {
-            Log.d(APP_TAG, "Health data changed: $dataTypeName")
+            val now = System.currentTimeMillis()
+            val last = lastEventTimes[dataTypeName] ?: 0L
 
-            val end = System.currentTimeMillis()
-            val start = end - 30 * 60 * 1000  // 5분 내 데이터
+            if (now - last < debounceMillis) {
+                Log.d(APP_TAG, "Debounced $dataTypeName 이벤트")
+                return
+            }
+
+            lastEventTimes[dataTypeName] = now
+            Log.d(APP_TAG, "처리 시작: $dataTypeName")
+
+            val end = now
+            val start = end - 30 * 60 * 1000
 
             CoroutineScope(Dispatchers.IO).launch {
                 val data = when (dataTypeName) {
