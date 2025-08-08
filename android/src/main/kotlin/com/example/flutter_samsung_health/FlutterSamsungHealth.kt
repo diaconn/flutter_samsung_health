@@ -95,8 +95,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             val now = System.currentTimeMillis()
             val last = lastEventTimes[dataTypeName] ?: 0L
 
-            if (now - last < debounceMillis) {
-                Log.d(APP_TAG, "Debounced $dataTypeName 이벤트")
+            if (now - last < debounceMillis)
                 return
             }
 
@@ -777,7 +776,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     ) getOxygenSaturationData(start, end)
                     else emptyList()
                 }
-
                 val bodyTemperature = async {
                     if (grantedPermissions.contains(
                             PermissionKey(
@@ -878,11 +876,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             suspendCoroutine { cont ->
                 try {
                     Log.d(APP_TAG, "심박 데이터 시작")
-                    Log.d(
-                        APP_TAG, "start : $start, end : $end, ${convertMillisToDateString(start)} ~ ${
-                            convertMillisToDateString(end)
-                        }"
-                    )
                     val request =
                         ReadRequest.Builder().setDataType(HealthConstants.HeartRate.HEALTH_DATA_TYPE)
                             .setLocalTimeRange(
@@ -938,11 +931,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             suspendCoroutine { cont ->
                 try {
                     Log.d(APP_TAG, "수면 데이터 시작")
-                    Log.d(
-                        APP_TAG, "start : $start, end : $end, ${convertMillisToDateString(start)} ~ ${
-                            convertMillisToDateString(end)
-                        }"
-                    )
                     val request =
                         ReadRequest.Builder().setDataType(HealthConstants.Sleep.HEALTH_DATA_TYPE).setLocalTimeRange(
                             HealthConstants.Sleep.START_TIME, HealthConstants.Sleep.TIME_OFFSET, start, end
@@ -985,12 +973,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             suspendCoroutine { cont ->
                 try {
                     Log.d(APP_TAG, "수면 단계 데이터 시작")
-                    Log.d(
-                        APP_TAG,
-                        "start : $start, end : $end, ${convertMillisToDateString(start)} ~ ${
-                            convertMillisToDateString(end)
-                        }"
-                    )
                     val request =
                         ReadRequest.Builder()
                             .setDataType(HealthConstants.SleepStage.HEALTH_DATA_TYPE)
@@ -1045,11 +1027,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             suspendCoroutine { cont ->
                 try {
                     Log.d(APP_TAG, "걷기 데이터 시작")
-                    Log.d(
-                        APP_TAG, "start : $start, end : $end, ${convertMillisToDateString(start)} ~ ${
-                            convertMillisToDateString(end)
-                        }"
-                    )
                     val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
                     sdf.timeZone = TimeZone.getDefault()
 
@@ -1174,7 +1151,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                             )
                         }
                         Log.d(APP_TAG, "영양소 데이터 종료")
-                        Log.d(APP_TAG, "nutrition: $nutritionList")
                         cont.resume(nutritionList)
                     }
                 } catch (e: Exception) {
@@ -1192,11 +1168,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             suspendCoroutine { cont ->
                 try {
                     Log.d(APP_TAG, "무게 데이터 시작")
-                    Log.d(
-                        APP_TAG, "start : $start, end : $end, ${convertMillisToDateString(start)} ~ ${
-                            convertMillisToDateString(end)
-                        }"
-                    )
                     val request = ReadRequest.Builder().setDataType(Weight.HEALTH_DATA_TYPE).setLocalTimeRange(
                         HealthConstants.Weight.START_TIME, HealthConstants.Weight.TIME_OFFSET, start, end
                     ).setSort(HealthConstants.Weight.START_TIME, HealthDataResolver.SortOrder.DESC).setProperties(
@@ -1240,7 +1211,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                             )
                         }
                         Log.d(APP_TAG, "무게 데이터 종료")
-                        Log.d(APP_TAG, "weight: $weightList")
                         cont.resume(weightList)
                     }
                 } catch (e: Exception) {
@@ -1343,12 +1313,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 }
             }
         }
-
-    fun convertMillisToDateString(millis: Long): String {
-        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-        sdf.timeZone = TimeZone.getTimeZone("Asia/Seoul") // KST로 명시
-        return sdf.format(Date(millis))
-    }
 
     override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
         events?.let {
