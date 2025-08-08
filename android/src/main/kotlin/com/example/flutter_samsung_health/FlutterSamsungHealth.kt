@@ -1191,6 +1191,11 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             suspendCoroutine { cont ->
                 try {
                     Log.d(APP_TAG, "무게 데이터 시작")
+                    Log.d(
+                        APP_TAG, "start : $start, end : $end, ${convertMillisToDateString(start)} ~ ${
+                            convertMillisToDateString(end)
+                        }"
+                    )
                     val request = ReadRequest.Builder().setDataType(Weight.HEALTH_DATA_TYPE).setLocalTimeRange(
                         HealthConstants.Weight.START_TIME, HealthConstants.Weight.TIME_OFFSET, start, end
                     ).setSort(HealthConstants.Weight.START_TIME, HealthDataResolver.SortOrder.DESC).setProperties(
@@ -1234,6 +1239,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                             )
                         }
                         Log.d(APP_TAG, "무게 데이터 종료")
+                        Log.d(APP_TAG, $weightList)
                         cont.resume(weightList)
                     }
                 } catch (e: Exception) {
