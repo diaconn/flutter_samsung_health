@@ -95,7 +95,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             val now = System.currentTimeMillis()
             val last = lastEventTimes[dataTypeName] ?: 0L
 
-            if (now - last < debounceMillis)
+            if (now - last < debounceMillis) {
                 return
             }
 
