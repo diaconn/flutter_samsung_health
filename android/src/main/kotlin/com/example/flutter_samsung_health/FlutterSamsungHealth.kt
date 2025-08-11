@@ -846,8 +846,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     for (data in result) {
                         resultList.add(
                             mapOf(
-                                "uuid" to data.getLong(HealthConstants.Exercise.UUID),
-                                "device_uuid" to data.getLong(HealthConstants.Exercise.DEVICE_UUID),
+                                "uuid" to data.getString(HealthConstants.Exercise.UUID),
+                                "device_uuid" to data.getString(HealthConstants.Exercise.DEVICE_UUID),
                                 "exercise_type" to ExerciseTypeMapper.getName(data.getInt(HealthConstants.Exercise.EXERCISE_TYPE)),
                                 "start_time" to data.getLong(HealthConstants.Exercise.START_TIME),
                                 "end_time" to data.getLong(HealthConstants.Exercise.END_TIME),
@@ -909,8 +909,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         for (data in result) {
                             resultList.add(
                                 mapOf(
-                                    "uuid" to data.getLong(HealthConstants.HeartRate.UUID),
-                                    "device_uuid" to data.getLong(HealthConstants.HeartRate.DEVICE_UUID),
+                                    "uuid" to data.getString(HealthConstants.HeartRate.UUID),
+                                    "device_uuid" to data.getString(HealthConstants.HeartRate.DEVICE_UUID),
                                     "start_time" to data.getLong(HealthConstants.HeartRate.START_TIME),
                                     "end_time" to data.getLong(HealthConstants.HeartRate.END_TIME),
                                     "time_offset" to data.getLong(HealthConstants.HeartRate.TIME_OFFSET),
@@ -959,8 +959,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         for (data in result) {
                             resultList.add(
                                 mapOf(
-                                    "uuid" to data.getLong(HealthConstants.Sleep.UUID),
-                                    "device_uuid" to data.getLong(HealthConstants.Sleep.DEVICE_UUID),
+                                    "uuid" to data.getString(HealthConstants.Sleep.UUID),
+                                    "device_uuid" to data.getString(HealthConstants.Sleep.DEVICE_UUID),
                                     "start_time" to data.getLong(HealthConstants.Sleep.START_TIME),
                                     "end_time" to data.getLong(HealthConstants.Sleep.END_TIME),
                                     "time_offset" to data.getLong(HealthConstants.Sleep.TIME_OFFSET)
@@ -1139,8 +1139,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         for (data in dataResult) {
                             nutritionList.add(
                                 mapOf(
-                                    "uuid" to data.getLong(HealthConstants.Nutrition.UUID),
-                                    "device_uuid" to data.getLong(HealthConstants.Nutrition.DEVICE_UUID),
+                                    "uuid" to data.getString(HealthConstants.Nutrition.UUID),
+                                    "device_uuid" to data.getString(HealthConstants.Nutrition.DEVICE_UUID),
                                     "start_time" to data.getLong(HealthConstants.Nutrition.START_TIME),
                                     "time_offset" to data.getLong(HealthConstants.Nutrition.TIME_OFFSET),
                                     "meal_type" to data.getInt(HealthConstants.Nutrition.MEAL_TYPE),
@@ -1212,8 +1212,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         for (data in dataResult) {
                             weightList.add(
                                 mapOf(
-                                    "uuid" to data.getLong(HealthConstants.Weight.UUID),
-                                    "device_uuid" to data.getLong(HealthConstants.Weight.DEVICE_UUID),
+                                    "uuid" to data.getString(HealthConstants.Weight.UUID),
+                                    "device_uuid" to data.getString(HealthConstants.Weight.DEVICE_UUID),
                                     "start_time" to data.getLong(HealthConstants.Weight.START_TIME),
                                     "time_offset" to data.getLong(HealthConstants.Weight.TIME_OFFSET),
                                     "weight" to data.getFloat(HealthConstants.Weight.WEIGHT),
@@ -1273,8 +1273,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         for (data in dataResult) {
                             oxygenSaturationList.add(
                                 mapOf(
-                                    "uuid" to data.getLong(HealthConstants.OxygenSaturation.UUID),
-                                    "device_uuid" to data.getLong(HealthConstants.OxygenSaturation.DEVICE_UUID),
+                                    "uuid" to data.getString(HealthConstants.OxygenSaturation.UUID),
+                                    "device_uuid" to data.getString(HealthConstants.OxygenSaturation.DEVICE_UUID),
                                     "start_time" to data.getLong(HealthConstants.OxygenSaturation.START_TIME),
                                     "end_time" to data.getLong(HealthConstants.OxygenSaturation.END_TIME),
                                     "time_offset" to data.getLong(HealthConstants.OxygenSaturation.TIME_OFFSET),
@@ -1324,8 +1324,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         for (data in dataResult) {
                             bodyTemperatureList.add(
                                 mapOf(
-                                    "uuid" to data.getLong(HealthConstants.BodyTemperature.UUID),
-                                    "device_uuid" to data.getLong(HealthConstants.BodyTemperature.DEVICE_UUID),
+                                    "uuid" to data.getString(HealthConstants.BodyTemperature.UUID),
+                                    "device_uuid" to data.getString(HealthConstants.BodyTemperature.DEVICE_UUID),
                                     "start_time" to data.getLong(HealthConstants.BodyTemperature.START_TIME),
                                     "time_offset" to data.getLong(HealthConstants.BodyTemperature.TIME_OFFSET),
                                     "temperature" to data.getFloat(HealthConstants.BodyTemperature.TEMPERATURE),
