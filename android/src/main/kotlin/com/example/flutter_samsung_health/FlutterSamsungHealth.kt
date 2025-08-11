@@ -947,13 +947,13 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             suspendCoroutine { cont ->
                 try {
                     Log.d(APP_TAG, "수면 데이터 시작")
+                    val adjustedStart = start - (24 * 60 * 60 * 1000) // 하루 전
                     val request =
                         ReadRequest.Builder().setDataType(HealthConstants.Sleep.HEALTH_DATA_TYPE).setLocalTimeRange(
-                            HealthConstants.Sleep.START_TIME, HealthConstants.Sleep.TIME_OFFSET, start, end
+                            HealthConstants.Sleep.START_TIME, HealthConstants.Sleep.TIME_OFFSET, adjustedStart, end
                         ).setSort(HealthConstants.Sleep.START_TIME, HealthDataResolver.SortOrder.DESC)
                             .setProperties(
                                 arrayOf(
-
                                     HealthConstants.Sleep.DEVICE_UUID,
                                     HealthConstants.Sleep.START_TIME,
                                     HealthConstants.Sleep.END_TIME,
