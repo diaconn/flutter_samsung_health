@@ -858,7 +858,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         resultList.add(
                             mapOf(
                                 "device_uuid" to data.getString(HealthConstants.Exercise.DEVICE_UUID),
-                                "exercise_type" to ExerciseTypeMapper.getName(data.getInt(HealthConstants.Exercise.EXERCISE_TYPE)),
+                                "exercise_type" to data.getInt(HealthConstants.Exercise.EXERCISE_TYPE),
+                                "exercise_type_name" to ExerciseTypeMapper.getName(data.getInt(HealthConstants.Exercise.EXERCISE_TYPE)),
                                 "start_time" to data.getLong(HealthConstants.Exercise.START_TIME),
                                 "end_time" to data.getLong(HealthConstants.Exercise.END_TIME),
                                 "time_offset" to data.getLong(HealthConstants.Exercise.TIME_OFFSET),
@@ -992,13 +993,14 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             suspendCoroutine { cont ->
                 try {
                     Log.d(APP_TAG, "수면 단계 데이터 시작")
+                    val adjustedStart = start - (24 * 60 * 60 * 1000) // 하루 전
                     val request =
                         ReadRequest.Builder()
                             .setDataType(HealthConstants.SleepStage.HEALTH_DATA_TYPE)
                             .setLocalTimeRange(
                                 HealthConstants.SleepStage.START_TIME,
                                 HealthConstants.SleepStage.TIME_OFFSET,
-                                start,
+                                adjustedStart,
                                 end
                             )
                             .setSort(HealthConstants.SleepStage.START_TIME, HealthDataResolver.SortOrder.DESC)
@@ -1023,7 +1025,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                                     "end_time" to data.getLong(HealthConstants.SleepStage.END_TIME),
                                     "time_offset" to data.getLong(HealthConstants.SleepStage.TIME_OFFSET),
                                     "sleep_id" to data.getString(HealthConstants.SleepStage.SLEEP_ID),
-                                    "stage" to data.getInt(HealthConstants.SleepStage.STAGE),
+                                    "stage_type" to data.getInt(HealthConstants.SleepStage.STAGE),
                                     "stage_type_name" to SleepTypeMapper.getName(data.getInt(HealthConstants.SleepStage.STAGE))
                                 )
                             )
