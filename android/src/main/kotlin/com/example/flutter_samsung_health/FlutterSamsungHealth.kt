@@ -948,6 +948,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 try {
                     Log.d(APP_TAG, "수면 데이터 시작")
                     val adjustedStart = start - (24 * 60 * 60 * 1000) // 하루 전
+                    Log.d(APP_TAG, "start : ${start}, ${convertMillisToDateString(start)}")
+                    Log.d(APP_TAG, "adjustedStart : ${adjustedStart}, ${convertMillisToDateString(adjustedStart)}")
                     val request =
                         ReadRequest.Builder().setDataType(HealthConstants.Sleep.HEALTH_DATA_TYPE).setLocalTimeRange(
                             HealthConstants.Sleep.START_TIME, HealthConstants.Sleep.TIME_OFFSET, adjustedStart, end
@@ -1429,5 +1431,11 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         fun getName(type: Int): String {
             return map[type] ?: "Unknown"
         }
+    }
+
+    fun convertMillisToDateString(millis: Long): String {
+        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        sdf.timeZone = TimeZone.getTimeZone("Asia/Seoul") // KST로 명시
+        return sdf.format(Date(millis))
     }
 }
