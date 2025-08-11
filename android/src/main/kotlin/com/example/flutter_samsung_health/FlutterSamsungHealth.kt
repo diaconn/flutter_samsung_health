@@ -80,13 +80,13 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
 
     private val observedDataTypes = setOf(
         Exercise.HEALTH_DATA_TYPE,
-        HeartRate.HEALTH_DATA_TYPE,
-        Sleep.HEALTH_DATA_TYPE,
-        SleepStage.HEALTH_DATA_TYPE,
-        StepCount.HEALTH_DATA_TYPE,
-        Nutrition.HEALTH_DATA_TYPE,
-        Weight.HEALTH_DATA_TYPE,
-        OxygenSaturation.HEALTH_DATA_TYPE,
+//        HeartRate.HEALTH_DATA_TYPE,
+//        Sleep.HEALTH_DATA_TYPE,
+//        SleepStage.HEALTH_DATA_TYPE,
+//        StepCount.HEALTH_DATA_TYPE,
+//        Nutrition.HEALTH_DATA_TYPE,
+//        Weight.HEALTH_DATA_TYPE,
+//        OxygenSaturation.HEALTH_DATA_TYPE,
 //        BodyTemperature.HEALTH_DATA_TYPE,
     )
 
@@ -100,31 +100,32 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             }
 
             lastEventTimes[dataTypeName] = now
-            Log.d(APP_TAG, "처리 시작: $dataTypeName")
+//            Log.d(APP_TAG, "처리 시작: $dataTypeName")
+            notifyFlutter(dataTypeName)
 
-            val end = now
-            val start = end - 30 * 60 * 1000
+//            val end = now
+//            val start = end - 30 * 60 * 1000
 
-            CoroutineScope(Dispatchers.IO).launch {
-                val data = when (dataTypeName) {
-                    HealthConstants.Exercise.HEALTH_DATA_TYPE -> getExerciseData(start, end)
-                    HealthConstants.HeartRate.HEALTH_DATA_TYPE -> getHeartRateData(start, end)
-                    HealthConstants.Sleep.HEALTH_DATA_TYPE -> getSleepData(start, end)
-                    HealthConstants.SleepStage.HEALTH_DATA_TYPE -> getSleepStageData(start, end)
-                    HealthConstants.StepCount.HEALTH_DATA_TYPE -> getStepData(start, end)
-                    HealthConstants.Nutrition.HEALTH_DATA_TYPE -> getNutritionData(start, end)
-                    HealthConstants.Weight.HEALTH_DATA_TYPE -> getWeightData(start, end)
-                    HealthConstants.OxygenSaturation.HEALTH_DATA_TYPE -> getOxygenSaturationData(start, end)
-                    HealthConstants.BodyTemperature.HEALTH_DATA_TYPE -> getBodyTemperatureData(start, end)
-                    else -> {
-                        Log.w(APP_TAG, "옵저버 처리 안된 타입: $dataTypeName")
-                        null
-                    }
-                }
-
-                Log.d(APP_TAG, "dataTypeName: $dataTypeName, data: $data");
-                notifyFlutter(dataTypeName, data ?: emptyList())
-            }
+//            CoroutineScope(Dispatchers.IO).launch {
+//                val data = when (dataTypeName) {
+//                    HealthConstants.Exercise.HEALTH_DATA_TYPE -> getExerciseData(start, end)
+//                    HealthConstants.HeartRate.HEALTH_DATA_TYPE -> getHeartRateData(start, end)
+//                    HealthConstants.Sleep.HEALTH_DATA_TYPE -> getSleepData(start, end)
+//                    HealthConstants.SleepStage.HEALTH_DATA_TYPE -> getSleepStageData(start, end)
+//                    HealthConstants.StepCount.HEALTH_DATA_TYPE -> getStepData(start, end)
+//                    HealthConstants.Nutrition.HEALTH_DATA_TYPE -> getNutritionData(start, end)
+//                    HealthConstants.Weight.HEALTH_DATA_TYPE -> getWeightData(start, end)
+//                    HealthConstants.OxygenSaturation.HEALTH_DATA_TYPE -> getOxygenSaturationData(start, end)
+//                    HealthConstants.BodyTemperature.HEALTH_DATA_TYPE -> getBodyTemperatureData(start, end)
+//                    else -> {
+//                        Log.w(APP_TAG, "옵저버 처리 안된 타입: $dataTypeName")
+//                        null
+//                    }
+//                }
+//
+//                Log.d(APP_TAG, "dataTypeName: $dataTypeName, data: $data");
+//                notifyFlutter(dataTypeName, data ?: emptyList())
+//            }
         }
     }
 
@@ -642,10 +643,21 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         }
     }
 
-    fun notifyFlutter(dataType: String, dataList: List<Map<String, Any>>) {
+//    fun notifyFlutter(dataType: String, dataList: List<Map<String, Any>>) {
+//        val payload = mapOf(
+//            "type" to dataType,
+//            "data" to dataList
+//        )
+//        Handler(Looper.getMainLooper()).post {
+//            eventSinks.forEach { sink ->
+//                sink.success(payload)
+//            }
+//        }
+//    }
+
+    fun notifyFlutter(dataType: String) {
         val payload = mapOf(
-            "type" to dataType,
-            "data" to dataList
+            "type" to dataType
         )
         Handler(Looper.getMainLooper()).post {
             eventSinks.forEach { sink ->
