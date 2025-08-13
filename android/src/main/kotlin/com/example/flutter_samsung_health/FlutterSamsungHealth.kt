@@ -1006,6 +1006,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                             .setSort(HealthConstants.SleepStage.START_TIME, HealthDataResolver.SortOrder.DESC)
                             .setProperties(
                                 arrayOf(
+                                    HealthConstants.SleepStage.DEVICE_UUID,
                                     HealthConstants.SleepStage.START_TIME,
                                     HealthConstants.SleepStage.END_TIME,
                                     HealthConstants.SleepStage.TIME_OFFSET,
@@ -1021,6 +1022,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         for (data in result) {
                             resultList.add(
                                 mapOf(
+                                    "device_uuid" to data.getString(HealthConstants.SleepStage.DEVICE_UUID),
                                     "start_time" to data.getLong(HealthConstants.SleepStage.START_TIME),
                                     "end_time" to data.getLong(HealthConstants.SleepStage.END_TIME),
                                     "time_offset" to data.getLong(HealthConstants.SleepStage.TIME_OFFSET),
