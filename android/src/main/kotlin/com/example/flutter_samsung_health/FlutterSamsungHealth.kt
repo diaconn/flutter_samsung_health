@@ -749,6 +749,16 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     ) getSleepData(start, end)
                     else emptyList()
                 }
+                val sleepStage = async {
+                    if (grantedPermissions.contains(
+                            PermissionKey(
+                                SleepStage.HEALTH_DATA_TYPE,
+                                PermissionType.READ
+                            )
+                        )
+                    ) getSleepStageData(start, end)
+                    else emptyList()
+                }
                 val steps = async {
                     if (grantedPermissions.contains(
                             PermissionKey(
@@ -802,6 +812,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     "exercise" to exercise.await(),
                     "heart_rate" to heartRate.await(),
                     "sleep" to sleep.await(),
+                    "sleep_stage" to sleepStage.await(),
                     "step" to steps.await(),
                     "nutrition" to nutrition.await(),
                     "weight" to weight.await(),
