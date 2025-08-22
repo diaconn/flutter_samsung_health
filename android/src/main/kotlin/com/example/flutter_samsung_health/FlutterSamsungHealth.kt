@@ -59,7 +59,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     private lateinit var mStore: HealthDataStore
     private val APP_TAG: String = "FlutterSamsungHealth"
     private var activity: Activity? = null
-    private var isObserverRegistered = false
     private val lastEventTimes = mutableMapOf<String, Long>()
     private val debounceMillis = 5_000L // 5초
 
@@ -619,17 +618,15 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     }
 
     private fun registerObservers() {
-        if (isObserverRegistered) return
-
         for (dataType in observedDataTypes) {
             try {
+                HealthDataObserver.removeObserver(mStore, mObserver)
                 HealthDataObserver.addObserver(mStore, dataType, mObserver)
                 Log.d(APP_TAG, "Observer registered: $dataType")
             } catch (e: Exception) {
                 Log.e(APP_TAG, "Failed to register observer for $dataType", e)
             }
         }
-        isObserverRegistered = true
     }
 
     private fun unregisterObservers() {
