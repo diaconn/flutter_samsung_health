@@ -16,6 +16,11 @@ class FlutterSamsungHealth {
     return FlutterSamsungHealthPlatform.instance.connect();
   }
 
+  /// 삼성 헬스 SDK 연결 해제
+  Future<Map<String, dynamic>> disconnect() {
+    return FlutterSamsungHealthPlatform.instance.disconnect();
+  }
+
   /// 삼성 헬스 권한
   Future<Map<String, dynamic>> requestPermissions() {
     return FlutterSamsungHealthPlatform.instance.requestPermissions();

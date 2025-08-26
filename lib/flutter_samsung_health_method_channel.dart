@@ -30,6 +30,13 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {'isConnect': false};
   }
 
+  /// 삼성 헬스 연결 해제
+  @override
+  Future<Map<String, dynamic>> disconnect() async {
+    final result = await methodChannel.invokeMethod<Map>('disconnect', {});
+    return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {'isConnect': false};
+  }
+
   /// 삼성 헬스 권한
   @override
   Future<Map<String, dynamic>> requestPermissions() async {

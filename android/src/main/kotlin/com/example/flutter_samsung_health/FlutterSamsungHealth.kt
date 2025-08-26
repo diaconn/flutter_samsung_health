@@ -151,6 +151,10 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 connectSamsungHealth(result, onlyRequest = false)
             }
 
+            "disconnect" -> {
+                disconnectSamsungHealth(result)
+            }
+
             "requestPermissions" -> {
                 connectSamsungHealth(result, onlyRequest = true)
             }
@@ -462,6 +466,29 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         })
 
         mStore.connectService()
+    }
+
+    private fun disconnectSamsungHealth(result: MethodChannel.Result) {
+        Log.d(APP_TAG, "disconnectSamsungHealth() 호출")
+
+        if (::mStore.isInitialized) {
+            try {
+                mStore.disconnectService()
+                Log.d(APP_TAG, "삼성 헬스 연결 해제 요청 완료")
+                unregisterObservers()
+                val resultMap: MutableMap<String, Any> = mutableMapOf()
+                resultMap["isConnect"] = false
+                result.success(resultMap)
+            } catch (e: Exception) {
+                Log.e(APP_TAG, "disconnect 실패: ${e.message}", e)
+                result.error("DISCONNECT_ERROR", e.message, null)
+            }
+        } else {
+            Log.w(APP_TAG, "mStore가 초기화되지 않았습니다.")
+            val resultMap: MutableMap<String, Any> = mutableMapOf()
+            resultMap["isConnect"] = false
+            result.success(resultMap)
+        }
     }
 
     private fun getGrantedPermissions(result: MethodChannel.Result) {
