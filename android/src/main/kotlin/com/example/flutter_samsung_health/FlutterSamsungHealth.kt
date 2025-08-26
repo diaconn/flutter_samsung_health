@@ -77,17 +77,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     private val observers = mutableSetOf<HealthDataObserver>()
     private val eventSinks = mutableListOf<EventChannel.EventSink>()
 
-    private val observedDataTypes = setOf(
-        Exercise.HEALTH_DATA_TYPE,
-//        HeartRate.HEALTH_DATA_TYPE,
-//        Sleep.HEALTH_DATA_TYPE,
-//        SleepStage.HEALTH_DATA_TYPE,
-//        StepCount.HEALTH_DATA_TYPE,
-//        Nutrition.HEALTH_DATA_TYPE,
-//        Weight.HEALTH_DATA_TYPE,
-//        OxygenSaturation.HEALTH_DATA_TYPE,
-//        BodyTemperature.HEALTH_DATA_TYPE,
-    )
+    private val observedDataTypes = setOf(Exercise.HEALTH_DATA_TYPE)
 
     private val mObserver: HealthDataObserver = object : HealthDataObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(dataTypeName: String) {
@@ -99,32 +89,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             }
 
             lastEventTimes[dataTypeName] = now
-//            Log.d(APP_TAG, "처리 시작: $dataTypeName")
             notifyFlutter(dataTypeName)
-
-//            val end = now
-//            val start = end - 30 * 60 * 1000
-
-//            CoroutineScope(Dispatchers.IO).launch {
-//                val data = when (dataTypeName) {
-//                    HealthConstants.Exercise.HEALTH_DATA_TYPE -> getExerciseData(start, end)
-//                    HealthConstants.HeartRate.HEALTH_DATA_TYPE -> getHeartRateData(start, end)
-//                    HealthConstants.Sleep.HEALTH_DATA_TYPE -> getSleepData(start, end)
-//                    HealthConstants.SleepStage.HEALTH_DATA_TYPE -> getSleepStageData(start, end)
-//                    HealthConstants.StepCount.HEALTH_DATA_TYPE -> getStepData(start, end)
-//                    HealthConstants.Nutrition.HEALTH_DATA_TYPE -> getNutritionData(start, end)
-//                    HealthConstants.Weight.HEALTH_DATA_TYPE -> getWeightData(start, end)
-//                    HealthConstants.OxygenSaturation.HEALTH_DATA_TYPE -> getOxygenSaturationData(start, end)
-//                    HealthConstants.BodyTemperature.HEALTH_DATA_TYPE -> getBodyTemperatureData(start, end)
-//                    else -> {
-//                        Log.w(APP_TAG, "옵저버 처리 안된 타입: $dataTypeName")
-//                        null
-//                    }
-//                }
-//
-//                Log.d(APP_TAG, "dataTypeName: $dataTypeName, data: $data");
-//                notifyFlutter(dataTypeName, data ?: emptyList())
-//            }
         }
     }
 
@@ -216,7 +181,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     requestPermission(result, permission)
                 })
             }
-
 
             "getSleepData" -> {
                 val start = call.argument<Long>("start")!!
@@ -371,7 +335,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     requestPermission(result, permission)
                 })
             }
-
             else -> result.notImplemented()
         }
     }
@@ -464,7 +427,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 result.success(resultMap)
             }
         })
-
         mStore.connectService()
     }
 
