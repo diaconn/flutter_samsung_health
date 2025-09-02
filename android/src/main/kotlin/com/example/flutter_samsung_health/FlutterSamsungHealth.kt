@@ -77,7 +77,10 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     private val observers = mutableSetOf<HealthDataObserver>()
     private val eventSinks = mutableListOf<EventChannel.EventSink>()
 
-    private val observedDataTypes = setOf(Exercise.HEALTH_DATA_TYPE)
+    private val observedDataTypes = setOf(
+        Exercise.HEALTH_DATA_TYPE,
+        Nutrition.HEALTH_DATA_TYPE
+    )
 
     private val mObserver: HealthDataObserver = object : HealthDataObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(dataTypeName: String) {
