@@ -610,9 +610,14 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     }
 
     private fun registerObservers() {
+        try {
+            HealthDataObserver.removeObserver(mStore, mObserver)
+        } catch (e: Exception) {
+            Log.e(APP_TAG, "Failed to clear previous observers", e)
+        }
+
         for (dataType in observedDataTypes) {
             try {
-                HealthDataObserver.removeObserver(mStore, mObserver)
                 HealthDataObserver.addObserver(mStore, dataType, mObserver)
                 Log.d(APP_TAG, "Observer registered: $dataType")
             } catch (e: Exception) {
