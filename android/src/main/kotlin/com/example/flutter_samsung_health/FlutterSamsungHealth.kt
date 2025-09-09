@@ -338,6 +338,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     requestPermission(result, permission)
                 })
             }
+
             else -> result.notImplemented()
         }
     }
@@ -627,13 +628,11 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     }
 
     private fun unregisterObservers() {
-        for (dataType in observedDataTypes) {
-            try {
-                HealthDataObserver.removeObserver(mStore, mObserver)
-                Log.d(APP_TAG, "Observer removed: $dataType")
-            } catch (e: Exception) {
-                Log.e(APP_TAG, "Failed to remove observer for $dataType", e)
-            }
+        try {
+            HealthDataObserver.removeObserver(mStore, mObserver)
+            Log.d(APP_TAG, "All observers removed")
+        } catch (e: Exception) {
+            Log.e(APP_TAG, "Failed to remove observers", e)
         }
     }
 
