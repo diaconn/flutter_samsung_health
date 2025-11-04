@@ -806,7 +806,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     "heart_rate" to heartRate.await(),
                     "sleep" to sleep.await(),
                     "sleep_stage" to sleepStage.await(),
-                    "step" to steps.await(),
+                    "step_count" to steps.await(),
                     "nutrition" to nutrition.await(),
                     "weight" to weight.await(),
                     "oxygen_saturation" to oxygenSaturation.await(),
