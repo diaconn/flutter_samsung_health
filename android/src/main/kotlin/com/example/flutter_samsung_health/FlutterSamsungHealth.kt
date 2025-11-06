@@ -557,14 +557,16 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
 
                 saveToSharedPreferences(true)
 
+                val responseMap = mutableMapOf<String, Any>("isConnect" to true)
                 if (denied.isNotEmpty()) {
                     val deniedTypes = denied.map { it.dataType.toString() }
-                    safeSuccess(mapOf("denied_permissions" to deniedTypes))
-                    registerObservers(grantedMapStringKey)
+                    responseMap.put("denied_permissions", deniedTypes)
                 } else {
-                    safeSuccess(mapOf("message" to "모든 권한 허용됨"))
-                    registerObservers(grantedMapStringKey)
+                    responseMap.put("message", "모든 권한 허용됨")
                 }
+
+                safeSuccess(responseMap)
+                registerObservers(grantedMapStringKey)
             }
         } catch (e: Exception) {
             safeFlutterError(
