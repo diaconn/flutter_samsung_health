@@ -116,7 +116,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             }
 
             "connect" -> {
-                connectSamsungHealth(result, onlyRequest = false)
+                connectSamsungHealth(result, onlyConnect = true)
             }
 
             "disconnect" -> {
@@ -124,7 +124,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             }
 
             "requestPermissions" -> {
-                connectSamsungHealth(result, onlyRequest = true)
+                connectSamsungHealth(result, onlyConnect = false)
             }
 
             "getGrantedPermissions" -> {
@@ -402,20 +402,20 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     /**
      * 삼성헬스 연계 관련 함수 추가.
      */
-    private fun connectSamsungHealth(result: MethodChannel.Result, onlyRequest: Boolean) {
-        Log.d(APP_TAG, "connectSamsungHealth() 호출")
+    private fun connectSamsungHealth(result: MethodChannel.Result, onlyConnect: Boolean) {
+        Log.d(APP_TAG, "connectSamsungHealth() 호출, onlyConnect: $onlyConnect")
         val resultMap: MutableMap<String, Any> = mutableMapOf()
 
         mStore = HealthDataStore(context, object : HealthDataStore.ConnectionListener {
             override fun onConnected() {
                 Log.d(APP_TAG, "삼성 헬스 연결 성공")
                 resultMap.put("isConnect", true)
-                registerObservers()
 
-                if (onlyRequest) {
-                    requestPermissionsOnly(result)
-                } else {
+                if (onlyConnect) {
+                    registerObservers()
                     result.success(resultMap)
+                } else {
+                    requestPermissions(result)
                 }
             }
 
@@ -525,7 +525,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         }
     }
 
-    private fun requestPermissionsOnly(
+    private fun requestPermissions(
         result: MethodChannel.Result
     ) {
         var isReplied = false
@@ -547,16 +547,23 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         val permissionManager = HealthPermissionManager(mStore)
         try {
             permissionManager.requestPermissions(permissions, activity!!).setResultListener { res ->
-                val grantedMap = res.resultMap
+                val grantedMap: MutableMap<HealthPermissionManager.PermissionKey, Boolean> = res.resultMap
                 val denied = permissions.filter { grantedMap[it] != true }
+
+                val grantedMapStringKey = grantedMap.entries.associate {
+                    it.key.dataType.toString() to it.value
+                }
+
 
                 saveToSharedPreferences(true)
 
                 if (denied.isNotEmpty()) {
                     val deniedTypes = denied.map { it.dataType.toString() }
                     safeSuccess(mapOf("denied_permissions" to deniedTypes))
+                    registerObservers(grantedMapStringKey)
                 } else {
                     safeSuccess(mapOf("message" to "모든 권한 허용됨"))
+                    registerObservers(grantedMapStringKey)
                 }
             }
         } catch (e: Exception) {
@@ -610,19 +617,25 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         }
     }
 
-    private fun registerObservers() {
+    private fun registerObservers(grantedMap: Map<String, Boolean>? = null) {
         try {
             HealthDataObserver.removeObserver(mStore, mObserver)
         } catch (e: Exception) {
-            Log.e(APP_TAG, "Failed to clear previous observers", e)
+            Log.e(APP_TAG, "기존 옵저버 제거 실패: ", e)
         }
 
         for (dataType in observedDataTypes) {
-            try {
-                HealthDataObserver.addObserver(mStore, dataType, mObserver)
-                Log.d(APP_TAG, "Observer registered: $dataType")
-            } catch (e: Exception) {
-                Log.e(APP_TAG, "Failed to register observer for $dataType", e)
+            if (grantedMap == null || grantedMap[dataType] == true) {
+                try {
+                    HealthDataObserver.addObserver(mStore, dataType, mObserver)
+                    Log.d(APP_TAG, "옵저버 등록 완료: $dataType")
+                } catch (e: SecurityException) {
+                    Log.w(APP_TAG, "권한 부족으로 옵저버 등록 실패 (무시): $dataType")
+                } catch (e: Exception) {
+                    Log.e(APP_TAG, "옵저버 등록 실패 [$dataType]: ", e)
+                }
+            } else {
+                Log.d(APP_TAG, "권한 없음으로 스킵: $dataType")
             }
         }
     }
