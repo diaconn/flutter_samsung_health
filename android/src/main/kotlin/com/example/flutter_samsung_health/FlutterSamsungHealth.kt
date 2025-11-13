@@ -1434,6 +1434,10 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                             val glucoseMmol = data.getFloat(HealthConstants.BloodGlucose.GLUCOSE)
                             val glucoseMgdl = glucoseMmol * 18.018f
 
+                            Log.d(APP_TAG, "glucose : ${data.getFloat(HealthConstants.BloodGlucose.GLUCOSE)}")
+                            Log.d(APP_TAG, "glucoseMmol : ${glucoseMmol}")
+                            Log.d(APP_TAG, "glucoseMgdl : ${glucoseMgdl}")
+
                             bloodGlucoseList.add(
                                 mapOf(
                                     "device_uuid" to data.getString(HealthConstants.BloodGlucose.DEVICE_UUID),
