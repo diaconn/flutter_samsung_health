@@ -191,4 +191,16 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
         .map((item) => Map<String, dynamic>.from((item as Map).map((key, value) => MapEntry(key.toString(), value))))
         .toList();
   }
+
+  /// 혈당 조회
+  @override
+  Future<List<Map<String, dynamic>>> getBloodGlucoseData(int start, int end) async {
+    final result = await methodChannel.invokeMethod<List>('getBloodGlucoseData', {
+      'start': start,
+      'end': end,
+    });
+    return (result ?? [])
+        .map((item) => Map<String, dynamic>.from((item as Map).map((key, value) => MapEntry(key.toString(), value))))
+        .toList();
+  }
 }

@@ -110,4 +110,12 @@ class FlutterSamsungHealth {
   }) {
     return FlutterSamsungHealthPlatform.instance.getBodyTemperatureData(start, end);
   }
+
+  /// 혈당 조회
+  Future<List<Map<String, dynamic>>> getBloodGlucoseData({
+    required int start,
+    required int end,
+  }) {
+    return FlutterSamsungHealthPlatform.instance.getBloodGlucoseData(start, end);
+  }
 }

@@ -10,6 +10,7 @@ import android.util.Log
 import com.samsung.android.sdk.healthdata.HealthConnectionErrorResult
 import com.samsung.android.sdk.healthdata.HealthConstants
 import com.samsung.android.sdk.healthdata.HealthConstants.BodyTemperature
+import com.samsung.android.sdk.healthdata.HealthConstants.BloodGlucose
 import com.samsung.android.sdk.healthdata.HealthConstants.Exercise
 import com.samsung.android.sdk.healthdata.HealthConstants.HeartRate
 import com.samsung.android.sdk.healthdata.HealthConstants.Sleep
@@ -72,6 +73,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         PermissionKey(Weight.HEALTH_DATA_TYPE, PermissionType.READ),
         PermissionKey(OxygenSaturation.HEALTH_DATA_TYPE, PermissionType.READ),
         PermissionKey(BodyTemperature.HEALTH_DATA_TYPE, PermissionType.READ),
+        PermissionKey(BloodGlucose.HEALTH_DATA_TYPE, PermissionType.READ),
     )
 
     private val observers = mutableSetOf<HealthDataObserver>()
@@ -79,7 +81,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
 
     private val observedDataTypes = setOf(
         Exercise.HEALTH_DATA_TYPE,
-        Nutrition.HEALTH_DATA_TYPE
+        Nutrition.HEALTH_DATA_TYPE,
+        BloodGlucose.HEALTH_DATA_TYPE
     )
 
     private val mObserver: HealthDataObserver = object : HealthDataObserver(Handler(Looper.getMainLooper())) {
@@ -331,6 +334,28 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         } catch (e: Exception) {
                             withContext(Dispatchers.Main) {
                                 result.error("GET_BODYTEMPERATURE_ERROR", e.message, null)
+                            }
+                        }
+                    }
+                }, onDenied = {
+                    requestPermission(result, permission)
+                })
+            }
+
+            "getBloodGlucoseData" -> {
+                val start = call.argument<Long>("start")!!
+                val end = call.argument<Long>("end")!!
+                val permission = PermissionKey(BloodGlucose.HEALTH_DATA_TYPE, PermissionType.READ)
+                checkPermissionAndExecute(permission, onGranted = {
+                    CoroutineScope(Dispatchers.Default).launch {
+                        try {
+                            val data = getBloodGlucoseData(start, end)
+                            withContext(Dispatchers.Main) {
+                                result.success(data)
+                            }
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) {
+                                result.error("GET_BLOODGLUCOSE_ERROR", e.message, null)
                             }
                         }
                     }
@@ -816,6 +841,16 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     else emptyList()
                 }
 
+                val bloodGlucose = async {
+                    if (grantedPermissions.contains(
+                            PermissionKey(
+                                BloodGlucose.HEALTH_DATA_TYPE, PermissionType.READ
+                            )
+                        )
+                    ) getBloodGlucoseData(start, end)
+                    else emptyList()
+                }
+
                 val totalResult = mapOf(
                     "exercise" to exercise.await(),
                     "heart_rate" to heartRate.await(),
@@ -826,6 +861,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     "weight" to weight.await(),
                     "oxygen_saturation" to oxygenSaturation.await(),
                     "body_temperature" to bodyTemperature.await(),
+                    "blood_glucose" to bloodGlucose.await(),
                 )
                 withContext(Dispatchers.Main) {
                     result.success(totalResult)
@@ -1359,6 +1395,59 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     }
                 } catch (e: Exception) {
                     Log.e(APP_TAG, "체온 데이터 Exception: ${e.message}")
+                    cont.resume(emptyList())
+                }
+            }
+        }
+
+    /**
+     * 혈당 조회
+     */
+    private suspend fun getBloodGlucoseData(start: Long, end: Long): List<Map<String, Any>> =
+        withContext(Dispatchers.Main) {
+            suspendCoroutine { cont ->
+                try {
+                    Log.d(APP_TAG, "혈당 데이터 시작")
+                    val request =
+                        ReadRequest.Builder().setDataType(BloodGlucose.HEALTH_DATA_TYPE).setLocalTimeRange(
+                            HealthConstants.BloodGlucose.START_TIME,
+                            HealthConstants.BloodGlucose.TIME_OFFSET,
+                            start,
+                            end
+                        ).setSort(HealthConstants.BloodGlucose.START_TIME, HealthDataResolver.SortOrder.DESC)
+                            .setProperties(
+                                arrayOf(
+                                    HealthConstants.BloodGlucose.DEVICE_UUID,
+                                    HealthConstants.BloodGlucose.START_TIME,
+                                    HealthConstants.BloodGlucose.TIME_OFFSET,
+                                    HealthConstants.BloodGlucose.GLUCOSE,
+                                    HealthConstants.BloodGlucose.MEASUREMENT_TYPE,
+                                    HealthConstants.BloodGlucose.MEAL_TIME,
+                                    HealthConstants.BloodGlucose.MEAL_TYPE,
+                                )
+                            ).build()
+
+                    val resolver = HealthDataResolver(mStore, null)
+                    val bloodGlucoseList = mutableListOf<Map<String, Any>>()
+                    resolver.read(request).setResultListener { dataResult ->
+                        for (data in dataResult) {
+                            bloodGlucoseList.add(
+                                mapOf(
+                                    "device_uuid" to data.getString(HealthConstants.BloodGlucose.DEVICE_UUID),
+                                    "start_time" to data.getLong(HealthConstants.BloodGlucose.START_TIME),
+                                    "time_offset" to data.getLong(HealthConstants.BloodGlucose.TIME_OFFSET),
+                                    "glucose" to data.getFloat(HealthConstants.BloodGlucose.GLUCOSE),
+                                    "measurement_type" to data.getFloat(HealthConstants.BloodGlucose.MEASUREMENT_TYPE),
+                                    "meal_time" to data.getFloat(HealthConstants.BloodGlucose.MEAL_TIME),
+                                    "meal_type" to data.getFloat(HealthConstants.BloodGlucose.MEAL_TYPE),
+                                )
+                            )
+                        }
+                        Log.d(APP_TAG, "혈당 데이터 종료")
+                        cont.resume(bloodGlucoseList)
+                    }
+                } catch (e: Exception) {
+                    Log.e(APP_TAG, "혈당 데이터 Exception: ${e.message}")
                     cont.resume(emptyList())
                 }
             }
