@@ -1431,12 +1431,16 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     val bloodGlucoseList = mutableListOf<Map<String, Any>>()
                     resolver.read(request).setResultListener { dataResult ->
                         for (data in dataResult) {
+                            val glucoseMmol = data.getFloat(HealthConstants.BloodGlucose.GLUCOSE)
+                            val glucoseMgdl = glucoseMmol * 18.018f
+
                             bloodGlucoseList.add(
                                 mapOf(
                                     "device_uuid" to data.getString(HealthConstants.BloodGlucose.DEVICE_UUID),
                                     "start_time" to data.getLong(HealthConstants.BloodGlucose.START_TIME),
                                     "time_offset" to data.getLong(HealthConstants.BloodGlucose.TIME_OFFSET),
-                                    "glucose" to data.getFloat(HealthConstants.BloodGlucose.GLUCOSE),
+                                    "glucose_mmol" to glucoseMmol,
+                                    "glucose_mgdl" to glucoseMgdl,
                                     "measurement_type" to data.getFloat(HealthConstants.BloodGlucose.MEASUREMENT_TYPE),
                                     "meal_time" to data.getFloat(HealthConstants.BloodGlucose.MEAL_TIME),
                                     "meal_type" to data.getFloat(HealthConstants.BloodGlucose.MEAL_TYPE),
