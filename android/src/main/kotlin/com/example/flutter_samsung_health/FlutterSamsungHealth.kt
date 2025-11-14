@@ -690,7 +690,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     }
 
     private fun enableObserver(type: String, result: MethodChannel.Result) {
-        Log.d(APP_TAG, "!!!!type: $type");
         try {
             val handler = Handler(Looper.getMainLooper())
             val observer = object : HealthDataObserver(handler) {
@@ -711,7 +710,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     }
 
     private fun disableObserver(type: String, result: MethodChannel.Result) {
-        Log.d(APP_TAG, "!!!!type: $type");
         val observer = activeObservers[type]
         if (observer == null) {
             result.success(mapOf("disabled" to false, "error" to "Observer not registered"))
@@ -730,9 +728,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     }
 
     fun getObserverStatus(type: String, result: MethodChannel.Result) {
-        Log.d(APP_TAG, "!!!!type: $type");
         val exists = activeObservers.containsKey(type)
-        Log.d(APP_TAG, "!!!!exists: $exists");
 
         result.success(
             mapOf(
@@ -741,18 +737,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             )
         )
     }
-
-//    fun notifyFlutter(dataType: String, dataList: List<Map<String, Any>>) {
-//        val payload = mapOf(
-//            "type" to dataType,
-//            "data" to dataList
-//        )
-//        Handler(Looper.getMainLooper()).post {
-//            eventSinks.forEach { sink ->
-//                sink.success(payload)
-//            }
-//        }
-//    }
 
     fun notifyFlutter(dataType: String) {
         val payload = mapOf(
