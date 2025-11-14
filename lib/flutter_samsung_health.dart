@@ -31,12 +31,22 @@ class FlutterSamsungHealth {
     return FlutterSamsungHealthPlatform.instance.getGrantedPermissions();
   }
 
-  /// 전체 데이터 조회
-  Future<Map<String,List<Map<String, dynamic>>>> getTotalData({
-    required int start,
-    required int end,
-  }) {
-    return FlutterSamsungHealthPlatform.instance.getTotalData(start, end);
+  /// 옵저버 단건 켜기
+  Future<Map<String, dynamic>> enableObserver(String type) async {
+    final result = await FlutterSamsungHealthPlatform.instance.enableObserver(type);
+    return result.map((key, value) => MapEntry(key.toString(), value));
+  }
+
+  /// 옵저버 단건 끄기
+  Future<Map<String, dynamic>> disableObserver(String type) async {
+    final result = await FlutterSamsungHealthPlatform.instance.disableObserver(type);
+    return result.map((key, value) => MapEntry(key.toString(), value));
+  }
+
+  /// 옵저버 상태 조회
+  Future<Map<String, dynamic>> getObserverStatus(String type) async {
+    final result = await FlutterSamsungHealthPlatform.instance.getObserverStatus(type);
+    return result.map((key, value) => MapEntry(key.toString(), value));
   }
 
   /// 운동 조회

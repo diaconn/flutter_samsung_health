@@ -76,7 +76,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         PermissionKey(BloodGlucose.HEALTH_DATA_TYPE, PermissionType.READ),
     )
 
-    private val observers = mutableSetOf<HealthDataObserver>()
+    private val activeObservers = mutableMapOf<String, HealthDataObserver>()
     private val eventSinks = mutableListOf<EventChannel.EventSink>()
 
     private val observedDataTypes = setOf(
@@ -132,6 +132,19 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
 
             "getGrantedPermissions" -> {
                 getGrantedPermissions(result)
+            }
+
+            "enableObserver" -> {
+                val type = call.argument<String>("type")!!
+                enableObserver(type, result)
+            }
+            "disableObserver" -> {
+                val type = call.argument<String>("type")!!
+                disableObserver(type, result)
+            }
+            "getObserverStatus" -> {
+                val type = call.argument<String>("type")!!
+                getObserverStatus(type, result)
             }
 
             "getTotalData" -> {
@@ -674,6 +687,55 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         } catch (e: Exception) {
             Log.e(APP_TAG, "Failed to remove observers", e)
         }
+    }
+
+    private fun enableObserver(type: String, result: MethodChannel.Result) {
+        try {
+            val handler = Handler(Looper.getMainLooper())
+            val observer = object : HealthDataObserver(handler) {
+                override fun onChange(dataTypeName: String?) {
+                    Log.d(APP_TAG, "Observer triggered for $type ($dataTypeName)")
+                    // 필요 시 데이터 재조회 로직 추가
+                }
+            }
+
+            HealthDataObserver.addObserver(mStore, type, observer)
+            activeObservers[type] = observer
+
+            result.success(mapOf("enabled" to true))
+        } catch (e: Exception) {
+            Log.e(APP_TAG, "Enable observer failed: $type", e)
+            result.success(mapOf("enabled" to false, "error" to e.message))
+        }
+    }
+
+    private fun disableObserver(type: String, result: MethodChannel.Result) {
+        val observer = activeObservers[type]
+        if (observer == null) {
+            result.success(mapOf("disabled" to false, "error" to "Observer not registered"))
+            return
+        }
+
+        try {
+            HealthDataObserver.removeObserver(mStore, observer)
+            activeObservers.remove(type)
+
+            result.success(mapOf("disabled" to true))
+        } catch (e: Exception) {
+            Log.e(APP_TAG, "Disable observer failed: $type", e)
+            result.success(mapOf("disabled" to false, "error" to e.message))
+        }
+    }
+
+    fun getObserverStatus(type: String, result: MethodChannel.Result) {
+        val exists = activeObservers.containsKey(type)
+
+        result.success(
+            mapOf(
+                "type" to type,
+                "isEnabled" to exists
+            )
+        )
     }
 
 //    fun notifyFlutter(dataType: String, dataList: List<Map<String, Any>>) {
