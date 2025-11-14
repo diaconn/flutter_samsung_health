@@ -49,6 +49,14 @@ class FlutterSamsungHealth {
     return result.map((key, value) => MapEntry(key.toString(), value));
   }
 
+  /// 전체 데이터 조회
+  Future<Map<String,List<Map<String, dynamic>>>> getTotalData({
+    required int start,
+    required int end,
+  }) {
+    return FlutterSamsungHealthPlatform.instance.getTotalData(start, end);
+  }
+
   /// 운동 조회
   Future<List<Map<String, dynamic>>> getExerciseData({
     required int start,
