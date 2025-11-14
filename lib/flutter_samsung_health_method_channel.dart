@@ -81,7 +81,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     final result =
     await methodChannel.invokeMethod<Map>('getObserverStatus', {"type": type});
     return result?.map((key, value) => MapEntry(key.toString(), value)) ??
-        {"isEnabled": false};
+        {"enabled": false};
   }
 
   /// 전체 데이터 조회

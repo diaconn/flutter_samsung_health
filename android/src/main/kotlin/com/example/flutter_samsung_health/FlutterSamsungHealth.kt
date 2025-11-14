@@ -135,15 +135,15 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             }
 
             "enableObserver" -> {
-                val type = call.argument<String>("type")!!
+                val type = call.argument<String>("type") ?: ""
                 enableObserver(type, result)
             }
             "disableObserver" -> {
-                val type = call.argument<String>("type")!!
+                val type = call.argument<String>("type") ?: ""
                 disableObserver(type, result)
             }
             "getObserverStatus" -> {
-                val type = call.argument<String>("type")!!
+                val type = call.argument<String>("type") ?: ""
                 getObserverStatus(type, result)
             }
 
@@ -690,6 +690,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     }
 
     private fun enableObserver(type: String, result: MethodChannel.Result) {
+        Log.d(APP_TAG, "!!!!type: $type");
         try {
             val handler = Handler(Looper.getMainLooper())
             val observer = object : HealthDataObserver(handler) {
@@ -710,6 +711,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     }
 
     private fun disableObserver(type: String, result: MethodChannel.Result) {
+        Log.d(APP_TAG, "!!!!type: $type");
         val observer = activeObservers[type]
         if (observer == null) {
             result.success(mapOf("disabled" to false, "error" to "Observer not registered"))
@@ -728,12 +730,14 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     }
 
     fun getObserverStatus(type: String, result: MethodChannel.Result) {
+        Log.d(APP_TAG, "!!!!type: $type");
         val exists = activeObservers.containsKey(type)
+        Log.d(APP_TAG, "!!!!exists: $exists");
 
         result.success(
             mapOf(
                 "type" to type,
-                "isEnabled" to exists
+                "enabled" to exists
             )
         )
     }
