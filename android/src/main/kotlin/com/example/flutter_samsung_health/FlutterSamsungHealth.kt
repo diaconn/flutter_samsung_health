@@ -119,7 +119,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             }
 
             "connect" -> {
-                connectSamsungHealth(result, onlyConnect = true)
+                connectSamsungHealth(result)
             }
 
             "disconnect" -> {
@@ -127,7 +127,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             }
 
             "requestPermissions" -> {
-                connectSamsungHealth(result, onlyConnect = false)
+                requestPermissions(result)
             }
 
             "getGrantedPermissions" -> {
@@ -138,10 +138,12 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 val type = call.argument<String>("type") ?: ""
                 enableObserver(type, result)
             }
+
             "disableObserver" -> {
                 val type = call.argument<String>("type") ?: ""
                 disableObserver(type, result)
             }
+
             "getObserverStatus" -> {
                 val type = call.argument<String>("type") ?: ""
                 getObserverStatus(type, result)
@@ -440,21 +442,15 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     /**
      * 삼성헬스 연계 관련 함수 추가.
      */
-    private fun connectSamsungHealth(result: MethodChannel.Result, onlyConnect: Boolean) {
-        Log.d(APP_TAG, "connectSamsungHealth() 호출, onlyConnect: $onlyConnect")
+    private fun connectSamsungHealth(result: MethodChannel.Result) {
+        Log.d(APP_TAG, "connectSamsungHealth() 호출")
         val resultMap: MutableMap<String, Any> = mutableMapOf()
 
         mStore = HealthDataStore(context, object : HealthDataStore.ConnectionListener {
             override fun onConnected() {
                 Log.d(APP_TAG, "삼성 헬스 연결 성공")
                 resultMap.put("isConnect", true)
-
-                if (onlyConnect) {
-                    registerObservers()
-                    result.success(resultMap)
-                } else {
-                    requestPermissions(result)
-                }
+                result.success(resultMap)
             }
 
             override fun onConnectionFailed(error: HealthConnectionErrorResult?) {
@@ -496,6 +492,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     }
 
     private fun getGrantedPermissions(result: MethodChannel.Result) {
+        Log.d(APP_TAG, "getGrantedPermissions() 호출")
         if (!::mStore.isInitialized) {
             result.error("STORE_NOT_READY", "Samsung Health 연결되지 않음", null)
             return
@@ -515,6 +512,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     }
 
     private fun requestPermission(result: MethodChannel.Result, permissionKey: PermissionKey) {
+        Log.d(APP_TAG, "requestPermission() 호출")
         val pmsManager = HealthPermissionManager(mStore)
         try {
             Log.d(APP_TAG, "삼성헬스 권한요청 시작 ")
@@ -534,6 +532,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     }
 
     private fun requestPermissionTotal(
+        Log.d(APP_TAG, "requestPermissionTotal() 호출")
         result: MethodChannel.Result, deniedPermissions: Set<PermissionKey>
     ) {
         if (loadFromSharedPreferences()) {
@@ -563,9 +562,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         }
     }
 
-    private fun requestPermissions(
-        result: MethodChannel.Result
-    ) {
+    private fun requestPermissions(result: MethodChannel.Result) {
+        Log.d(APP_TAG, "requestPermissions() 호출")
         var isReplied = false
 
         fun safeSuccess(response: Any) {
@@ -592,7 +590,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     it.key.dataType.toString() to it.value
                 }
 
-
                 saveToSharedPreferences(true)
 
                 val responseMap = mutableMapOf<String, Any>("isConnect" to true)
@@ -603,8 +600,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     responseMap.put("message", "모든 권한 허용됨")
                 }
 
-                safeSuccess(responseMap)
-                registerObservers(grantedMapStringKey)
+                safeSuccess(mapOf("granted" to grantedMapStringKey, "response" to responseMap))
             }
         } catch (e: Exception) {
             safeFlutterError(
@@ -691,52 +687,87 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
 
     private fun enableObserver(type: String, result: MethodChannel.Result) {
         try {
-            val handler = Handler(Looper.getMainLooper())
-            val observer = object : HealthDataObserver(handler) {
-                override fun onChange(dataTypeName: String?) {
-                    Log.d(APP_TAG, "Observer triggered for $type ($dataTypeName)")
-                    // 필요 시 데이터 재조회 로직 추가
-                }
+            // 이미 등록되어 있으면 바로 true 반환
+            if (activeObservers.containsKey(type)) {
+                result.success(mapOf("type" to type, "enabled" to true, "already" to true))
+                return
             }
 
-            HealthDataObserver.addObserver(mStore, type, observer)
-            activeObservers[type] = observer
-
-            result.success(mapOf("enabled" to true))
+            val handler = Handler(Looper.getMainLooper())
+            val observer = object : HealthDataObserver(handler) {
+                override fun onChange(dataTypeName: String) {
+                    Log.d(APP_TAG, "Observer triggered for $type ($dataTypeName)")
+                    notifyFlutter(dataTypeName)
+                }
+            }
+            try {
+                HealthDataObserver.addObserver(mStore, type, observer)
+                activeObservers[type] = observer
+                result.success(mapOf("type" to type, "enabled" to true))
+                Log.d(APP_TAG, "enableObserver: registered $type")
+            } catch (se: SecurityException) {
+                // 권한이 없으면 실패
+                Log.w(APP_TAG, "Enable observer security exception for $type: ${se.message}")
+                result.success(mapOf("type" to type, "enabled" to false, "error" to "permission_denied"))
+            } catch (e: Exception) {
+                Log.e(APP_TAG, "Enable observer failed: $type", e)
+                result.success(mapOf("type" to type, "enabled" to false, "error" to e.message))
+            }
         } catch (e: Exception) {
-            Log.e(APP_TAG, "Enable observer failed: $type", e)
-            result.success(mapOf("enabled" to false, "error" to e.message))
+            Log.e(APP_TAG, "Enable observer unexpected error: $type", e)
+            result.success(mapOf("type" to type, "enabled" to false, "error" to e.message))
         }
     }
 
     private fun disableObserver(type: String, result: MethodChannel.Result) {
         val observer = activeObservers[type]
         if (observer == null) {
-            result.success(mapOf("disabled" to false, "error" to "Observer not registered"))
+            result.success(mapOf("type" to type, "disabled" to false, "error" to "not_registered"))
             return
         }
 
         try {
             HealthDataObserver.removeObserver(mStore, observer)
             activeObservers.remove(type)
-
-            result.success(mapOf("disabled" to true))
+            result.success(mapOf("type" to type, "disabled" to true))
+            Log.d(APP_TAG, "disableObserver: removed $type")
         } catch (e: Exception) {
             Log.e(APP_TAG, "Disable observer failed: $type", e)
-            result.success(mapOf("disabled" to false, "error" to e.message))
+            result.success(mapOf("type" to type, "disabled" to false, "error" to e.message))
         }
     }
 
     fun getObserverStatus(type: String, result: MethodChannel.Result) {
         val exists = activeObservers.containsKey(type)
-
-        result.success(
-            mapOf(
-                "type" to type,
-                "enabled" to exists
-            )
-        )
+        result.success(mapOf("type" to type, "enabled" to exists))
     }
+
+    private fun registerEnabledObserversFromSP() {
+        // SP에 'observer_<type>' 키로 저장되어 있다고 가정
+        try {
+            val typesToCheck = listOf(
+                Exercise.HEALTH_DATA_TYPE,
+                Nutrition.HEALTH_DATA_TYPE,
+                BloodGlucose.HEALTH_DATA_TYPE
+            )
+
+            for (type in typesToCheck) {
+                val spKey = "observer_${type}"
+                // SP.getBoolean(...) 의 구현에 맞춰서 불러와라. (예시는 pseudo)
+                val enabled = /* SP.getBool(spKey) */ false // 실제 SP 호출 코드로 교체
+                if (enabled && !activeObservers.containsKey(type)) {
+                    enableObserver(type, object : MethodChannel.Result {
+                        override fun success(p0: Any?) {}
+                        override fun error(p0: String, p1: String?, p2: Any?) {}
+                        override fun notImplemented() {}
+                    })
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(APP_TAG, "registerEnabledObserversFromSP failed", e)
+        }
+    }
+
 
     fun notifyFlutter(dataType: String) {
         val payload = mapOf(
