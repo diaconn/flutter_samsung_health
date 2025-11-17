@@ -532,9 +532,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     }
 
     private fun requestPermissionTotal(
-        Log.d(APP_TAG, "requestPermissionTotal() 호출")
         result: MethodChannel.Result, deniedPermissions: Set<PermissionKey>
     ) {
+        Log.d(APP_TAG, "requestPermissionTotal() 호출")
         if (loadFromSharedPreferences()) {
             // 이미 권한 요청했음 → Flutter로 거부된 권한 이름 전달
             val deniedTypes = deniedPermissions.map { it.dataType.toString() }
