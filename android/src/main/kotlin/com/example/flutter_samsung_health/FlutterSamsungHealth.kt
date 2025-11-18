@@ -126,12 +126,12 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 disconnectSamsungHealth(result)
             }
 
-            "requestPermissions" -> {
-                requestPermissions(result)
-            }
-
             "getGrantedPermissions" -> {
                 getGrantedPermissions(result)
+            }
+
+            "requestPermissions" -> {
+                requestPermissions(result)
             }
 
             "enableObserver" -> {
@@ -152,11 +152,24 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             "getTotalData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
-                checkPermissionAndExecuteTotal(permissionKeys = permissions, onGranted = { grantedPermissions ->
-                    getTotalData(start, end, result, grantedPermissions)
-                }, onDenied = { deniedPermissions ->
-                    requestPermissionTotal(result, deniedPermissions)
-                })
+                checkPermissionAndExecuteTotal(
+                    permissionKeys = permissions,
+                    onGranted = { grantedPermissions ->
+                        if (grantedPermissions.isNotEmpty()) {
+                            getTotalData(start, end, result, grantedPermissions)
+                        } else {
+                            result.error("PERMISSION_ERROR", "권한이 없습니다.", null)
+                        }
+                    },
+                    onDenied = { deniedPermissions ->
+                        if (deniedPermissions.isNotEmpty()) {
+                            requestHealthPermissions(result, deniedPermissions)
+                        } else {
+                            // deniedPermissions 비어있으면 권한 거부 없음 → 그냥 처리
+                            result.error("PERMISSION_ERROR", "권한이 부족합니다.", null)
+                        }
+                    }
+                )
             }
 
             "getExerciseData" -> {
@@ -177,7 +190,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         }
                     }
                 }, onDenied = {
-                    requestPermission(result, permission)
+                    requestHealthPermissions(result, setOf(permission))
                 })
             }
 
@@ -199,7 +212,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         }
                     }
                 }, onDenied = {
-                    requestPermission(result, permission)
+                    requestHealthPermissions(result, setOf(permission))
                 })
             }
 
@@ -221,7 +234,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         }
                     }
                 }, onDenied = {
-                    requestPermission(result, permission)
+                    requestHealthPermissions(result, setOf(permission))
                 })
             }
 
@@ -243,7 +256,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         }
                     }
                 }, onDenied = {
-                    requestPermission(result, permission)
+                    requestHealthPermissions(result, setOf(permission))
                 })
             }
 
@@ -265,7 +278,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         }
                     }
                 }, onDenied = {
-                    requestPermission(result, permission)
+                    requestHealthPermissions(result, setOf(permission))
                 })
             }
 
@@ -287,7 +300,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         }
                     }
                 }, onDenied = {
-                    requestPermission(result, permission)
+                    requestHealthPermissions(result, setOf(permission))
                 })
             }
 
@@ -309,7 +322,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         }
                     }
                 }, onDenied = {
-                    requestPermission(result, permission)
+                    requestHealthPermissions(result, setOf(permission))
                 })
             }
 
@@ -331,7 +344,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         }
                     }
                 }, onDenied = {
-                    requestPermission(result, permission)
+                    requestHealthPermissions(result, setOf(permission))
                 })
             }
 
@@ -353,7 +366,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         }
                     }
                 }, onDenied = {
-                    requestPermission(result, permission)
+                    requestHealthPermissions(result, setOf(permission))
                 })
             }
 
@@ -375,7 +388,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         }
                     }
                 }, onDenied = {
-                    requestPermission(result, permission)
+                    requestHealthPermissions(result, setOf(permission))
                 })
             }
 
@@ -511,53 +524,42 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         }
     }
 
-    private fun requestPermission(result: MethodChannel.Result, permissionKey: PermissionKey) {
-        Log.d(APP_TAG, "requestPermission() 호출")
-        val pmsManager = HealthPermissionManager(mStore)
-        try {
-            Log.d(APP_TAG, "삼성헬스 권한요청 시작 ")
-            // Show user permission UI for allowing user to change options
-            pmsManager.requestPermissions(setOf(permissionKey), activity!!).setResultListener({ res ->
-                val resultMap: Map<PermissionKey, Boolean> = res.resultMap
-                if (resultMap.containsValue(false)) {
-                    Log.d(APP_TAG, "일부 권한 거부됨: $resultMap")
-                } else {
-                    Log.d(APP_TAG, "모든 권한 획득 완료!")
-                }
-            })
-        } catch (e: Exception) {
-            showPermissionAlarmDialog()
-            Log.d(APP_TAG, "Permission setting fails. $e")
-        }
-    }
-
-    private fun requestPermissionTotal(
-        result: MethodChannel.Result, deniedPermissions: Set<PermissionKey>
+    private fun requestHealthPermissions(
+        result: MethodChannel.Result,
+        permissionsToRequest: Set<PermissionKey>
     ) {
-        Log.d(APP_TAG, "requestPermissionTotal() 호출")
+        Log.d(APP_TAG, "requestHealthPermissions() 호출 with permissions: $permissionsToRequest")
+
+        if (permissionsToRequest.isEmpty()) {
+            // 요청할 권한이 없으면 바로 성공 응답
+            result.success(mapOf("message" to "요청할 권한이 없습니다."))
+            return
+        }
+
         if (loadFromSharedPreferences()) {
-            // 이미 권한 요청했음 → Flutter로 거부된 권한 이름 전달
-            val deniedTypes = deniedPermissions.map { it.dataType.toString() }
+            // 이미 권한 요청한 이력이 있으면 권한 거부 목록 전달 (재요청 방지)
+            val deniedTypes = permissionsToRequest.map { it.dataType.toString() }
             result.success(mapOf("denied_permissions" to deniedTypes))
             return
         }
 
         val permissionManager = HealthPermissionManager(mStore)
         try {
-            permissionManager.requestPermissions(deniedPermissions, activity!!).setResultListener { res ->
+            permissionManager.requestPermissions(permissionsToRequest, activity!!).setResultListener { res ->
                 val resultMap = res.resultMap
-                val stillDenied = deniedPermissions.filter { resultMap[it] != true }
+                val stillDenied = permissionsToRequest.filter { resultMap[it] != true }
                 if (stillDenied.isNotEmpty()) {
                     saveToSharedPreferences(true)
                     val deniedTypes = stillDenied.map { it.dataType.toString() }
                     result.success(mapOf("denied_permissions" to deniedTypes))
+                    Log.d(APP_TAG, "권한 일부 거부됨: $deniedTypes")
                 } else {
                     result.success(mapOf("message" to "모든 권한 허용됨"))
+                    Log.d(APP_TAG, "모든 권한 허용됨")
                 }
             }
         } catch (e: Exception) {
-            showPermissionAlarmDialog()
-            Log.e(APP_TAG, "Permission request failed: $e")
+            Log.e(APP_TAG, "권한 요청 실패: $e")
             result.error("PERMISSION_ERROR", "권한 요청 실패", null)
         }
     }
@@ -610,7 +612,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 e.message,
                 { isReplied },
                 { isReplied = it })
-            showPermissionAlarmDialog()
         }
     }
 
@@ -642,9 +643,16 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             val granted = resultMap.filterValues { it }.keys
             val denied = permissionKeys - granted
 
-            if (granted.isNotEmpty()) {
+            if (denied.isEmpty()) {
+                // 권한 모두 획득 상태
                 onGranted(granted)
+            } else if (granted.isNotEmpty()) {
+                // 일부 권한은 획득, 일부는 거부
+                // 상황에 맞게 분기하거나 onGranted + onDenied 모두 호출 가능
+                onGranted(granted)
+                onDenied(denied)
             } else {
+                // 권한 모두 거부
                 onDenied(denied)
             }
         } catch (e: Exception) {
@@ -770,18 +778,12 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
 
 
     fun notifyFlutter(dataType: String) {
-        val payload = mapOf(
-            "type" to dataType
-        )
+        val payload = mapOf("type" to dataType)
         Handler(Looper.getMainLooper()).post {
             eventSinks.forEach { sink ->
                 sink.success(payload)
             }
         }
-    }
-
-    private fun showPermissionAlarmDialog() {
-        Log.d(APP_TAG, "showPermissionAlarmDialog 호출")
     }
 
     private fun saveToSharedPreferences(requested: Boolean) {
