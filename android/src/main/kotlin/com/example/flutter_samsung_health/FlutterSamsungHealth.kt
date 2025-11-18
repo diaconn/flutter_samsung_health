@@ -529,17 +529,30 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         permissionsToRequest: Set<PermissionKey>
     ) {
         Log.d(APP_TAG, "requestHealthPermissions() 호출 with permissions: $permissionsToRequest")
+        var isResultSent = false
+
+        fun sendSuccessIfNotSent(response: Any) {
+            if (!isResultSent) {
+                isResultSent = true
+                result.success(response)
+            }
+        }
+
+        fun sendErrorIfNotSent(code: String, msg: String, details: Any?) {
+            if (!isResultSent) {
+                isResultSent = true
+                result.error(code, msg, details)
+            }
+        }
 
         if (permissionsToRequest.isEmpty()) {
-            // 요청할 권한이 없으면 바로 성공 응답
-            result.success(mapOf("message" to "요청할 권한이 없습니다."))
+            sendSuccessIfNotSent(mapOf("message" to "요청할 권한이 없습니다."))
             return
         }
 
         if (loadFromSharedPreferences()) {
-            // 이미 권한 요청한 이력이 있으면 권한 거부 목록 전달 (재요청 방지)
             val deniedTypes = permissionsToRequest.map { it.dataType.toString() }
-            result.success(mapOf("denied_permissions" to deniedTypes))
+            sendSuccessIfNotSent(mapOf("denied_permissions" to deniedTypes))
             return
         }
 
@@ -551,16 +564,16 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 if (stillDenied.isNotEmpty()) {
                     saveToSharedPreferences(true)
                     val deniedTypes = stillDenied.map { it.dataType.toString() }
-                    result.success(mapOf("denied_permissions" to deniedTypes))
+                    sendSuccessIfNotSent(mapOf("denied_permissions" to deniedTypes))
                     Log.d(APP_TAG, "권한 일부 거부됨: $deniedTypes")
                 } else {
-                    result.success(mapOf("message" to "모든 권한 허용됨"))
+                    sendSuccessIfNotSent(mapOf("message" to "모든 권한 허용됨"))
                     Log.d(APP_TAG, "모든 권한 허용됨")
                 }
             }
         } catch (e: Exception) {
             Log.e(APP_TAG, "권한 요청 실패: $e")
-            result.error("PERMISSION_ERROR", "권한 요청 실패", null)
+            sendErrorIfNotSent("PERMISSION_ERROR", "권한 요청 실패", null)
         }
     }
 
@@ -662,16 +675,27 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     }
 
     private fun registerObservers(grantedMap: Map<String, Boolean>? = null) {
-        try {
-            HealthDataObserver.removeObserver(mStore, mObserver)
-        } catch (e: Exception) {
-            Log.e(APP_TAG, "기존 옵저버 제거 실패: ", e)
+        activeObservers.values.forEach { observer ->
+            try {
+                HealthDataObserver.removeObserver(mStore, observer)
+            } catch (e: Exception) {
+                Log.e(APP_TAG, "기존 옵저버 제거 실패: ", e)
+            }
         }
+        activeObservers.clear()
 
         for (dataType in observedDataTypes) {
             if (grantedMap == null || grantedMap[dataType] == true) {
                 try {
+                    val handler = Handler(Looper.getMainLooper())
+                    val observer = object : HealthDataObserver(handler) {
+                        override fun onChange(dataTypeName: String) {
+                            Log.d(APP_TAG, "Observer triggered for $dataType ($dataTypeName)")
+                            notifyFlutter(dataTypeName)
+                        }
+                    }
                     HealthDataObserver.addObserver(mStore, dataType, mObserver)
+                    activeObservers[dataType] = observer
                     Log.d(APP_TAG, "옵저버 등록 완료: $dataType")
                 } catch (e: SecurityException) {
                     Log.w(APP_TAG, "권한 부족으로 옵저버 등록 실패 (무시): $dataType")
@@ -685,12 +709,15 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     }
 
     private fun unregisterObservers() {
-        try {
-            HealthDataObserver.removeObserver(mStore, mObserver)
-            Log.d(APP_TAG, "All observers removed")
-        } catch (e: Exception) {
-            Log.e(APP_TAG, "Failed to remove observers", e)
+        activeObservers.forEach { (type, observer) ->
+            try {
+                HealthDataObserver.removeObserver(mStore, observer)
+                Log.d(APP_TAG, "옵저버 제거 완료: $type")
+            } catch (e: Exception) {
+                Log.e(APP_TAG, "옵저버 제거 실패: $type", e)
+            }
         }
+        activeObservers.clear()
     }
 
     private fun enableObserver(type: String, result: MethodChannel.Result) {
