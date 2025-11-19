@@ -134,19 +134,19 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 requestPermissions(result)
             }
 
-            "enableObserver" -> {
-                val type = call.argument<String>("type") ?: ""
-                enableObserver(type, result)
+            "enableObservers" -> {
+                val types = call.argument<List<String>>("types") ?: emptyList()
+                enableObservers(types, result)
             }
 
-            "disableObserver" -> {
-                val type = call.argument<String>("type") ?: ""
-                disableObserver(type, result)
+            "disableObservers" -> {
+                val types = call.argument<List<String>>("types") ?: emptyList()
+                disableObservers(types, result)
             }
 
-            "getObserverStatus" -> {
-                val type = call.argument<String>("type") ?: ""
-                getObserverStatus(type, result)
+            "getObserversStatus" -> {
+                val types = call.argument<List<String>>("types") ?: emptyList()
+                getObserversStatus(types, result)
             }
 
             "getTotalData" -> {
@@ -727,89 +727,77 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         activeObservers.clear()
     }
 
-    private fun enableObserver(type: String, result: MethodChannel.Result) {
-        try {
-            // 이미 등록되어 있으면 바로 true 반환
-            if (activeObservers.containsKey(type)) {
-                result.success(mapOf("type" to type, "enabled" to true, "already" to true))
+    private fun enableObservers(types: List<String>, result: MethodChannel.Result) {
+        val results = mutableListOf<Map<String, Any>>()
+
+        for (type in types) {
+            try {
+                // 이미 등록되어 있으면 바로 true 반환
+                if (activeObservers.containsKey(type)) {
+                    results.add(mapOf("type" to type, "enabled" to true, "already" to true))
+                    continue
+                }
+
+                val handler = Handler(Looper.getMainLooper())
+                val observer = object : HealthDataObserver(handler) {
+                    override fun onChange(dataTypeName: String) {
+                        Log.d(APP_TAG, "Observer triggered for $type ($dataTypeName)")
+                        notifyFlutter(dataTypeName)
+                    }
+                }
+                try {
+                    HealthDataObserver.addObserver(mStore, type, observer)
+                    activeObservers[type] = observer
+                    results.add(mapOf("type" to (type ?: ""), "enabled" to true))
+                    Log.d(APP_TAG, "enableObservers: registered $type")
+                } catch (se: SecurityException) {
+                    // 권한이 없으면 실패
+                    results.add(mapOf("type" to (type ?: ""), "enabled" to false, "error" to "permission_denied"))
+                    Log.w(APP_TAG, "Enable observer security exception for $type: ${se.message}")
+                } catch (e: Exception) {
+                    results.add(mapOf("type" to (type ?: ""), "enabled" to false, "error" to (e.message ?: "")))
+                    Log.e(APP_TAG, "Enable observer failed: $type", e)
+                }
+            } catch (e: Exception) {
+                results.add(mapOf("type" to (type ?: ""), "enabled" to false, "error" to (e.message ?: "")))
+                Log.e(APP_TAG, "Enable observer unexpected error: $type", e)
+            }
+        }
+
+        result.success(mapOf("results" to results))
+    }
+
+    private fun disableObservers(types: List<String>, result: MethodChannel.Result) {
+        val results = mutableListOf<Map<String, Any>>()
+
+        for (type in types) {
+            val observer = activeObservers[type]
+            if (observer == null) {
+                results.add(mapOf("type" to (type ?: ""), "disabled" to false, "error" to "not_registered"))
                 return
             }
 
-            val handler = Handler(Looper.getMainLooper())
-            val observer = object : HealthDataObserver(handler) {
-                override fun onChange(dataTypeName: String) {
-                    Log.d(APP_TAG, "Observer triggered for $type ($dataTypeName)")
-                    notifyFlutter(dataTypeName)
-                }
-            }
             try {
-                HealthDataObserver.addObserver(mStore, type, observer)
-                activeObservers[type] = observer
-                result.success(mapOf("type" to type, "enabled" to true))
-                Log.d(APP_TAG, "enableObserver: registered $type")
-            } catch (se: SecurityException) {
-                // 권한이 없으면 실패
-                Log.w(APP_TAG, "Enable observer security exception for $type: ${se.message}")
-                result.success(mapOf("type" to type, "enabled" to false, "error" to "permission_denied"))
+                HealthDataObserver.removeObserver(mStore, observer)
+                activeObservers.remove(type)
+                results.add(mapOf("type" to (type ?: ""), "disabled" to true))
+                Log.d(APP_TAG, "disableObservers: removed $type")
             } catch (e: Exception) {
-                Log.e(APP_TAG, "Enable observer failed: $type", e)
-                result.success(mapOf("type" to type, "enabled" to false, "error" to e.message))
+                results.add(mapOf("type" to (type ?: ""), "disabled" to false, "error" to (e.message ?: "")))
+                Log.e(APP_TAG, "Disable observer failed: $type", e)
             }
-        } catch (e: Exception) {
-            Log.e(APP_TAG, "Enable observer unexpected error: $type", e)
-            result.success(mapOf("type" to type, "enabled" to false, "error" to e.message))
-        }
-    }
-
-    private fun disableObserver(type: String, result: MethodChannel.Result) {
-        val observer = activeObservers[type]
-        if (observer == null) {
-            result.success(mapOf("type" to type, "disabled" to false, "error" to "not_registered"))
-            return
         }
 
-        try {
-            HealthDataObserver.removeObserver(mStore, observer)
-            activeObservers.remove(type)
-            result.success(mapOf("type" to type, "disabled" to true))
-            Log.d(APP_TAG, "disableObserver: removed $type")
-        } catch (e: Exception) {
-            Log.e(APP_TAG, "Disable observer failed: $type", e)
-            result.success(mapOf("type" to type, "disabled" to false, "error" to e.message))
+        result.success(mapOf("results" to results))
+    }
+
+    fun getObserversStatus(types: List<String>, result: MethodChannel.Result) {
+        val results = types.map { type ->
+            val exists = activeObservers.containsKey(type)
+            mapOf("type" to (type ?: ""), "enabled" to exists)
         }
+        result.success(mapOf("results" to results))
     }
-
-    fun getObserverStatus(type: String, result: MethodChannel.Result) {
-        val exists = activeObservers.containsKey(type)
-        result.success(mapOf("type" to type, "enabled" to exists))
-    }
-
-    private fun registerEnabledObserversFromSP() {
-        // SP에 'observer_<type>' 키로 저장되어 있다고 가정
-        try {
-            val typesToCheck = listOf(
-                Exercise.HEALTH_DATA_TYPE,
-                Nutrition.HEALTH_DATA_TYPE,
-                BloodGlucose.HEALTH_DATA_TYPE
-            )
-
-            for (type in typesToCheck) {
-                val spKey = "observer_${type}"
-                // SP.getBoolean(...) 의 구현에 맞춰서 불러와라. (예시는 pseudo)
-                val enabled = /* SP.getBool(spKey) */ false // 실제 SP 호출 코드로 교체
-                if (enabled && !activeObservers.containsKey(type)) {
-                    enableObserver(type, object : MethodChannel.Result {
-                        override fun success(p0: Any?) {}
-                        override fun error(p0: String, p1: String?, p2: Any?) {}
-                        override fun notImplemented() {}
-                    })
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(APP_TAG, "registerEnabledObserversFromSP failed", e)
-        }
-    }
-
 
     fun notifyFlutter(dataType: String) {
         val payload = mapOf("type" to dataType)

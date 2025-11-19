@@ -57,31 +57,31 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     };
   }
 
-  /// 옵저버 단건 켜기
+  /// 옵저버 켜기
   @override
-  Future<Map<String, dynamic>> enableObserver(String type) async {
+  Future<Map<String, dynamic>> enableObservers(List<String> types) async {
     final result =
-    await methodChannel.invokeMethod<Map>('enableObserver', {"type": type});
+    await methodChannel.invokeMethod<Map>('enableObservers', {"types": types});
     return result?.map((key, value) => MapEntry(key.toString(), value)) ??
-        {"enabled": false};
+        {"results": []};
   }
 
-  /// 옵저버 단건 끄기
+  /// 옵저버 끄기
   @override
-  Future<Map<String, dynamic>> disableObserver(String type) async {
+  Future<Map<String, dynamic>> disableObservers(List<String> types) async {
     final result =
-    await methodChannel.invokeMethod<Map>('disableObserver', {"type": type});
+    await methodChannel.invokeMethod<Map>('disableObservers', {"types": types});
     return result?.map((key, value) => MapEntry(key.toString(), value)) ??
-        {"disabled": false};
+        {"results": []};
   }
 
   /// 옵저버 상태조회
   @override
-  Future<Map<String, dynamic>> getObserverStatus(String type) async {
+  Future<Map<String, dynamic>> getObserversStatus(List<String> types) async {
     final result =
-    await methodChannel.invokeMethod<Map>('getObserverStatus', {"type": type});
+    await methodChannel.invokeMethod<Map>('getObserversStatus', {"types": types});
     return result?.map((key, value) => MapEntry(key.toString(), value)) ??
-        {"enabled": false};
+        {"results": []};
   }
 
   /// 전체 데이터 조회

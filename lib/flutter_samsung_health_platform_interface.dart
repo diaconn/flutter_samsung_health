@@ -42,13 +42,13 @@ abstract class FlutterSamsungHealthPlatform extends PlatformInterface {
   Future<Map<String, dynamic>> getGrantedPermissions();
 
   /// 옵저버 단건 켜기
-  Future<Map<String, dynamic>> enableObserver(String type);
+  Future<Map<String, dynamic>> enableObservers(List<String> types);
 
   /// 옵저버 단건 끄기
-  Future<Map<String, dynamic>> disableObserver(String type);
+  Future<Map<String, dynamic>> disableObservers(List<String> types);
 
   /// 옵저버 상태 조회
-  Future<Map<String, dynamic>> getObserverStatus(String type);
+  Future<Map<String, dynamic>> getObserversStatus(List<String> types);
 
   /// 전체 데이터
   Future<Map<String, List<Map<String, dynamic>>>> getTotalData(int start, int end);

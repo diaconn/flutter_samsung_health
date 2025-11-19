@@ -32,20 +32,20 @@ class FlutterSamsungHealth {
   }
 
   /// 옵저버 단건 켜기
-  Future<Map<String, dynamic>> enableObserver(String type) async {
-    final result = await FlutterSamsungHealthPlatform.instance.enableObserver(type);
+  Future<Map<String, dynamic>> enableObservers(List<String> types) async {
+    final result = await FlutterSamsungHealthPlatform.instance.enableObservers(types);
     return result.map((key, value) => MapEntry(key.toString(), value));
   }
 
   /// 옵저버 단건 끄기
-  Future<Map<String, dynamic>> disableObserver(String type) async {
-    final result = await FlutterSamsungHealthPlatform.instance.disableObserver(type);
+  Future<Map<String, dynamic>> disableObservers(List<String> types) async {
+    final result = await FlutterSamsungHealthPlatform.instance.disableObservers(types);
     return result.map((key, value) => MapEntry(key.toString(), value));
   }
 
   /// 옵저버 상태 조회
-  Future<Map<String, dynamic>> getObserverStatus(String type) async {
-    final result = await FlutterSamsungHealthPlatform.instance.getObserverStatus(type);
+  Future<Map<String, dynamic>> getObserversStatus(List<String> types) async {
+    final result = await FlutterSamsungHealthPlatform.instance.getObserversStatus(types);
     return result.map((key, value) => MapEntry(key.toString(), value));
   }
 
