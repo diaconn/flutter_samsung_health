@@ -682,27 +682,16 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     }
 
     private fun registerObservers(grantedMap: Map<String, Boolean>? = null) {
-        activeObservers.forEach { (type, observer) ->
-            try {
-                HealthDataObserver.removeObserver(mStore, observer)
-            } catch (e: Exception) {
-                Log.e(APP_TAG, "기존 옵저버 제거 실패: ", e)
-            }
+        try {
+            HealthDataObserver.removeObserver(mStore, mObserver)
+        } catch (e: Exception) {
+            Log.e(APP_TAG, "기존 옵저버 제거 실패: ", e)
         }
-        activeObservers.clear()
 
         for (dataType in observedDataTypes) {
             if (grantedMap == null || grantedMap[dataType] == true) {
                 try {
-                    val handler = Handler(Looper.getMainLooper())
-                    val observer = object : HealthDataObserver(handler) {
-                        override fun onChange(dataTypeName: String) {
-                            Log.d(APP_TAG, "Observer triggered for $dataType ($dataTypeName)")
-                            notifyFlutter(dataTypeName)
-                        }
-                    }
-                    HealthDataObserver.addObserver(mStore, dataType, observer)
-                    activeObservers[dataType] = observer
+                    HealthDataObserver.addObserver(mStore, dataType, mObserver)
                     Log.d(APP_TAG, "옵저버 등록 완료: $dataType")
                 } catch (e: SecurityException) {
                     Log.w(APP_TAG, "권한 부족으로 옵저버 등록 실패 (무시): $dataType")
