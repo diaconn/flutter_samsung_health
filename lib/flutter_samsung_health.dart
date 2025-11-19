@@ -31,13 +31,13 @@ class FlutterSamsungHealth {
     return FlutterSamsungHealthPlatform.instance.getGrantedPermissions();
   }
 
-  /// 옵저버 단건 켜기
+  /// 옵저버 켜기
   Future<Map<String, dynamic>> enableObservers(List<String> types) async {
     final result = await FlutterSamsungHealthPlatform.instance.enableObservers(types);
     return result.map((key, value) => MapEntry(key.toString(), value));
   }
 
-  /// 옵저버 단건 끄기
+  /// 옵저버 끄기
   Future<Map<String, dynamic>> disableObservers(List<String> types) async {
     final result = await FlutterSamsungHealthPlatform.instance.disableObservers(types);
     return result.map((key, value) => MapEntry(key.toString(), value));

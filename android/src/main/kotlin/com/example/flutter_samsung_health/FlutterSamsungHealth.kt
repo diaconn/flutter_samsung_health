@@ -682,7 +682,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     }
 
     private fun registerObservers(grantedMap: Map<String, Boolean>? = null) {
-        activeObservers.values.forEach { observer ->
+        activeObservers.forEach { (type, observer) ->
             try {
                 HealthDataObserver.removeObserver(mStore, observer)
             } catch (e: Exception) {
@@ -701,7 +701,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                             notifyFlutter(dataTypeName)
                         }
                     }
-                    HealthDataObserver.addObserver(mStore, dataType, mObserver)
+                    HealthDataObserver.addObserver(mStore, dataType, observer)
                     activeObservers[dataType] = observer
                     Log.d(APP_TAG, "옵저버 등록 완료: $dataType")
                 } catch (e: SecurityException) {
