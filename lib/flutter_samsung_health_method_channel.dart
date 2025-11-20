@@ -9,42 +9,42 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
   @visibleForTesting
   final methodChannel = const MethodChannel('flutter_samsung_health');
 
-  /// 삼성 헬스 설치 여부 체크
+  /// 설치 여부 체크
   @override
   Future<Map<String, dynamic>> isSamsungHealthInstalled() async {
     final result = await methodChannel.invokeMethod<Map>('isSamsungHealthInstalled', {});
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {'isInstalled': false};
   }
 
-  /// 삼성 헬스 앱 열기
+  /// 앱 실행
   @override
   Future<Map<String, dynamic>> openSamsungHealth() async {
     final result = await methodChannel.invokeMethod<Map>('openSamsungHealth', {});
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {'action': "failed"};
   }
 
-  /// 삼성 헬스 연결
+  /// 연결
   @override
   Future<Map<String, dynamic>> connect() async {
     final result = await methodChannel.invokeMethod<Map>('connect', {});
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {'isConnect': false};
   }
 
-  /// 삼성 헬스 연결 해제
+  /// 연결 해제
   @override
   Future<Map<String, dynamic>> disconnect() async {
     final result = await methodChannel.invokeMethod<Map>('disconnect', {});
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {'isConnect': false};
   }
 
-  /// 삼성 헬스 권한
+  /// 권한
   @override
   Future<Map<String, dynamic>> requestPermissions() async {
     final result = await methodChannel.invokeMethod<Map>('requestPermissions', {});
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {'isConnect': false};
   }
 
-  /// 삼성 헬스 승인된 권한 받기
+  /// 승인 권한
   @override
   Future<Map<String, dynamic>> getGrantedPermissions() async {
     final List<dynamic>? result = await methodChannel.invokeMethod<List<dynamic>>('getGrantedPermissions', {});
@@ -75,7 +75,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
         {"results": []};
   }
 
-  /// 옵저버 상태조회
+  /// 옵저버 상태 조회
   @override
   Future<Map<String, dynamic>> getObserversStatus(List<String> types) async {
     final result =
@@ -183,7 +183,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
         .toList();
   }
 
-  /// 무게 조회
+  /// 신체 조회
   @override
   Future<List<Map<String, dynamic>>> getWeightData(int start, int end) async {
     final result = await methodChannel.invokeMethod<List>('getWeightData', {

@@ -1,32 +1,32 @@
 import 'flutter_samsung_health_platform_interface.dart';
 
 class FlutterSamsungHealth {
-  /// 삼성 헬스 설치 유무 체크
+  /// 설치 여부 체크
   Future<Map<String, dynamic>> isSamsungHealthInstalled() {
     return FlutterSamsungHealthPlatform.instance.isSamsungHealthInstalled();
   }
 
-  /// 삼성 헬스 앱 실행
+  /// 앱 실행
   Future<Map<String, dynamic>> openSamsungHealth() {
     return FlutterSamsungHealthPlatform.instance.openSamsungHealth();
   }
 
-  /// 삼성 헬스 SDK 연결
+  /// 연결
   Future<Map<String, dynamic>> connect() {
     return FlutterSamsungHealthPlatform.instance.connect();
   }
 
-  /// 삼성 헬스 SDK 연결 해제
+  /// 연결 해제
   Future<Map<String, dynamic>> disconnect() {
     return FlutterSamsungHealthPlatform.instance.disconnect();
   }
 
-  /// 삼성 헬스 권한
+  /// 권한
   Future<Map<String, dynamic>> requestPermissions() {
     return FlutterSamsungHealthPlatform.instance.requestPermissions();
   }
 
-  /// 삼성 헬스 승인 권한
+  /// 승인 권한
   Future<Map<String, dynamic>> getGrantedPermissions() {
     return FlutterSamsungHealthPlatform.instance.getGrantedPermissions();
   }
@@ -73,14 +73,6 @@ class FlutterSamsungHealth {
     return FlutterSamsungHealthPlatform.instance.getHeartRateData(start, end);
   }
 
-  /// 걷기 조회(5분 누적)
-  Future<List<Map<String, dynamic>>> getStepData({
-    required int start,
-    required int end,
-  }) {
-    return FlutterSamsungHealthPlatform.instance.getStepData(start, end);
-  }
-
   /// 수면 조회
   Future<List<Map<String, dynamic>>> getSleepData({
     required int start,
@@ -97,6 +89,14 @@ class FlutterSamsungHealth {
     return FlutterSamsungHealthPlatform.instance.getSleepStageData(start, end);
   }
 
+  /// 걷기 조회(5분 누적)
+  Future<List<Map<String, dynamic>>> getStepData({
+    required int start,
+    required int end,
+  }) {
+    return FlutterSamsungHealthPlatform.instance.getStepData(start, end);
+  }
+
   /// 영양소 조회
   Future<List<Map<String, dynamic>>> getNutritionData({
     required int start,
@@ -105,7 +105,7 @@ class FlutterSamsungHealth {
     return FlutterSamsungHealthPlatform.instance.getNutritionData(start, end);
   }
 
-  /// 무게 조회
+  /// 신체 조회
   Future<List<Map<String, dynamic>>> getWeightData({
     required int start,
     required int end,

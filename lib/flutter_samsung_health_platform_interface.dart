@@ -29,7 +29,7 @@ abstract class FlutterSamsungHealthPlatform extends PlatformInterface {
   /// 앱 실행
   Future<Map<String, dynamic>> openSamsungHealth();
 
-  /// 연결 (권한 확인 및 요청)
+  /// 연결
   Future<Map<String, dynamic>> connect();
 
   /// 연결 해제
@@ -50,36 +50,36 @@ abstract class FlutterSamsungHealthPlatform extends PlatformInterface {
   /// 옵저버 상태 조회
   Future<Map<String, dynamic>> getObserversStatus(List<String> types);
 
-  /// 전체 데이터
+  /// 전체 데이터 조회
   Future<Map<String, List<Map<String, dynamic>>>> getTotalData(int start, int end);
 
-  /// 운동
+  /// 운동 조회
   Future<List<Map<String, dynamic>>> getExerciseData(int start, int end);
 
-  /// 심박
+  /// 심박 조회
   Future<List<Map<String, dynamic>>> getHeartRateData(int start, int end);
 
-  /// 수면
+  /// 수면 조회
   Future<List<Map<String, dynamic>>> getSleepData(int start, int end);
 
-  /// 수면 단계
+  /// 수면 단계 조회
   Future<List<Map<String, dynamic>>> getSleepStageData(int start, int end);
 
   /// 걷기 조회(5분 누적)
   Future<List<Map<String, dynamic>>> getStepData(int start, int end);
 
-  /// 영양소 정보
+  /// 영양소 조회
   Future<List<Map<String, dynamic>>> getNutritionData(int start, int end);
 
-  /// 무게 정보
+  /// 신체 조회
   Future<List<Map<String, dynamic>>> getWeightData(int start, int end);
 
-  /// 산소 포화도 정보
+  /// 산소 포화도 조회
   Future<List<Map<String, dynamic>>> getOxygenSaturationData(int start, int end);
 
-  /// 체온 정보
+  /// 체온 조회
   Future<List<Map<String, dynamic>>> getBodyTemperatureData(int start, int end);
 
-  /// 혈당 정보
+  /// 혈당 조회
   Future<List<Map<String, dynamic>>> getBloodGlucoseData(int start, int end);
 }

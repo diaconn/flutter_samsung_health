@@ -109,66 +109,67 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
+        val wrapper = ResultWrapper(result)
+
         when (call.method) {
             "isSamsungHealthInstalled" -> {
-                isSamsungHealthInstalled(result, context)
+                isSamsungHealthInstalled(wrapper, context)
             }
 
             "openSamsungHealth" -> {
-                openSamsungHealthInStore(result, context)
+                openSamsungHealthInStore(wrapper, context)
             }
 
             "connect" -> {
-                connectSamsungHealth(result)
+                connectSamsungHealth(wrapper)
             }
 
             "disconnect" -> {
-                disconnectSamsungHealth(result)
+                disconnectSamsungHealth(wrapper)
             }
 
             "getGrantedPermissions" -> {
-                getGrantedPermissions(result)
+                getGrantedPermissions(wrapper)
             }
 
             "requestPermissions" -> {
-                requestPermissions(result)
+                requestPermissions(wrapper)
             }
 
             "enableObservers" -> {
                 val types = call.argument<List<String>>("types") ?: emptyList()
-                enableObservers(types, result)
+                enableObservers(types, wrapper)
             }
 
             "disableObservers" -> {
                 val types = call.argument<List<String>>("types") ?: emptyList()
-                disableObservers(types, result)
+                disableObservers(types, wrapper)
             }
 
             "getObserversStatus" -> {
                 val types = call.argument<List<String>>("types") ?: emptyList()
-                getObserversStatus(types, result)
+                getObserversStatus(types, wrapper)
             }
 
             "getTotalData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
-                val wrappedResult = ResultWrapper(result)
 
                 checkPermissionAndExecuteTotal(
                     permissionKeys = permissions,
                     onGranted = { grantedPermissions ->
                         if (grantedPermissions.isNotEmpty()) {
-                            getTotalData(start, end, wrappedResult, grantedPermissions)
+                            getTotalData(start, end, wrapper, grantedPermissions)
                         } else {
-                            wrappedResult.error("PERMISSION_ERROR", "권한이 없습니다.", null)
+                            wrapper.error("PERMISSION_ERROR", "권한이 없습니다.", null)
                         }
                     },
                     onDenied = { deniedPermissions ->
                         if (deniedPermissions.isNotEmpty()) {
-                            requestHealthPermissions(wrappedResult, deniedPermissions)
+                            requestHealthPermissions(wrapper, deniedPermissions)
                         } else {
                             // deniedPermissions 비어있으면 권한 거부 없음 → 그냥 처리
-                            wrappedResult.error("PERMISSION_ERROR", "권한이 부족합니다.", null)
+                            wrapper.error("PERMISSION_ERROR", "권한이 부족합니다.", null)
                         }
                     }
                 )
@@ -178,23 +179,22 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
                 val permission = PermissionKey(Exercise.HEALTH_DATA_TYPE, PermissionType.READ)
-                val wrappedResult = ResultWrapper(result)
 
                 checkPermissionAndExecute(permission, onGranted = {
                     CoroutineScope(Dispatchers.Default).launch {
                         try {
                             val data = getExerciseData(start, end)
                             withContext(Dispatchers.Main) {
-                                result.success(data)
+                                wrapper.success(data)
                             }
                         } catch (e: Exception) {
                             withContext(Dispatchers.Main) {
-                                result.error("GET_EXERCISE_ERROR", e.message, null)
+                                wrapper.error("GET_EXERCISE_ERROR", e.message, null)
                             }
                         }
                     }
                 }, onDenied = {
-                    requestHealthPermissions(wrappedResult, setOf(permission))
+                    requestHealthPermissions(wrapper, setOf(permission))
                 })
             }
 
@@ -202,23 +202,22 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
                 val permission = PermissionKey(HeartRate.HEALTH_DATA_TYPE, PermissionType.READ)
-                val wrappedResult = ResultWrapper(result)
 
                 checkPermissionAndExecute(permission, onGranted = {
                     CoroutineScope(Dispatchers.Default).launch {
                         try {
                             val data = getHeartRateData(start, end)
                             withContext(Dispatchers.Main) {
-                                result.success(data)
+                                wrapper.success(data)
                             }
                         } catch (e: Exception) {
                             withContext(Dispatchers.Main) {
-                                result.error("GET_HEART_RATE_ERROR", e.message, null)
+                                wrapper.error("GET_HEART_RATE_ERROR", e.message, null)
                             }
                         }
                     }
                 }, onDenied = {
-                    requestHealthPermissions(wrappedResult, setOf(permission))
+                    requestHealthPermissions(wrapper, setOf(permission))
                 })
             }
 
@@ -226,23 +225,22 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
                 val permission = PermissionKey(Sleep.HEALTH_DATA_TYPE, PermissionType.READ)
-                val wrappedResult = ResultWrapper(result)
 
                 checkPermissionAndExecute(permission, onGranted = {
                     CoroutineScope(Dispatchers.Default).launch {
                         try {
                             val data = getSleepData(start, end)
                             withContext(Dispatchers.Main) {
-                                result.success(data)
+                                wrapper.success(data)
                             }
                         } catch (e: Exception) {
                             withContext(Dispatchers.Main) {
-                                result.error("GET_SLEEP_ERROR", e.message, null)
+                                wrapper.error("GET_SLEEP_ERROR", e.message, null)
                             }
                         }
                     }
                 }, onDenied = {
-                    requestHealthPermissions(wrappedResult, setOf(permission))
+                    requestHealthPermissions(wrapper, setOf(permission))
                 })
             }
 
@@ -250,23 +248,22 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
                 val permission = PermissionKey(SleepStage.HEALTH_DATA_TYPE, PermissionType.READ)
-                val wrappedResult = ResultWrapper(result)
 
                 checkPermissionAndExecute(permission, onGranted = {
                     CoroutineScope(Dispatchers.Default).launch {
                         try {
                             val data = getSleepStageData(start, end)
                             withContext(Dispatchers.Main) {
-                                result.success(data)
+                                wrapper.success(data)
                             }
                         } catch (e: Exception) {
                             withContext(Dispatchers.Main) {
-                                result.error("GET_SLEEPSTAGE_ERROR", e.message, null)
+                                wrapper.error("GET_SLEEPSTAGE_ERROR", e.message, null)
                             }
                         }
                     }
                 }, onDenied = {
-                    requestHealthPermissions(wrappedResult, setOf(permission))
+                    requestHealthPermissions(wrapper, setOf(permission))
                 })
             }
 
@@ -274,23 +271,22 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
                 val permission = PermissionKey(StepCount.HEALTH_DATA_TYPE, PermissionType.READ)
-                val wrappedResult = ResultWrapper(result)
 
                 checkPermissionAndExecute(permission, onGranted = {
                     CoroutineScope(Dispatchers.Default).launch {
                         try {
                             val data = getStepData(start, end)
                             withContext(Dispatchers.Main) {
-                                result.success(data)
+                                wrapper.success(data)
                             }
                         } catch (e: Exception) {
                             withContext(Dispatchers.Main) {
-                                result.error("GET_STEP_ERROR", e.message, null)
+                                wrapper.error("GET_STEP_ERROR", e.message, null)
                             }
                         }
                     }
                 }, onDenied = {
-                    requestHealthPermissions(wrappedResult, setOf(permission))
+                    requestHealthPermissions(wrapper, setOf(permission))
                 })
             }
 
@@ -298,23 +294,22 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
                 val permission = PermissionKey(Nutrition.HEALTH_DATA_TYPE, PermissionType.READ)
-                val wrappedResult = ResultWrapper(result)
 
                 checkPermissionAndExecute(permission, onGranted = {
                     CoroutineScope(Dispatchers.Default).launch {
                         try {
                             val data = getNutritionData(start, end)
                             withContext(Dispatchers.Main) {
-                                result.success(data)
+                                wrapper.success(data)
                             }
                         } catch (e: Exception) {
                             withContext(Dispatchers.Main) {
-                                result.error("GET_NUTRITION_ERROR", e.message, null)
+                                wrapper.error("GET_NUTRITION_ERROR", e.message, null)
                             }
                         }
                     }
                 }, onDenied = {
-                    requestHealthPermissions(wrappedResult, setOf(permission))
+                    requestHealthPermissions(wrapper, setOf(permission))
                 })
             }
 
@@ -322,23 +317,22 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
                 val permission = PermissionKey(Weight.HEALTH_DATA_TYPE, PermissionType.READ)
-                val wrappedResult = ResultWrapper(result)
 
                 checkPermissionAndExecute(permission, onGranted = {
                     CoroutineScope(Dispatchers.Default).launch {
                         try {
                             val data = getWeightData(start, end)
                             withContext(Dispatchers.Main) {
-                                result.success(data)
+                                wrapper.success(data)
                             }
                         } catch (e: Exception) {
                             withContext(Dispatchers.Main) {
-                                result.error("GET_WEIGHT_ERROR", e.message, null)
+                                wrapper.error("GET_WEIGHT_ERROR", e.message, null)
                             }
                         }
                     }
                 }, onDenied = {
-                    requestHealthPermissions(wrappedResult, setOf(permission))
+                    requestHealthPermissions(wrapper, setOf(permission))
                 })
             }
 
@@ -346,23 +340,22 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
                 val permission = PermissionKey(OxygenSaturation.HEALTH_DATA_TYPE, PermissionType.READ)
-                val wrappedResult = ResultWrapper(result)
 
                 checkPermissionAndExecute(permission, onGranted = {
                     CoroutineScope(Dispatchers.Default).launch {
                         try {
                             val data = getOxygenSaturationData(start, end)
                             withContext(Dispatchers.Main) {
-                                result.success(data)
+                                wrapper.success(data)
                             }
                         } catch (e: Exception) {
                             withContext(Dispatchers.Main) {
-                                result.error("GET_OXYGENSATURATION_ERROR", e.message, null)
+                                wrapper.error("GET_OXYGENSATURATION_ERROR", e.message, null)
                             }
                         }
                     }
                 }, onDenied = {
-                    requestHealthPermissions(wrappedResult, setOf(permission))
+                    requestHealthPermissions(wrapper, setOf(permission))
                 })
             }
 
@@ -370,23 +363,22 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
                 val permission = PermissionKey(BodyTemperature.HEALTH_DATA_TYPE, PermissionType.READ)
-                val wrappedResult = ResultWrapper(result)
 
                 checkPermissionAndExecute(permission, onGranted = {
                     CoroutineScope(Dispatchers.Default).launch {
                         try {
                             val data = getBodyTemperatureData(start, end)
                             withContext(Dispatchers.Main) {
-                                result.success(data)
+                                wrapper.success(data)
                             }
                         } catch (e: Exception) {
                             withContext(Dispatchers.Main) {
-                                result.error("GET_BODYTEMPERATURE_ERROR", e.message, null)
+                                wrapper.error("GET_BODYTEMPERATURE_ERROR", e.message, null)
                             }
                         }
                     }
                 }, onDenied = {
-                    requestHealthPermissions(wrappedResult, setOf(permission))
+                    requestHealthPermissions(wrapper, setOf(permission))
                 })
             }
 
@@ -394,46 +386,45 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
                 val permission = PermissionKey(BloodGlucose.HEALTH_DATA_TYPE, PermissionType.READ)
-                val wrappedResult = ResultWrapper(result)
 
                 checkPermissionAndExecute(permission, onGranted = {
                     CoroutineScope(Dispatchers.Default).launch {
                         try {
                             val data = getBloodGlucoseData(start, end)
                             withContext(Dispatchers.Main) {
-                                result.success(data)
+                                wrapper.success(data)
                             }
                         } catch (e: Exception) {
                             withContext(Dispatchers.Main) {
-                                result.error("GET_BLOODGLUCOSE_ERROR", e.message, null)
+                                wrapper.error("GET_BLOODGLUCOSE_ERROR", e.message, null)
                             }
                         }
                     }
                 }, onDenied = {
-                    requestHealthPermissions(wrappedResult, setOf(permission))
+                    requestHealthPermissions(wrapper, setOf(permission))
                 })
             }
 
-            else -> result.notImplemented()
+            else -> wrapper.notImplemented()
         }
     }
 
 
-    private fun isSamsungHealthInstalled(result: MethodChannel.Result, context: Context) {
+    private fun isSamsungHealthInstalled(wrapper: ResultWrapper, context: Context) {
         Log.d(APP_TAG, "isSamsungHealthInstalled() 호출")
         val resultMap: MutableMap<String, Any> = mutableMapOf()
 
         try {
             context.packageManager.getPackageInfo("com.sec.android.app.shealth", 0)
             resultMap.put("isInstalled", true)
-            result.success(resultMap)
+            wrapper.success(resultMap)
         } catch (e: Exception) {
             resultMap.put("isInstalled", false)
-            result.success(resultMap)
+            wrapper.success(resultMap)
         }
     }
 
-    private fun openSamsungHealthInStore(result: MethodChannel.Result, context: Context) {
+    private fun openSamsungHealthInStore(wrapper: ResultWrapper, context: Context) {
         Log.d(APP_TAG, "openSamsungHealthInStore() 호출")
         val resultMap: MutableMap<String, Any> = mutableMapOf()
         val packageName = "com.sec.android.app.shealth"
@@ -448,11 +439,11 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(launchIntent)
                 resultMap.put("action", "launched")
-                result.success(resultMap)
+                wrapper.success(resultMap)
             } else {
                 Log.e(APP_TAG, "삼성 헬스 실행 인텐트 없음")
                 resultMap.put("action", "launch_failed")
-                result.success(resultMap)
+                wrapper.success(resultMap)
             }
 
         } catch (e: Exception) {
@@ -465,11 +456,11 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 }
                 context.startActivity(intent)
                 resultMap.put("action", "move_to_store")
-                result.success(resultMap)
+                wrapper.success(resultMap)
             } catch (e: Exception) {
                 Log.e(APP_TAG, "Play 스토어 이동 실패: $e")
                 resultMap.put("action", "store_failed")
-                result.success(resultMap)
+                wrapper.success(resultMap)
             }
         }
     }
@@ -477,7 +468,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     /**
      * 삼성헬스 연계 관련 함수 추가.
      */
-    private fun connectSamsungHealth(result: MethodChannel.Result) {
+    private fun connectSamsungHealth(wrapper: ResultWrapper) {
         Log.d(APP_TAG, "connectSamsungHealth() 호출")
         val resultMap: MutableMap<String, Any> = mutableMapOf()
 
@@ -485,25 +476,25 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             override fun onConnected() {
                 Log.d(APP_TAG, "삼성 헬스 연결 성공")
                 resultMap.put("isConnect", true)
-                result.success(resultMap)
+                wrapper.success(resultMap)
             }
 
             override fun onConnectionFailed(error: HealthConnectionErrorResult?) {
                 Log.e(APP_TAG, "연결 실패: $error")
                 resultMap.put("isConnect", false)
-                result.success(resultMap)
+                wrapper.success(resultMap)
             }
 
             override fun onDisconnected() {
                 Log.w(APP_TAG, "삼성 헬스 연결 종료")
                 resultMap.put("isConnect", false)
-                result.success(resultMap)
+                wrapper.success(resultMap)
             }
         })
         mStore.connectService()
     }
 
-    private fun disconnectSamsungHealth(result: MethodChannel.Result) {
+    private fun disconnectSamsungHealth(wrapper: ResultWrapper) {
         Log.d(APP_TAG, "disconnectSamsungHealth() 호출")
 
         if (::mStore.isInitialized) {
@@ -513,23 +504,23 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 unregisterObservers()
                 val resultMap: MutableMap<String, Any> = mutableMapOf()
                 resultMap["isConnect"] = false
-                result.success(resultMap)
+                wrapper.success(resultMap)
             } catch (e: Exception) {
                 Log.e(APP_TAG, "disconnect 실패: ${e.message}", e)
-                result.error("DISCONNECT_ERROR", e.message, null)
+                wrapper.error("DISCONNECT_ERROR", e.message, null)
             }
         } else {
             Log.w(APP_TAG, "mStore가 초기화되지 않았습니다.")
             val resultMap: MutableMap<String, Any> = mutableMapOf()
             resultMap["isConnect"] = false
-            result.success(resultMap)
+            wrapper.success(resultMap)
         }
     }
 
-    private fun getGrantedPermissions(result: MethodChannel.Result) {
+    private fun getGrantedPermissions(wrapper: ResultWrapper) {
         Log.d(APP_TAG, "getGrantedPermissions() 호출")
         if (!::mStore.isInitialized) {
-            result.error("STORE_NOT_READY", "Samsung Health 연결되지 않음", null)
+            wrapper.error("STORE_NOT_READY", "Samsung Health 연결되지 않음", null)
             return
         }
 
@@ -539,27 +530,27 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
 
             val grantedList = resultMap.filterValues { it }.keys.map { it.dataType.toString() }
 
-            result.success(grantedList)
+            wrapper.success(grantedList)
         } catch (e: Exception) {
             Log.e(APP_TAG, "권한 조회 중 오류", e)
-            result.error("PERMISSION_QUERY_ERROR", "권한 조회 실패", null)
+            wrapper.error("PERMISSION_QUERY_ERROR", "권한 조회 실패", null)
         }
     }
 
     private fun requestHealthPermissions(
-        wrappedResult: ResultWrapper,
+        wrapper: ResultWrapper,
         permissionsToRequest: Set<PermissionKey>
     ) {
         Log.d(APP_TAG, "requestHealthPermissions() 호출 with permissions: $permissionsToRequest")
 
         if (permissionsToRequest.isEmpty()) {
-            wrappedResult.success(mapOf("message" to "요청할 권한이 없습니다."))
+            wrapper.success(mapOf("message" to "요청할 권한이 없습니다."))
             return
         }
 
         if (loadFromSharedPreferences()) {
             val deniedTypes = permissionsToRequest.map { it.dataType.toString() }
-            wrappedResult.success(mapOf("denied_permissions" to deniedTypes))
+            wrapper.success(mapOf("denied_permissions" to deniedTypes))
             return
         }
 
@@ -571,34 +562,22 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 if (stillDenied.isNotEmpty()) {
                     saveToSharedPreferences(true)
                     val deniedTypes = stillDenied.map { it.dataType.toString() }
-                    wrappedResult.success(mapOf("denied_permissions" to deniedTypes))
+                    wrapper.success(mapOf("denied_permissions" to deniedTypes))
                     Log.d(APP_TAG, "권한 일부 거부됨: $deniedTypes")
                 } else {
-                    wrappedResult.success(mapOf("message" to "모든 권한 허용됨"))
+                    wrapper.success(mapOf("message" to "모든 권한 허용됨"))
                     Log.d(APP_TAG, "모든 권한 허용됨")
                 }
             }
         } catch (e: Exception) {
             Log.e(APP_TAG, "권한 요청 실패: $e")
-            wrappedResult.error("PERMISSION_ERROR", "권한 요청 실패", null)
+            wrapper.error("PERMISSION_ERROR", "권한 요청 실패", null)
         }
     }
 
-    private fun requestPermissions(result: MethodChannel.Result) {
+    private fun requestPermissions(wrapper: ResultWrapper) {
         Log.d(APP_TAG, "requestPermissions() 호출")
         var isReplied = false
-
-        fun safeSuccess(response: Any) {
-            if (isReplied) return
-            try {
-                result.success(response)
-                isReplied = true
-            } catch (e: IllegalStateException) {
-                Log.w(APP_TAG, "Reply already submitted exception on success: ${e.message}")
-            } catch (e: Exception) {
-                Log.e(APP_TAG, "Unexpected error on success reply", e)
-            }
-        }
 
         clearPermissionRequestRecordInternal()
 
@@ -622,16 +601,11 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     responseMap.put("message", "모든 권한 허용됨")
                 }
 
-                safeSuccess(mapOf("granted" to grantedMapStringKey, "response" to responseMap))
+                wrapper.success(mapOf("granted" to grantedMapStringKey, "response" to responseMap))
             }
         } catch (e: Exception) {
-            safeFlutterError(
-                result,
-                "PERMISSION_ERROR",
-                "권한 요청 중 오류 발생",
-                e.message,
-                { isReplied },
-                { isReplied = it })
+            Log.e(APP_TAG, "requestPermissions 예외: ${e.message}", e)
+            wrapper.error("PERMISSION_ERROR", "권한 요청 중 오류 발생", e.message)
         }
     }
 
@@ -723,7 +697,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         activeObservers.clear()
     }
 
-    private fun enableObservers(types: List<String>, result: MethodChannel.Result) {
+    private fun enableObservers(types: List<String>, wrapper: ResultWrapper) {
         val results = mutableListOf<Map<String, Any>>()
 
         for (type in types) {
@@ -760,10 +734,10 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             }
         }
 
-        result.success(mapOf("results" to results))
+        wrapper.success(mapOf("results" to results))
     }
 
-    private fun disableObservers(types: List<String>, result: MethodChannel.Result) {
+    private fun disableObservers(types: List<String>, wrapper: ResultWrapper) {
         val results = mutableListOf<Map<String, Any>>()
 
         for (type in types) {
@@ -784,15 +758,15 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             }
         }
 
-        result.success(mapOf("results" to results))
+        wrapper.success(mapOf("results" to results))
     }
 
-    fun getObserversStatus(types: List<String>, result: MethodChannel.Result) {
+    fun getObserversStatus(types: List<String>, wrapper: ResultWrapper) {
         val results = types.map { type ->
             val exists = activeObservers.containsKey(type)
             mapOf("type" to (type ?: ""), "enabled" to exists)
         }
-        result.success(mapOf("results" to results))
+        wrapper.success(mapOf("results" to results))
     }
 
     fun notifyFlutter(dataType: String) {
@@ -824,31 +798,11 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         }
     }
 
-    private fun safeFlutterError(
-        result: MethodChannel.Result?,
-        errorCode: String,
-        errorMessage: String,
-        errorDetails: Any? = null,
-        isRepliedFlag: () -> Boolean,
-        setRepliedFlag: (Boolean) -> Unit
-    ) {
-        if (isRepliedFlag()) {
-            // 이미 응답 완료된 경우 무시
-            Log.w(APP_TAG, "Flutter error reply already submitted: $errorMessage")
-            return
-        }
-        try {
-            result?.error(errorCode, errorMessage, errorDetails)
-            setRepliedFlag(true)
-        } catch (e: IllegalStateException) {
-            Log.w(APP_TAG, "Flutter error reply already submitted: $errorMessage")
-        } catch (e: Exception) {
-            Log.e(APP_TAG, "Unexpected error sending Flutter error response", e)
-        }
-    }
-
     private fun getTotalData(
-        start: Long, end: Long, wrappedResult: ResultWrapper, grantedPermissions: Set<PermissionKey>
+        start: Long,
+        end: Long,
+        wrapper: ResultWrapper,
+        grantedPermissions: Set<PermissionKey>,
     ) {
         /// 각 데이터들 비동기로 호출하고 결과값 맵에 담아 반환
         CoroutineScope(Dispatchers.IO).launch {
@@ -965,12 +919,12 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     "blood_glucose" to bloodGlucose.await(),
                 )
                 withContext(Dispatchers.Main) {
-                    wrappedResult.success(totalResult)
+                    wrapper.success(totalResult)
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
 
-                    wrappedResult.error("TOTAL_DATA_ERROR", "데이터 수집 실패: ${e.message}", null)
+                    wrapper.error("TOTAL_DATA_ERROR", "데이터 수집 실패: ${e.message}", null)
                 }
             }
 
