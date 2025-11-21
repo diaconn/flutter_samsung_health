@@ -39,8 +39,8 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
 
   /// 권한
   @override
-  Future<Map<String, dynamic>> requestPermissions() async {
-    final result = await methodChannel.invokeMethod<Map>('requestPermissions', {});
+  Future<Map<String, dynamic>> requestPermissions(List<String>? types) async {
+    final result = await methodChannel.invokeMethod<Map>('requestPermissions', {"types": types});
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {'isConnect': false};
   }
 

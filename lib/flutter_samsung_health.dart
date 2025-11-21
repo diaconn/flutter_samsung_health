@@ -22,8 +22,8 @@ class FlutterSamsungHealth {
   }
 
   /// 권한
-  Future<Map<String, dynamic>> requestPermissions() {
-    return FlutterSamsungHealthPlatform.instance.requestPermissions();
+  Future<Map<String, dynamic>> requestPermissions(List<String>? types) {
+    return FlutterSamsungHealthPlatform.instance.requestPermissions(types);
   }
 
   /// 승인 권한

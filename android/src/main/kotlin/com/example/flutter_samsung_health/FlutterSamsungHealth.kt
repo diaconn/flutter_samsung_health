@@ -16,6 +16,7 @@ import com.samsung.android.sdk.healthdata.HealthConstants.HeartRate
 import com.samsung.android.sdk.healthdata.HealthConstants.Sleep
 import com.samsung.android.sdk.healthdata.HealthConstants.SleepStage
 import com.samsung.android.sdk.healthdata.HealthConstants.StepCount
+import com.samsung.android.sdk.healthdata.HealthConstants.StepDailyTrend
 import com.samsung.android.sdk.healthdata.HealthConstants.Nutrition
 import com.samsung.android.sdk.healthdata.HealthConstants.Weight
 import com.samsung.android.sdk.healthdata.HealthConstants.OxygenSaturation
@@ -133,7 +134,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             }
 
             "requestPermissions" -> {
-                requestPermissions(wrapper)
+                val types = call.argument<List<String>>("types") ?: emptyList()
+                requestPermissions(types, wrapper)
             }
 
             "enableObservers" -> {
@@ -409,7 +411,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         }
     }
 
-
     private fun isSamsungHealthInstalled(wrapper: ResultWrapper, context: Context) {
         Log.d(APP_TAG, "isSamsungHealthInstalled() 호출")
         val resultMap: MutableMap<String, Any> = mutableMapOf()
@@ -575,17 +576,28 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         }
     }
 
-    private fun requestPermissions(wrapper: ResultWrapper) {
+    private fun requestPermissions(types: List<String>, wrapper: ResultWrapper) {
         Log.d(APP_TAG, "requestPermissions() 호출")
         var isReplied = false
 
         clearPermissionRequestRecordInternal()
 
         val permissionManager = HealthPermissionManager(mStore)
+
+        val permissionKeys: Set<HealthPermissionManager.PermissionKey> =
+            if (!types.isNullOrEmpty()) {
+                types.map { type ->
+                    PermissionKey(type.trim(), PermissionType.READ)
+                }.toSet()
+            } else {
+                permissions
+            }
+        Log.d(APP_TAG, "요청할 최종 권한 리스트: $permissionKeys")
+
         try {
-            permissionManager.requestPermissions(permissions, activity!!).setResultListener { res ->
+            permissionManager.requestPermissions(permissionKeys, activity!!).setResultListener { res ->
                 val grantedMap: MutableMap<HealthPermissionManager.PermissionKey, Boolean> = res.resultMap
-                val denied = permissions.filter { grantedMap[it] != true }
+                val denied = permissionKeys.filter { grantedMap[it] != true }
 
                 val grantedMapStringKey = grantedMap.entries.associate {
                     it.key.dataType.toString() to it.value
@@ -880,7 +892,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 val oxygenSaturation = async {
                     if (grantedPermissions.contains(
                             PermissionKey(
-                                OxygenSaturation.HEALTH_DATA_TYPE, PermissionType.READ
+                                OxygenSaturation.HEALTH_DATA_TYPE,
+                                PermissionType.READ
                             )
                         )
                     ) getOxygenSaturationData(start, end)
@@ -889,7 +902,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 val bodyTemperature = async {
                     if (grantedPermissions.contains(
                             PermissionKey(
-                                BodyTemperature.HEALTH_DATA_TYPE, PermissionType.READ
+                                BodyTemperature.HEALTH_DATA_TYPE,
+                                PermissionType.READ
                             )
                         )
                     ) getBodyTemperatureData(start, end)
@@ -899,7 +913,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 val bloodGlucose = async {
                     if (grantedPermissions.contains(
                             PermissionKey(
-                                BloodGlucose.HEALTH_DATA_TYPE, PermissionType.READ
+                                BloodGlucose.HEALTH_DATA_TYPE,
+                                PermissionType.READ
                             )
                         )
                     ) getBloodGlucoseData(start, end)
@@ -938,29 +953,31 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         suspendCoroutine { cont ->
             try {
                 Log.d(APP_TAG, "운동 데이터 시작")
-                val request =
-                    ReadRequest.Builder()
-                        .setDataType(HealthConstants.Exercise.HEALTH_DATA_TYPE)
-                        .setLocalTimeRange(
-                            HealthConstants.Exercise.START_TIME, HealthConstants.Exercise.TIME_OFFSET, start, end
+                val request = ReadRequest.Builder()
+                    .setDataType(HealthConstants.Exercise.HEALTH_DATA_TYPE)
+                    .setLocalTimeRange(
+                        HealthConstants.Exercise.START_TIME,
+                        HealthConstants.Exercise.TIME_OFFSET,
+                        start,
+                        end
+                    )
+                    .setSort(HealthConstants.Exercise.START_TIME, HealthDataResolver.SortOrder.DESC)
+                    .setProperties(
+                        arrayOf(
+                            HealthConstants.Exercise.DEVICE_UUID,
+                            HealthConstants.Exercise.EXERCISE_TYPE,
+                            HealthConstants.Exercise.START_TIME,
+                            HealthConstants.Exercise.END_TIME,
+                            HealthConstants.Exercise.TIME_OFFSET,
+                            HealthConstants.Exercise.DURATION,
+                            HealthConstants.Exercise.DISTANCE,
+                            HealthConstants.Exercise.CALORIE,
+                            HealthConstants.Exercise.MAX_HEART_RATE,
+                            HealthConstants.Exercise.MEAN_HEART_RATE,
+                            HealthConstants.Exercise.MIN_HEART_RATE,
+                            HealthConstants.Exercise.LIVE_DATA
                         )
-                        .setSort(HealthConstants.Exercise.START_TIME, HealthDataResolver.SortOrder.DESC)
-                        .setProperties(
-                            arrayOf(
-                                HealthConstants.Exercise.DEVICE_UUID,
-                                HealthConstants.Exercise.EXERCISE_TYPE,
-                                HealthConstants.Exercise.START_TIME,
-                                HealthConstants.Exercise.END_TIME,
-                                HealthConstants.Exercise.TIME_OFFSET,
-                                HealthConstants.Exercise.DURATION,
-                                HealthConstants.Exercise.DISTANCE,
-                                HealthConstants.Exercise.CALORIE,
-                                HealthConstants.Exercise.MAX_HEART_RATE,
-                                HealthConstants.Exercise.MEAN_HEART_RATE,
-                                HealthConstants.Exercise.MIN_HEART_RATE,
-                                HealthConstants.Exercise.LIVE_DATA
-                            )
-                        ).build()
+                    ).build()
 
                 val resolver = HealthDataResolver(mStore, null)
                 val resultList = mutableListOf<Map<String, Any>>()
@@ -1002,27 +1019,28 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             suspendCoroutine { cont ->
                 try {
                     Log.d(APP_TAG, "심박 데이터 시작")
-                    val request =
-                        ReadRequest.Builder().setDataType(HealthConstants.HeartRate.HEALTH_DATA_TYPE)
-                            .setLocalTimeRange(
+                    val request = ReadRequest.Builder()
+                        .setDataType(HealthConstants.HeartRate.HEALTH_DATA_TYPE)
+                        .setLocalTimeRange(
+                            HealthConstants.HeartRate.START_TIME,
+                            HealthConstants.HeartRate.TIME_OFFSET,
+                            start,
+                            end
+                        )
+                        .setSort(HealthConstants.HeartRate.START_TIME, HealthDataResolver.SortOrder.DESC)
+                        .setProperties(
+                            arrayOf(
+                                HealthConstants.HeartRate.DEVICE_UUID,
                                 HealthConstants.HeartRate.START_TIME,
+                                HealthConstants.HeartRate.END_TIME,
                                 HealthConstants.HeartRate.TIME_OFFSET,
-                                start,
-                                end
-                            ).setSort(HealthConstants.HeartRate.START_TIME, HealthDataResolver.SortOrder.DESC)
-                            .setProperties(
-                                arrayOf(
-                                    HealthConstants.HeartRate.DEVICE_UUID,
-                                    HealthConstants.HeartRate.START_TIME,
-                                    HealthConstants.HeartRate.END_TIME,
-                                    HealthConstants.HeartRate.TIME_OFFSET,
-                                    HealthConstants.HeartRate.HEART_RATE,
-                                    HealthConstants.HeartRate.HEART_BEAT_COUNT,
-                                    HealthConstants.HeartRate.MIN,
-                                    HealthConstants.HeartRate.MAX,
-                                    HealthConstants.HeartRate.BINNING_DATA
-                                )
-                            ).build()
+                                HealthConstants.HeartRate.HEART_RATE,
+                                HealthConstants.HeartRate.HEART_BEAT_COUNT,
+                                HealthConstants.HeartRate.MIN,
+                                HealthConstants.HeartRate.MAX,
+                                HealthConstants.HeartRate.BINNING_DATA
+                            )
+                        ).build()
 
                     val resolver = HealthDataResolver(mStore, null)
                     val resultList = mutableListOf<Map<String, Any>>()
@@ -1060,18 +1078,23 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 try {
                     Log.d(APP_TAG, "수면 데이터 시작")
                     val adjustedStart = start - (24 * 60 * 60 * 1000) // 하루 전
-                    val request =
-                        ReadRequest.Builder().setDataType(HealthConstants.Sleep.HEALTH_DATA_TYPE).setLocalTimeRange(
-                            HealthConstants.Sleep.START_TIME, HealthConstants.Sleep.TIME_OFFSET, adjustedStart, end
-                        ).setSort(HealthConstants.Sleep.START_TIME, HealthDataResolver.SortOrder.DESC)
-                            .setProperties(
-                                arrayOf(
-                                    HealthConstants.Sleep.DEVICE_UUID,
-                                    HealthConstants.Sleep.START_TIME,
-                                    HealthConstants.Sleep.END_TIME,
-                                    HealthConstants.Sleep.TIME_OFFSET
-                                )
-                            ).build()
+                    val request = ReadRequest.Builder()
+                        .setDataType(HealthConstants.Sleep.HEALTH_DATA_TYPE)
+                        .setLocalTimeRange(
+                            HealthConstants.Sleep.START_TIME,
+                            HealthConstants.Sleep.TIME_OFFSET,
+                            adjustedStart,
+                            end
+                        )
+                        .setSort(HealthConstants.Sleep.START_TIME, HealthDataResolver.SortOrder.DESC)
+                        .setProperties(
+                            arrayOf(
+                                HealthConstants.Sleep.DEVICE_UUID,
+                                HealthConstants.Sleep.START_TIME,
+                                HealthConstants.Sleep.END_TIME,
+                                HealthConstants.Sleep.TIME_OFFSET
+                            )
+                        ).build()
 
                     val resolver = HealthDataResolver(mStore, null)
                     val resultList = mutableListOf<Map<String, Any>>()
@@ -1105,27 +1128,25 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 try {
                     Log.d(APP_TAG, "수면 단계 데이터 시작")
                     val adjustedStart = start - (24 * 60 * 60 * 1000) // 하루 전
-                    val request =
-                        ReadRequest.Builder()
-                            .setDataType(HealthConstants.SleepStage.HEALTH_DATA_TYPE)
-                            .setLocalTimeRange(
+                    val request = ReadRequest.Builder()
+                        .setDataType(HealthConstants.SleepStage.HEALTH_DATA_TYPE)
+                        .setLocalTimeRange(
+                            HealthConstants.SleepStage.START_TIME,
+                            HealthConstants.SleepStage.TIME_OFFSET,
+                            adjustedStart,
+                            end
+                        )
+                        .setSort(HealthConstants.SleepStage.START_TIME, HealthDataResolver.SortOrder.DESC)
+                        .setProperties(
+                            arrayOf(
+                                HealthConstants.SleepStage.DEVICE_UUID,
                                 HealthConstants.SleepStage.START_TIME,
+                                HealthConstants.SleepStage.END_TIME,
                                 HealthConstants.SleepStage.TIME_OFFSET,
-                                adjustedStart,
-                                end
+                                HealthConstants.SleepStage.SLEEP_ID,
+                                HealthConstants.SleepStage.STAGE,
                             )
-                            .setSort(HealthConstants.SleepStage.START_TIME, HealthDataResolver.SortOrder.DESC)
-                            .setProperties(
-                                arrayOf(
-                                    HealthConstants.SleepStage.DEVICE_UUID,
-                                    HealthConstants.SleepStage.START_TIME,
-                                    HealthConstants.SleepStage.END_TIME,
-                                    HealthConstants.SleepStage.TIME_OFFSET,
-                                    HealthConstants.SleepStage.SLEEP_ID,
-                                    HealthConstants.SleepStage.STAGE,
-                                )
-                            )
-                            .build()
+                        ).build()
 
                     val resolver = HealthDataResolver(mStore, null)
                     val resultList = mutableListOf<Map<String, Any>>()
@@ -1164,20 +1185,26 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
                     sdf.timeZone = TimeZone.getDefault()
 
-                    val request: AggregateRequest =
-                        AggregateRequest.Builder().setDataType(StepCount.HEALTH_DATA_TYPE)
-                            .addFunction(AggregateFunction.SUM, StepCount.COUNT, "total_step")
-                            .addFunction(AggregateFunction.SUM, StepCount.CALORIE, "total_calorie")
-                            .addFunction(AggregateFunction.SUM, StepCount.DISTANCE, "total_distance")
-                            .setLocalTimeRange(StepCount.START_TIME, StepCount.TIME_OFFSET, start, end)
-                            .setTimeGroup(
-                                AggregateRequest.TimeGroupUnit.MINUTELY,
-                                5,
-                                HealthConstants.StepCount.START_TIME,
-                                StepCount.TIME_OFFSET,
-                                "minute"
-                            ).setSort(HealthConstants.StepCount.START_TIME, HealthDataResolver.SortOrder.DESC)
-                            .build()
+                    val request: AggregateRequest = AggregateRequest.Builder()
+                        .setDataType(StepCount.HEALTH_DATA_TYPE)
+                        .addFunction(AggregateFunction.SUM, StepCount.COUNT, "total_step")
+                        .addFunction(AggregateFunction.SUM, StepCount.CALORIE, "total_calorie")
+                        .addFunction(AggregateFunction.SUM, StepCount.DISTANCE, "total_distance")
+                        .setLocalTimeRange(
+                            StepCount.START_TIME,
+                            StepCount.TIME_OFFSET,
+                            start,
+                            end
+                        )
+                        .setTimeGroup(
+                            AggregateRequest.TimeGroupUnit.MINUTELY,
+                            5,
+                            HealthConstants.StepCount.START_TIME,
+                            StepCount.TIME_OFFSET,
+                            "minute"
+                        )
+                        .setSort(HealthConstants.StepCount.START_TIME, HealthDataResolver.SortOrder.DESC)
+                        .build()
 
                     val resolver = HealthDataResolver(mStore, null)
                     val hourlyStepList = mutableListOf<Map<String, Any>>()
@@ -1224,9 +1251,15 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             suspendCoroutine { cont ->
                 try {
                     Log.d(APP_TAG, "영양소 데이터 시작")
-                    val request = ReadRequest.Builder().setDataType(Nutrition.HEALTH_DATA_TYPE).setLocalTimeRange(
-                        HealthConstants.Nutrition.START_TIME, HealthConstants.Nutrition.TIME_OFFSET, start, end
-                    ).setSort(HealthConstants.Nutrition.START_TIME, HealthDataResolver.SortOrder.DESC)
+                    val request = ReadRequest.Builder()
+                        .setDataType(Nutrition.HEALTH_DATA_TYPE)
+                        .setLocalTimeRange(
+                            HealthConstants.Nutrition.START_TIME,
+                            HealthConstants.Nutrition.TIME_OFFSET,
+                            start,
+                            end
+                        )
+                        .setSort(HealthConstants.Nutrition.START_TIME, HealthDataResolver.SortOrder.DESC)
                         .setProperties(
                             arrayOf(
                                 HealthConstants.Nutrition.DEVICE_UUID,
@@ -1304,26 +1337,33 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             suspendCoroutine { cont ->
                 try {
                     Log.d(APP_TAG, "무게 데이터 시작")
-                    val request = ReadRequest.Builder().setDataType(Weight.HEALTH_DATA_TYPE).setLocalTimeRange(
-                        HealthConstants.Weight.START_TIME, HealthConstants.Weight.TIME_OFFSET, start, end
-                    ).setSort(HealthConstants.Weight.START_TIME, HealthDataResolver.SortOrder.DESC).setProperties(
-                        arrayOf(
-                            HealthConstants.Weight.DEVICE_UUID,
+                    val request = ReadRequest.Builder()
+                        .setDataType(Weight.HEALTH_DATA_TYPE)
+                        .setLocalTimeRange(
                             HealthConstants.Weight.START_TIME,
                             HealthConstants.Weight.TIME_OFFSET,
-                            HealthConstants.Weight.WEIGHT,
-                            HealthConstants.Weight.HEIGHT,
-                            HealthConstants.Weight.BODY_FAT,
-                            HealthConstants.Weight.SKELETAL_MUSCLE,
-                            HealthConstants.Weight.MUSCLE_MASS,
-                            HealthConstants.Weight.BASAL_METABOLIC_RATE,
-                            HealthConstants.Weight.BODY_FAT_MASS,
-                            HealthConstants.Weight.FAT_FREE_MASS,
-                            HealthConstants.Weight.FAT_FREE,
-                            HealthConstants.Weight.SKELETAL_MUSCLE_MASS,
-                            HealthConstants.Weight.TOTAL_BODY_WATER
+                            start,
+                            end
                         )
-                    ).build()
+                        .setSort(HealthConstants.Weight.START_TIME, HealthDataResolver.SortOrder.DESC)
+                        .setProperties(
+                            arrayOf(
+                                HealthConstants.Weight.DEVICE_UUID,
+                                HealthConstants.Weight.START_TIME,
+                                HealthConstants.Weight.TIME_OFFSET,
+                                HealthConstants.Weight.WEIGHT,
+                                HealthConstants.Weight.HEIGHT,
+                                HealthConstants.Weight.BODY_FAT,
+                                HealthConstants.Weight.SKELETAL_MUSCLE,
+                                HealthConstants.Weight.MUSCLE_MASS,
+                                HealthConstants.Weight.BASAL_METABOLIC_RATE,
+                                HealthConstants.Weight.BODY_FAT_MASS,
+                                HealthConstants.Weight.FAT_FREE_MASS,
+                                HealthConstants.Weight.FAT_FREE,
+                                HealthConstants.Weight.SKELETAL_MUSCLE_MASS,
+                                HealthConstants.Weight.TOTAL_BODY_WATER
+                            )
+                        ).build()
 
                     val resolver = HealthDataResolver(mStore, null)
                     val weightList = mutableListOf<Map<String, Any>>()
@@ -1366,23 +1406,25 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             suspendCoroutine { cont ->
                 try {
                     Log.d(APP_TAG, "산소 포화도 데이터 시작")
-                    val request =
-                        ReadRequest.Builder().setDataType(OxygenSaturation.HEALTH_DATA_TYPE).setLocalTimeRange(
+                    val request = ReadRequest.Builder()
+                        .setDataType(OxygenSaturation.HEALTH_DATA_TYPE)
+                        .setLocalTimeRange(
                             HealthConstants.OxygenSaturation.START_TIME,
                             HealthConstants.OxygenSaturation.TIME_OFFSET,
                             start,
                             end
-                        ).setSort(HealthConstants.OxygenSaturation.START_TIME, HealthDataResolver.SortOrder.DESC)
-                            .setProperties(
-                                arrayOf(
-                                    HealthConstants.OxygenSaturation.DEVICE_UUID,
-                                    HealthConstants.OxygenSaturation.START_TIME,
-                                    HealthConstants.OxygenSaturation.END_TIME,
-                                    HealthConstants.OxygenSaturation.TIME_OFFSET,
-                                    HealthConstants.OxygenSaturation.SPO2,
-                                    HealthConstants.OxygenSaturation.HEART_RATE
-                                )
-                            ).build()
+                        )
+                        .setSort(HealthConstants.OxygenSaturation.START_TIME, HealthDataResolver.SortOrder.DESC)
+                        .setProperties(
+                            arrayOf(
+                                HealthConstants.OxygenSaturation.DEVICE_UUID,
+                                HealthConstants.OxygenSaturation.START_TIME,
+                                HealthConstants.OxygenSaturation.END_TIME,
+                                HealthConstants.OxygenSaturation.TIME_OFFSET,
+                                HealthConstants.OxygenSaturation.SPO2,
+                                HealthConstants.OxygenSaturation.HEART_RATE
+                            )
+                        ).build()
 
                     val resolver = HealthDataResolver(mStore, null)
                     val oxygenSaturationList = mutableListOf<Map<String, Any>>()
@@ -1417,21 +1459,23 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             suspendCoroutine { cont ->
                 try {
                     Log.d(APP_TAG, "체온 데이터 시작")
-                    val request =
-                        ReadRequest.Builder().setDataType(BodyTemperature.HEALTH_DATA_TYPE).setLocalTimeRange(
+                    val request = ReadRequest.Builder()
+                        .setDataType(BodyTemperature.HEALTH_DATA_TYPE)
+                        .setLocalTimeRange(
                             HealthConstants.BodyTemperature.START_TIME,
                             HealthConstants.BodyTemperature.TIME_OFFSET,
                             start,
                             end
-                        ).setSort(HealthConstants.BodyTemperature.START_TIME, HealthDataResolver.SortOrder.DESC)
-                            .setProperties(
-                                arrayOf(
-                                    HealthConstants.BodyTemperature.DEVICE_UUID,
-                                    HealthConstants.BodyTemperature.START_TIME,
-                                    HealthConstants.BodyTemperature.TIME_OFFSET,
-                                    HealthConstants.BodyTemperature.TEMPERATURE,
-                                )
-                            ).build()
+                        )
+                        .setSort(HealthConstants.BodyTemperature.START_TIME, HealthDataResolver.SortOrder.DESC)
+                        .setProperties(
+                            arrayOf(
+                                HealthConstants.BodyTemperature.DEVICE_UUID,
+                                HealthConstants.BodyTemperature.START_TIME,
+                                HealthConstants.BodyTemperature.TIME_OFFSET,
+                                HealthConstants.BodyTemperature.TEMPERATURE,
+                            )
+                        ).build()
 
                     val resolver = HealthDataResolver(mStore, null)
                     val bodyTemperatureList = mutableListOf<Map<String, Any>>()
@@ -1464,24 +1508,26 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             suspendCoroutine { cont ->
                 try {
                     Log.d(APP_TAG, "혈당 데이터 시작")
-                    val request =
-                        ReadRequest.Builder().setDataType(BloodGlucose.HEALTH_DATA_TYPE).setLocalTimeRange(
+                    val request = ReadRequest.Builder()
+                        .setDataType(BloodGlucose.HEALTH_DATA_TYPE)
+                        .setLocalTimeRange(
                             HealthConstants.BloodGlucose.START_TIME,
                             HealthConstants.BloodGlucose.TIME_OFFSET,
                             start,
                             end
-                        ).setSort(HealthConstants.BloodGlucose.START_TIME, HealthDataResolver.SortOrder.DESC)
-                            .setProperties(
-                                arrayOf(
-                                    HealthConstants.BloodGlucose.DEVICE_UUID,
-                                    HealthConstants.BloodGlucose.START_TIME,
-                                    HealthConstants.BloodGlucose.TIME_OFFSET,
-                                    HealthConstants.BloodGlucose.GLUCOSE,
-                                    HealthConstants.BloodGlucose.MEASUREMENT_TYPE,
-                                    HealthConstants.BloodGlucose.MEAL_TIME,
-                                    HealthConstants.BloodGlucose.MEAL_TYPE,
-                                )
-                            ).build()
+                        )
+                        .setSort(HealthConstants.BloodGlucose.START_TIME, HealthDataResolver.SortOrder.DESC)
+                        .setProperties(
+                            arrayOf(
+                                HealthConstants.BloodGlucose.DEVICE_UUID,
+                                HealthConstants.BloodGlucose.START_TIME,
+                                HealthConstants.BloodGlucose.TIME_OFFSET,
+                                HealthConstants.BloodGlucose.GLUCOSE,
+                                HealthConstants.BloodGlucose.MEASUREMENT_TYPE,
+                                HealthConstants.BloodGlucose.MEAL_TIME,
+                                HealthConstants.BloodGlucose.MEAL_TYPE,
+                            )
+                        ).build()
 
                     val resolver = HealthDataResolver(mStore, null)
                     val bloodGlucoseList = mutableListOf<Map<String, Any>>()
@@ -1677,6 +1723,16 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             100004 to "Morning Snack",
             100005 to "Afternoon Snack",
             100006 to "Evening Snack"
+        )
+
+        fun getName(type: Int): String {
+            return map[type] ?: "Unknown"
+        }
+    }
+
+    object SourceTypeMapper {
+        private val map = mapOf(
+            -2 to "All", -1 to "Partner App", 0 to "Phone Only"
         )
 
         fun getName(type: Int): String {

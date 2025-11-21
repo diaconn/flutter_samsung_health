@@ -36,7 +36,7 @@ abstract class FlutterSamsungHealthPlatform extends PlatformInterface {
   Future<Map<String, dynamic>> disconnect();
 
   /// 권한
-  Future<Map<String, dynamic>> requestPermissions();
+  Future<Map<String, dynamic>> requestPermissions(List<String>? types);
 
   /// 승인 권한
   Future<Map<String, dynamic>> getGrantedPermissions();
