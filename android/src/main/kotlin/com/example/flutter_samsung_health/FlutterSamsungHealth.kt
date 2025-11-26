@@ -63,8 +63,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             "sleep" -> Permission.of(DataTypes.SLEEP, AccessType.READ)
             "steps" -> Permission.of(DataTypes.STEPS, AccessType.READ)
             "nutrition" -> Permission.of(DataTypes.NUTRITION, AccessType.READ)
-            "body_composition", "weight" -> Permission.of(DataTypes.BODY_COMPOSITION, AccessType.READ)
-            "blood_oxygen", "oxygen_saturation" -> Permission.of(DataTypes.BLOOD_OXYGEN, AccessType.READ)
+            "body_composition" -> Permission.of(DataTypes.BODY_COMPOSITION, AccessType.READ)
+            "blood_oxygen" -> Permission.of(DataTypes.BLOOD_OXYGEN, AccessType.READ)
             "body_temperature" -> Permission.of(DataTypes.BODY_TEMPERATURE, AccessType.READ)
             "blood_glucose" -> Permission.of(DataTypes.BLOOD_GLUCOSE, AccessType.READ)
             else -> null
