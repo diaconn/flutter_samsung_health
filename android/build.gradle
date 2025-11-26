@@ -9,7 +9,7 @@ buildscript {
     }
 
     dependencies {
-        classpath("com.android.tools.build:gradle:8.1.0")
+        classpath("com.android.tools.build:gradle:8.3.0")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version")
     }
 }
@@ -26,6 +26,7 @@ allprojects {
 
 apply plugin: "com.android.library"
 apply plugin: "kotlin-android"
+apply plugin: "kotlin-parcelize"
 
 android {
     namespace = "com.example.flutter_samsung_health"
@@ -47,14 +48,14 @@ android {
     }
 
     defaultConfig {
-        minSdk = 21
+        minSdk = 29
     }
 
     dependencies {
         testImplementation("org.jetbrains.kotlin:kotlin-test")
         testImplementation("org.mockito:mockito-core:5.0.0")
-        // Note: samsung-health-data.aar 은 사용하는 앱 쪽에서 직접 추가해야 합니다.
-        compileOnly(name: "samsung-health-data-1.5.1", ext: "aar")
+        compileOnly(name: "samsung-health-data-api-1.0.0", ext: "aar")
+        implementation("com.google.code.gson:gson:2.9.0")
     }
 
     testOptions {
@@ -62,9 +63,9 @@ android {
             useJUnitPlatform()
 
             testLogging {
-               events "passed", "skipped", "failed", "standardOut", "standardError"
-               outputs.upToDateWhen {false}
-               showStandardStreams = true
+                events "passed", "skipped", "failed", "standardOut", "standardError"
+                outputs.upToDateWhen {false}
+                showStandardStreams = true
             }
         }
     }

@@ -35,20 +35,13 @@ abstract class FlutterSamsungHealthPlatform extends PlatformInterface {
   /// 연결 해제
   Future<Map<String, dynamic>> disconnect();
 
-  /// 권한
+  /// 권한 요청
+  /// [types]: 요청할 권한 타입 목록 (예: ['exercise', 'heart_rate', 'sleep', 'steps', 'nutrition', 'body_composition', 'blood_oxygen', 'body_temperature', 'blood_glucose'])
+  /// 빈 배열이면 모든 권한 요청
   Future<Map<String, dynamic>> requestPermissions(List<String>? types);
 
-  /// 승인 권한
+  /// 승인된 권한 조회
   Future<Map<String, dynamic>> getGrantedPermissions();
-
-  /// 옵저버 켜기
-  Future<Map<String, dynamic>> enableObservers(List<String> types);
-
-  /// 옵저버 끄기
-  Future<Map<String, dynamic>> disableObservers(List<String> types);
-
-  /// 옵저버 상태 조회
-  Future<Map<String, dynamic>> getObserversStatus(List<String> types);
 
   /// 전체 데이터 조회
   Future<Map<String, List<Map<String, dynamic>>>> getTotalData(int start, int end);
@@ -59,19 +52,16 @@ abstract class FlutterSamsungHealthPlatform extends PlatformInterface {
   /// 심박 조회
   Future<List<Map<String, dynamic>>> getHeartRateData(int start, int end);
 
-  /// 수면 조회
+  /// 수면 조회 (수면 단계 포함)
   Future<List<Map<String, dynamic>>> getSleepData(int start, int end);
 
-  /// 수면 단계 조회
-  Future<List<Map<String, dynamic>>> getSleepStageData(int start, int end);
-
-  /// 걷기 조회(5분 누적)
+  /// 걸음 조회 (집계 데이터)
   Future<List<Map<String, dynamic>>> getStepData(int start, int end);
 
   /// 영양소 조회
   Future<List<Map<String, dynamic>>> getNutritionData(int start, int end);
 
-  /// 신체 조회
+  /// 체중/신체 구성 조회
   Future<List<Map<String, dynamic>>> getWeightData(int start, int end);
 
   /// 산소 포화도 조회

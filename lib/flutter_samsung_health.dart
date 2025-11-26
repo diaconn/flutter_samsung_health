@@ -31,24 +31,6 @@ class FlutterSamsungHealth {
     return FlutterSamsungHealthPlatform.instance.getGrantedPermissions();
   }
 
-  /// 옵저버 켜기
-  Future<Map<String, dynamic>> enableObservers(List<String> types) async {
-    final result = await FlutterSamsungHealthPlatform.instance.enableObservers(types);
-    return result.map((key, value) => MapEntry(key.toString(), value));
-  }
-
-  /// 옵저버 끄기
-  Future<Map<String, dynamic>> disableObservers(List<String> types) async {
-    final result = await FlutterSamsungHealthPlatform.instance.disableObservers(types);
-    return result.map((key, value) => MapEntry(key.toString(), value));
-  }
-
-  /// 옵저버 상태 조회
-  Future<Map<String, dynamic>> getObserversStatus(List<String> types) async {
-    final result = await FlutterSamsungHealthPlatform.instance.getObserversStatus(types);
-    return result.map((key, value) => MapEntry(key.toString(), value));
-  }
-
   /// 전체 데이터 조회
   Future<Map<String,List<Map<String, dynamic>>>> getTotalData({
     required int start,
@@ -73,7 +55,7 @@ class FlutterSamsungHealth {
     return FlutterSamsungHealthPlatform.instance.getHeartRateData(start, end);
   }
 
-  /// 수면 조회
+  /// 수면 조회 (수면 단계 포함)
   Future<List<Map<String, dynamic>>> getSleepData({
     required int start,
     required int end,
@@ -81,15 +63,7 @@ class FlutterSamsungHealth {
     return FlutterSamsungHealthPlatform.instance.getSleepData(start, end);
   }
 
-  /// 수면 단계 조회
-  Future<List<Map<String, dynamic>>> getSleepStageData({
-    required int start,
-    required int end,
-  }) {
-    return FlutterSamsungHealthPlatform.instance.getSleepStageData(start, end);
-  }
-
-  /// 걷기 조회(5분 누적)
+  /// 걸음 조회 (집계 데이터)
   Future<List<Map<String, dynamic>>> getStepData({
     required int start,
     required int end,

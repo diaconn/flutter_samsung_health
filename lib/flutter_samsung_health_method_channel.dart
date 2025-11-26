@@ -57,33 +57,6 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     };
   }
 
-  /// 옵저버 켜기
-  @override
-  Future<Map<String, dynamic>> enableObservers(List<String> types) async {
-    final result =
-    await methodChannel.invokeMethod<Map>('enableObservers', {"types": types});
-    return result?.map((key, value) => MapEntry(key.toString(), value)) ??
-        {"results": []};
-  }
-
-  /// 옵저버 끄기
-  @override
-  Future<Map<String, dynamic>> disableObservers(List<String> types) async {
-    final result =
-    await methodChannel.invokeMethod<Map>('disableObservers', {"types": types});
-    return result?.map((key, value) => MapEntry(key.toString(), value)) ??
-        {"results": []};
-  }
-
-  /// 옵저버 상태 조회
-  @override
-  Future<Map<String, dynamic>> getObserversStatus(List<String> types) async {
-    final result =
-    await methodChannel.invokeMethod<Map>('getObserversStatus', {"types": types});
-    return result?.map((key, value) => MapEntry(key.toString(), value)) ??
-        {"results": []};
-  }
-
   /// 전체 데이터 조회
   @override
   Future<Map<String, List<Map<String, dynamic>>>> getTotalData(int start, int end) async {
@@ -147,19 +120,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
         .toList();
   }
 
-  /// 수면 단계 조회
-  @override
-  Future<List<Map<String, dynamic>>> getSleepStageData(int start, int end) async {
-    final result = await methodChannel.invokeMethod<List>('getSleepStageData', {
-      'start': start,
-      'end': end,
-    });
-    return (result ?? [])
-        .map((item) => Map<String, dynamic>.from((item as Map).map((key, value) => MapEntry(key.toString(), value))))
-        .toList();
-  }
-
-  /// 걷기 조회(5분 누적)
+  /// 걸음 조회 (집계 데이터)
   @override
   Future<List<Map<String, dynamic>>> getStepData(int start, int end) async {
     final result = await methodChannel.invokeMethod<List>('getStepData', {

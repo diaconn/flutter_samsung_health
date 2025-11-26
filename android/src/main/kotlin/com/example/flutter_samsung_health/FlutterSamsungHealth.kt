@@ -3,32 +3,18 @@ package com.example.flutter_samsung_health
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.os.Handler
-import android.os.Looper
 import android.net.Uri
 import android.util.Log
-import com.samsung.android.sdk.healthdata.HealthConnectionErrorResult
-import com.samsung.android.sdk.healthdata.HealthConstants
-import com.samsung.android.sdk.healthdata.HealthConstants.BodyTemperature
-import com.samsung.android.sdk.healthdata.HealthConstants.BloodGlucose
-import com.samsung.android.sdk.healthdata.HealthConstants.Exercise
-import com.samsung.android.sdk.healthdata.HealthConstants.HeartRate
-import com.samsung.android.sdk.healthdata.HealthConstants.Sleep
-import com.samsung.android.sdk.healthdata.HealthConstants.SleepStage
-import com.samsung.android.sdk.healthdata.HealthConstants.StepCount
-import com.samsung.android.sdk.healthdata.HealthConstants.StepDailyTrend
-import com.samsung.android.sdk.healthdata.HealthConstants.Nutrition
-import com.samsung.android.sdk.healthdata.HealthConstants.Weight
-import com.samsung.android.sdk.healthdata.HealthConstants.OxygenSaturation
-import com.samsung.android.sdk.healthdata.HealthDataResolver
-import com.samsung.android.sdk.healthdata.HealthDataResolver.ReadRequest
-import com.samsung.android.sdk.healthdata.HealthDataResolver.AggregateRequest
-import com.samsung.android.sdk.healthdata.HealthDataResolver.AggregateRequest.AggregateFunction
-import com.samsung.android.sdk.healthdata.HealthDataObserver
-import com.samsung.android.sdk.healthdata.HealthDataStore
-import com.samsung.android.sdk.healthdata.HealthPermissionManager
-import com.samsung.android.sdk.healthdata.HealthPermissionManager.PermissionKey
-import com.samsung.android.sdk.healthdata.HealthPermissionManager.PermissionType
+import com.samsung.android.sdk.health.data.HealthDataService
+import com.samsung.android.sdk.health.data.HealthDataStore
+import com.samsung.android.sdk.health.data.permission.AccessType
+import com.samsung.android.sdk.health.data.permission.Permission
+import com.samsung.android.sdk.health.data.request.DataType
+import com.samsung.android.sdk.health.data.request.DataTypes
+import com.samsung.android.sdk.health.data.request.LocalTimeFilter
+import com.samsung.android.sdk.health.data.request.Ordering
+import com.samsung.android.sdk.health.data.error.ResolvablePlatformException
+import com.samsung.android.sdk.health.data.error.HealthDataException
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -37,66 +23,67 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.*
-import java.text.SimpleDateFormat
-import java.util.*
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 
-private const val PREF_NAME = "samsung_health_preferences"
-private const val PREF_KEY_PERMISSION_REQUESTED = "permission_requested"
-
-/** FlutterSamsungHealth */
+/** FlutterSamsungHealth - Samsung Health Data SDK 1.0.0 */
 class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, EventChannel.StreamHandler {
-    /// The MethodChannel that will the communication between Flutter and native Android
-    /// This local reference serves to register the plugin with the Flutter Engine and unregister it
-    /// when the Flutter Engine is detached from the Activity
+
     private lateinit var channel: MethodChannel
     private lateinit var context: Context
-    private lateinit var mStore: HealthDataStore
-    private val APP_TAG: String = "FlutterSamsungHealth"
+    private var healthDataStore: HealthDataStore? = null
     private var activity: Activity? = null
-    private val lastEventTimes = mutableMapOf<String, Long>()
-    private val debounceMillis = 5_000L // 5초
-
-    private val permissions = setOf(
-        PermissionKey(Exercise.HEALTH_DATA_TYPE, PermissionType.READ),
-        PermissionKey(HeartRate.HEALTH_DATA_TYPE, PermissionType.READ),
-        PermissionKey(Sleep.HEALTH_DATA_TYPE, PermissionType.READ),
-        PermissionKey(SleepStage.HEALTH_DATA_TYPE, PermissionType.READ),
-        PermissionKey(StepCount.HEALTH_DATA_TYPE, PermissionType.READ),
-        PermissionKey(Nutrition.HEALTH_DATA_TYPE, PermissionType.READ),
-        PermissionKey(Weight.HEALTH_DATA_TYPE, PermissionType.READ),
-        PermissionKey(OxygenSaturation.HEALTH_DATA_TYPE, PermissionType.READ),
-        PermissionKey(BodyTemperature.HEALTH_DATA_TYPE, PermissionType.READ),
-        PermissionKey(BloodGlucose.HEALTH_DATA_TYPE, PermissionType.READ),
-    )
-
-    private val activeObservers = mutableMapOf<String, HealthDataObserver>()
     private val eventSinks = mutableListOf<EventChannel.EventSink>()
 
-    private val observedDataTypes = setOf(
-        Exercise.HEALTH_DATA_TYPE,
-        Nutrition.HEALTH_DATA_TYPE,
-        BloodGlucose.HEALTH_DATA_TYPE
+    private val APP_TAG: String = "FlutterSamsungHealth"
+
+    // 권한 매핑 - DataTypes 사용
+    private val allPermissions = setOf(
+        Permission.of(DataTypes.EXERCISE, AccessType.READ),
+        Permission.of(DataTypes.HEART_RATE, AccessType.READ),
+        Permission.of(DataTypes.SLEEP, AccessType.READ),
+        Permission.of(DataTypes.STEPS, AccessType.READ),
+        Permission.of(DataTypes.NUTRITION, AccessType.READ),
+        Permission.of(DataTypes.BODY_COMPOSITION, AccessType.READ),
+        Permission.of(DataTypes.BLOOD_OXYGEN, AccessType.READ),
+        Permission.of(DataTypes.BODY_TEMPERATURE, AccessType.READ),
+        Permission.of(DataTypes.BLOOD_GLUCOSE, AccessType.READ),
     )
 
-    private val mObserver: HealthDataObserver = object : HealthDataObserver(Handler(Looper.getMainLooper())) {
-        override fun onChange(dataTypeName: String) {
-            val now = System.currentTimeMillis()
-            val last = lastEventTimes[dataTypeName] ?: 0L
+    // DataType 문자열 → Permission 매핑
+    private fun getPermissionForType(type: String): Permission? {
+        return when (type) {
+            "exercise" -> Permission.of(DataTypes.EXERCISE, AccessType.READ)
+            "heart_rate" -> Permission.of(DataTypes.HEART_RATE, AccessType.READ)
+            "sleep" -> Permission.of(DataTypes.SLEEP, AccessType.READ)
+            "steps" -> Permission.of(DataTypes.STEPS, AccessType.READ)
+            "nutrition" -> Permission.of(DataTypes.NUTRITION, AccessType.READ)
+            "body_composition", "weight" -> Permission.of(DataTypes.BODY_COMPOSITION, AccessType.READ)
+            "blood_oxygen", "oxygen_saturation" -> Permission.of(DataTypes.BLOOD_OXYGEN, AccessType.READ)
+            "body_temperature" -> Permission.of(DataTypes.BODY_TEMPERATURE, AccessType.READ)
+            "blood_glucose" -> Permission.of(DataTypes.BLOOD_GLUCOSE, AccessType.READ)
+            else -> null
+        }
+    }
 
-            if (now - last < debounceMillis) {
-                return
-            }
-
-            lastEventTimes[dataTypeName] = now
-            notifyFlutter(dataTypeName)
+    // Permission → 문자열 타입명 변환
+    private fun getDataTypeNameForPermission(permission: Permission): String {
+        return when (permission.dataType) {
+            DataTypes.EXERCISE -> "exercise"
+            DataTypes.HEART_RATE -> "heart_rate"
+            DataTypes.SLEEP -> "sleep"
+            DataTypes.STEPS -> "steps"
+            DataTypes.NUTRITION -> "nutrition"
+            DataTypes.BODY_COMPOSITION -> "body_composition"
+            DataTypes.BLOOD_OXYGEN -> "blood_oxygen"
+            DataTypes.BODY_TEMPERATURE -> "body_temperature"
+            DataTypes.BLOOD_GLUCOSE -> "blood_glucose"
+            else -> permission.dataType.toString()
         }
     }
 
@@ -113,342 +100,99 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         val wrapper = ResultWrapper(result)
 
         when (call.method) {
-            "isSamsungHealthInstalled" -> {
-                isSamsungHealthInstalled(wrapper, context)
-            }
-
-            "openSamsungHealth" -> {
-                openSamsungHealthInStore(wrapper, context)
-            }
-
-            "connect" -> {
-                connectSamsungHealth(wrapper)
-            }
-
-            "disconnect" -> {
-                disconnectSamsungHealth(wrapper)
-            }
-
-            "getGrantedPermissions" -> {
-                getGrantedPermissions(wrapper)
-            }
-
+            "isSamsungHealthInstalled" -> isSamsungHealthInstalled(wrapper)
+            "openSamsungHealth" -> openSamsungHealth(wrapper)
+            "connect" -> connect(wrapper)
+            "disconnect" -> disconnect(wrapper)
             "requestPermissions" -> {
                 val types = call.argument<List<String>>("types") ?: emptyList()
                 requestPermissions(types, wrapper)
             }
-
-            "enableObservers" -> {
-                val types = call.argument<List<String>>("types") ?: emptyList()
-                enableObservers(types, wrapper)
-            }
-
-            "disableObservers" -> {
-                val types = call.argument<List<String>>("types") ?: emptyList()
-                disableObservers(types, wrapper)
-            }
-
-            "getObserversStatus" -> {
-                val types = call.argument<List<String>>("types") ?: emptyList()
-                getObserversStatus(types, wrapper)
-            }
-
+            "getGrantedPermissions" -> getGrantedPermissions(wrapper)
             "getTotalData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
-
-                checkPermissionAndExecuteTotal(
-                    permissionKeys = permissions,
-                    onGranted = { grantedPermissions ->
-                        if (grantedPermissions.isNotEmpty()) {
-                            getTotalData(start, end, wrapper, grantedPermissions)
-                        } else {
-                            wrapper.error("PERMISSION_ERROR", "권한이 없습니다.", null)
-                        }
-                    },
-                    onDenied = { deniedPermissions ->
-                        if (deniedPermissions.isNotEmpty()) {
-                            requestHealthPermissions(wrapper, deniedPermissions)
-                        } else {
-                            // deniedPermissions 비어있으면 권한 거부 없음 → 그냥 처리
-                            wrapper.error("PERMISSION_ERROR", "권한이 부족합니다.", null)
-                        }
-                    }
-                )
+                getTotalData(start, end, wrapper)
             }
-
             "getExerciseData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
-                val permission = PermissionKey(Exercise.HEALTH_DATA_TYPE, PermissionType.READ)
-
-                checkPermissionAndExecute(permission, onGranted = {
-                    CoroutineScope(Dispatchers.Default).launch {
-                        try {
-                            val data = getExerciseData(start, end)
-                            withContext(Dispatchers.Main) {
-                                wrapper.success(data)
-                            }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                wrapper.error("GET_EXERCISE_ERROR", e.message, null)
-                            }
-                        }
-                    }
-                }, onDenied = {
-                    requestHealthPermissions(wrapper, setOf(permission))
-                })
+                getExerciseData(start, end, wrapper)
             }
-
             "getHeartRateData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
-                val permission = PermissionKey(HeartRate.HEALTH_DATA_TYPE, PermissionType.READ)
-
-                checkPermissionAndExecute(permission, onGranted = {
-                    CoroutineScope(Dispatchers.Default).launch {
-                        try {
-                            val data = getHeartRateData(start, end)
-                            withContext(Dispatchers.Main) {
-                                wrapper.success(data)
-                            }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                wrapper.error("GET_HEART_RATE_ERROR", e.message, null)
-                            }
-                        }
-                    }
-                }, onDenied = {
-                    requestHealthPermissions(wrapper, setOf(permission))
-                })
+                getHeartRateData(start, end, wrapper)
             }
-
             "getSleepData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
-                val permission = PermissionKey(Sleep.HEALTH_DATA_TYPE, PermissionType.READ)
-
-                checkPermissionAndExecute(permission, onGranted = {
-                    CoroutineScope(Dispatchers.Default).launch {
-                        try {
-                            val data = getSleepData(start, end)
-                            withContext(Dispatchers.Main) {
-                                wrapper.success(data)
-                            }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                wrapper.error("GET_SLEEP_ERROR", e.message, null)
-                            }
-                        }
-                    }
-                }, onDenied = {
-                    requestHealthPermissions(wrapper, setOf(permission))
-                })
+                getSleepData(start, end, wrapper)
             }
-
-            "getSleepStageData" -> {
-                val start = call.argument<Long>("start")!!
-                val end = call.argument<Long>("end")!!
-                val permission = PermissionKey(SleepStage.HEALTH_DATA_TYPE, PermissionType.READ)
-
-                checkPermissionAndExecute(permission, onGranted = {
-                    CoroutineScope(Dispatchers.Default).launch {
-                        try {
-                            val data = getSleepStageData(start, end)
-                            withContext(Dispatchers.Main) {
-                                wrapper.success(data)
-                            }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                wrapper.error("GET_SLEEPSTAGE_ERROR", e.message, null)
-                            }
-                        }
-                    }
-                }, onDenied = {
-                    requestHealthPermissions(wrapper, setOf(permission))
-                })
-            }
-
             "getStepData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
-                val permission = PermissionKey(StepCount.HEALTH_DATA_TYPE, PermissionType.READ)
-
-                checkPermissionAndExecute(permission, onGranted = {
-                    CoroutineScope(Dispatchers.Default).launch {
-                        try {
-                            val data = getStepData(start, end)
-                            withContext(Dispatchers.Main) {
-                                wrapper.success(data)
-                            }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                wrapper.error("GET_STEP_ERROR", e.message, null)
-                            }
-                        }
-                    }
-                }, onDenied = {
-                    requestHealthPermissions(wrapper, setOf(permission))
-                })
+                getStepData(start, end, wrapper)
             }
-
             "getNutritionData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
-                val permission = PermissionKey(Nutrition.HEALTH_DATA_TYPE, PermissionType.READ)
-
-                checkPermissionAndExecute(permission, onGranted = {
-                    CoroutineScope(Dispatchers.Default).launch {
-                        try {
-                            val data = getNutritionData(start, end)
-                            withContext(Dispatchers.Main) {
-                                wrapper.success(data)
-                            }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                wrapper.error("GET_NUTRITION_ERROR", e.message, null)
-                            }
-                        }
-                    }
-                }, onDenied = {
-                    requestHealthPermissions(wrapper, setOf(permission))
-                })
+                getNutritionData(start, end, wrapper)
             }
-
             "getWeightData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
-                val permission = PermissionKey(Weight.HEALTH_DATA_TYPE, PermissionType.READ)
-
-                checkPermissionAndExecute(permission, onGranted = {
-                    CoroutineScope(Dispatchers.Default).launch {
-                        try {
-                            val data = getWeightData(start, end)
-                            withContext(Dispatchers.Main) {
-                                wrapper.success(data)
-                            }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                wrapper.error("GET_WEIGHT_ERROR", e.message, null)
-                            }
-                        }
-                    }
-                }, onDenied = {
-                    requestHealthPermissions(wrapper, setOf(permission))
-                })
+                getWeightData(start, end, wrapper)
             }
-
             "getOxygenSaturationData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
-                val permission = PermissionKey(OxygenSaturation.HEALTH_DATA_TYPE, PermissionType.READ)
-
-                checkPermissionAndExecute(permission, onGranted = {
-                    CoroutineScope(Dispatchers.Default).launch {
-                        try {
-                            val data = getOxygenSaturationData(start, end)
-                            withContext(Dispatchers.Main) {
-                                wrapper.success(data)
-                            }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                wrapper.error("GET_OXYGENSATURATION_ERROR", e.message, null)
-                            }
-                        }
-                    }
-                }, onDenied = {
-                    requestHealthPermissions(wrapper, setOf(permission))
-                })
+                getOxygenSaturationData(start, end, wrapper)
             }
-
             "getBodyTemperatureData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
-                val permission = PermissionKey(BodyTemperature.HEALTH_DATA_TYPE, PermissionType.READ)
-
-                checkPermissionAndExecute(permission, onGranted = {
-                    CoroutineScope(Dispatchers.Default).launch {
-                        try {
-                            val data = getBodyTemperatureData(start, end)
-                            withContext(Dispatchers.Main) {
-                                wrapper.success(data)
-                            }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                wrapper.error("GET_BODYTEMPERATURE_ERROR", e.message, null)
-                            }
-                        }
-                    }
-                }, onDenied = {
-                    requestHealthPermissions(wrapper, setOf(permission))
-                })
+                getBodyTemperatureData(start, end, wrapper)
             }
-
             "getBloodGlucoseData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
-                val permission = PermissionKey(BloodGlucose.HEALTH_DATA_TYPE, PermissionType.READ)
-
-                checkPermissionAndExecute(permission, onGranted = {
-                    CoroutineScope(Dispatchers.Default).launch {
-                        try {
-                            val data = getBloodGlucoseData(start, end)
-                            withContext(Dispatchers.Main) {
-                                wrapper.success(data)
-                            }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                wrapper.error("GET_BLOODGLUCOSE_ERROR", e.message, null)
-                            }
-                        }
-                    }
-                }, onDenied = {
-                    requestHealthPermissions(wrapper, setOf(permission))
-                })
+                getBloodGlucoseData(start, end, wrapper)
             }
-
             else -> wrapper.notImplemented()
         }
     }
 
-    private fun isSamsungHealthInstalled(wrapper: ResultWrapper, context: Context) {
+    private fun isSamsungHealthInstalled(wrapper: ResultWrapper) {
         Log.d(APP_TAG, "isSamsungHealthInstalled() 호출")
-        val resultMap: MutableMap<String, Any> = mutableMapOf()
-
+        val resultMap = mutableMapOf<String, Any>()
         try {
             context.packageManager.getPackageInfo("com.sec.android.app.shealth", 0)
-            resultMap.put("isInstalled", true)
-            wrapper.success(resultMap)
+            resultMap["isInstalled"] = true
         } catch (e: Exception) {
-            resultMap.put("isInstalled", false)
-            wrapper.success(resultMap)
+            resultMap["isInstalled"] = false
         }
+        wrapper.success(resultMap)
     }
 
-    private fun openSamsungHealthInStore(wrapper: ResultWrapper, context: Context) {
-        Log.d(APP_TAG, "openSamsungHealthInStore() 호출")
-        val resultMap: MutableMap<String, Any> = mutableMapOf()
+    private fun openSamsungHealth(wrapper: ResultWrapper) {
+        Log.d(APP_TAG, "openSamsungHealth() 호출")
+        val resultMap = mutableMapOf<String, Any>()
         val packageName = "com.sec.android.app.shealth"
-        val packageManager = context.packageManager
 
         try {
+            val packageManager = context.packageManager
             packageManager.getPackageInfo(packageName, 0)
 
-            // 삼성 헬스 실행
             val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
             if (launchIntent != null) {
                 launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(launchIntent)
-                resultMap.put("action", "launched")
-                wrapper.success(resultMap)
+                resultMap["action"] = "launched"
             } else {
-                Log.e(APP_TAG, "삼성 헬스 실행 인텐트 없음")
-                resultMap.put("action", "launch_failed")
-                wrapper.success(resultMap)
+                resultMap["action"] = "launch_failed"
             }
-
         } catch (e: Exception) {
-            // Play 스토어로 이동
             try {
                 val intent = Intent(Intent.ACTION_VIEW).apply {
                     data = Uri.parse("market://details?id=$packageName")
@@ -456,1132 +200,597 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 context.startActivity(intent)
-                resultMap.put("action", "move_to_store")
-                wrapper.success(resultMap)
+                resultMap["action"] = "move_to_store"
             } catch (e: Exception) {
-                Log.e(APP_TAG, "Play 스토어 이동 실패: $e")
-                resultMap.put("action", "store_failed")
-                wrapper.success(resultMap)
+                resultMap["action"] = "store_failed"
             }
+        }
+        wrapper.success(resultMap)
+    }
+
+    private fun connect(wrapper: ResultWrapper) {
+        Log.d(APP_TAG, "connect() 호출")
+        val resultMap = mutableMapOf<String, Any>()
+
+        try {
+            healthDataStore = HealthDataService.getStore(context)
+            Log.d(APP_TAG, "Samsung Health 연결 성공")
+            resultMap["isConnect"] = true
+            wrapper.success(resultMap)
+        } catch (e: ResolvablePlatformException) {
+            Log.e(APP_TAG, "연결 실패 (해결 가능): ${e.message}")
+            if (e.hasResolution && activity != null) {
+                e.resolve(activity!!)
+            }
+            resultMap["isConnect"] = false
+            resultMap["error"] = "resolvable"
+            resultMap["message"] = e.message ?: "Unknown error"
+            wrapper.success(resultMap)
+        } catch (e: HealthDataException) {
+            Log.e(APP_TAG, "연결 실패: ${e.message}")
+            resultMap["isConnect"] = false
+            resultMap["error"] = "health_data_exception"
+            resultMap["message"] = e.message ?: "Unknown error"
+            wrapper.success(resultMap)
+        } catch (e: Exception) {
+            Log.e(APP_TAG, "연결 실패: ${e.message}")
+            resultMap["isConnect"] = false
+            resultMap["error"] = "unknown"
+            resultMap["message"] = e.message ?: "Unknown error"
+            wrapper.success(resultMap)
         }
     }
 
-    /**
-     * 삼성헬스 연계 관련 함수 추가.
-     */
-    private fun connectSamsungHealth(wrapper: ResultWrapper) {
-        Log.d(APP_TAG, "connectSamsungHealth() 호출")
-        val resultMap: MutableMap<String, Any> = mutableMapOf()
-
-        mStore = HealthDataStore(context, object : HealthDataStore.ConnectionListener {
-            override fun onConnected() {
-                Log.d(APP_TAG, "삼성 헬스 연결 성공")
-                resultMap.put("isConnect", true)
-                wrapper.success(resultMap)
-            }
-
-            override fun onConnectionFailed(error: HealthConnectionErrorResult?) {
-                Log.e(APP_TAG, "연결 실패: $error")
-                resultMap.put("isConnect", false)
-                wrapper.success(resultMap)
-            }
-
-            override fun onDisconnected() {
-                Log.w(APP_TAG, "삼성 헬스 연결 종료")
-                resultMap.put("isConnect", false)
-                wrapper.success(resultMap)
-            }
-        })
-        mStore.connectService()
+    private fun disconnect(wrapper: ResultWrapper) {
+        Log.d(APP_TAG, "disconnect() 호출")
+        healthDataStore = null
+        val resultMap = mutableMapOf<String, Any>("isConnect" to false)
+        wrapper.success(resultMap)
     }
 
-    private fun disconnectSamsungHealth(wrapper: ResultWrapper) {
-        Log.d(APP_TAG, "disconnectSamsungHealth() 호출")
+    private fun requestPermissions(types: List<String>, wrapper: ResultWrapper) {
+        Log.d(APP_TAG, "requestPermissions() 호출: $types")
 
-        if (::mStore.isInitialized) {
-            try {
-                mStore.disconnectService()
-                Log.d(APP_TAG, "삼성 헬스 연결 해제 요청 완료")
-                unregisterObservers()
-                val resultMap: MutableMap<String, Any> = mutableMapOf()
-                resultMap["isConnect"] = false
-                wrapper.success(resultMap)
-            } catch (e: Exception) {
-                Log.e(APP_TAG, "disconnect 실패: ${e.message}", e)
-                wrapper.error("DISCONNECT_ERROR", e.message, null)
-            }
+        val store = healthDataStore
+        if (store == null) {
+            wrapper.error("STORE_NOT_READY", "Samsung Health에 먼저 연결하세요", null)
+            return
+        }
+
+        val act = activity
+        if (act == null) {
+            wrapper.error("ACTIVITY_NOT_READY", "Activity가 없습니다", null)
+            return
+        }
+
+        val permissionsToRequest = if (types.isEmpty()) {
+            allPermissions
         } else {
-            Log.w(APP_TAG, "mStore가 초기화되지 않았습니다.")
-            val resultMap: MutableMap<String, Any> = mutableMapOf()
-            resultMap["isConnect"] = false
-            wrapper.success(resultMap)
+            types.mapNotNull { getPermissionForType(it) }.toSet()
+        }
+
+        if (permissionsToRequest.isEmpty()) {
+            wrapper.success(mapOf("granted" to emptyMap<String, Boolean>(), "message" to "요청할 권한이 없습니다"))
+            return
+        }
+
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                val grantedPermissions = store.getGrantedPermissions(permissionsToRequest)
+
+                if (grantedPermissions.containsAll(permissionsToRequest)) {
+                    Log.d(APP_TAG, "모든 권한이 이미 허용됨")
+                    val grantedMap = permissionsToRequest.associate {
+                        getDataTypeNameForPermission(it) to true
+                    }
+                    wrapper.success(mapOf("granted" to grantedMap, "message" to "모든 권한 허용됨"))
+                } else {
+                    store.requestPermissions(permissionsToRequest, act)
+
+                    // 권한 요청 후 다시 확인
+                    val newGrantedPermissions = store.getGrantedPermissions(permissionsToRequest)
+                    val grantedMap = permissionsToRequest.associate {
+                        getDataTypeNameForPermission(it) to newGrantedPermissions.contains(it)
+                    }
+                    val deniedList = permissionsToRequest
+                        .filter { !newGrantedPermissions.contains(it) }
+                        .map { getDataTypeNameForPermission(it) }
+
+                    val response = mutableMapOf<String, Any>("granted" to grantedMap)
+                    if (deniedList.isNotEmpty()) {
+                        response["denied_permissions"] = deniedList
+                    } else {
+                        response["message"] = "모든 권한 허용됨"
+                    }
+                    wrapper.success(response)
+                }
+            } catch (e: Exception) {
+                Log.e(APP_TAG, "권한 요청 실패: ${e.message}", e)
+                wrapper.error("PERMISSION_ERROR", e.message, null)
+            }
         }
     }
 
     private fun getGrantedPermissions(wrapper: ResultWrapper) {
         Log.d(APP_TAG, "getGrantedPermissions() 호출")
-        if (!::mStore.isInitialized) {
-            wrapper.error("STORE_NOT_READY", "Samsung Health 연결되지 않음", null)
+
+        val store = healthDataStore
+        if (store == null) {
+            wrapper.error("STORE_NOT_READY", "Samsung Health에 먼저 연결하세요", null)
             return
         }
 
-        try {
-            val permissionManager = HealthPermissionManager(mStore)
-            val resultMap = permissionManager.isPermissionAcquired(permissions)
-
-            val grantedList = resultMap.filterValues { it }.keys.map { it.dataType.toString() }
-
-            wrapper.success(grantedList)
-        } catch (e: Exception) {
-            Log.e(APP_TAG, "권한 조회 중 오류", e)
-            wrapper.error("PERMISSION_QUERY_ERROR", "권한 조회 실패", null)
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                val grantedPermissions = store.getGrantedPermissions(allPermissions)
+                val grantedList = grantedPermissions.map { getDataTypeNameForPermission(it) }
+                wrapper.success(grantedList)
+            } catch (e: Exception) {
+                Log.e(APP_TAG, "권한 조회 실패: ${e.message}", e)
+                wrapper.error("PERMISSION_QUERY_ERROR", e.message, null)
+            }
         }
     }
 
-    private fun requestHealthPermissions(
-        wrapper: ResultWrapper,
-        permissionsToRequest: Set<PermissionKey>
-    ) {
-        Log.d(APP_TAG, "requestHealthPermissions() 호출 with permissions: $permissionsToRequest")
-
-        if (permissionsToRequest.isEmpty()) {
-            wrapper.success(mapOf("message" to "요청할 권한이 없습니다."))
+    private fun getTotalData(start: Long, end: Long, wrapper: ResultWrapper) {
+        val store = healthDataStore
+        if (store == null) {
+            wrapper.error("STORE_NOT_READY", "Samsung Health에 먼저 연결하세요", null)
             return
         }
 
-        if (loadFromSharedPreferences()) {
-            val deniedTypes = permissionsToRequest.map { it.dataType.toString() }
-            wrapper.success(mapOf("denied_permissions" to deniedTypes))
-            return
-        }
-
-        val permissionManager = HealthPermissionManager(mStore)
-        try {
-            permissionManager.requestPermissions(permissionsToRequest, activity!!).setResultListener { res ->
-                val resultMap = res.resultMap
-                val stillDenied = permissionsToRequest.filter { resultMap[it] != true }
-                if (stillDenied.isNotEmpty()) {
-                    saveToSharedPreferences(true)
-                    val deniedTypes = stillDenied.map { it.dataType.toString() }
-                    wrapper.success(mapOf("denied_permissions" to deniedTypes))
-                    Log.d(APP_TAG, "권한 일부 거부됨: $deniedTypes")
-                } else {
-                    wrapper.success(mapOf("message" to "모든 권한 허용됨"))
-                    Log.d(APP_TAG, "모든 권한 허용됨")
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(APP_TAG, "권한 요청 실패: $e")
-            wrapper.error("PERMISSION_ERROR", "권한 요청 실패", null)
-        }
-    }
-
-    private fun requestPermissions(types: List<String>, wrapper: ResultWrapper) {
-        Log.d(APP_TAG, "requestPermissions() 호출")
-        var isReplied = false
-
-        clearPermissionRequestRecordInternal()
-
-        val permissionManager = HealthPermissionManager(mStore)
-
-        val permissionKeys: Set<HealthPermissionManager.PermissionKey> =
-            if (!types.isNullOrEmpty()) {
-                types.map { type ->
-                    PermissionKey(type.trim(), PermissionType.READ)
-                }.toSet()
-            } else {
-                permissions
-            }
-        Log.d(APP_TAG, "요청할 최종 권한 리스트: $permissionKeys")
-
-        try {
-            permissionManager.requestPermissions(permissionKeys, activity!!).setResultListener { res ->
-                val grantedMap: MutableMap<HealthPermissionManager.PermissionKey, Boolean> = res.resultMap
-                val denied = permissionKeys.filter { grantedMap[it] != true }
-
-                val grantedMapStringKey = grantedMap.entries.associate {
-                    it.key.dataType.toString() to it.value
-                }
-
-                saveToSharedPreferences(true)
-
-                val responseMap = mutableMapOf<String, Any>("isConnect" to true)
-                if (denied.isNotEmpty()) {
-                    val deniedTypes = denied.map { it.dataType.toString() }
-                    responseMap.put("denied_permissions", deniedTypes)
-                } else {
-                    responseMap.put("message", "모든 권한 허용됨")
-                }
-
-                wrapper.success(mapOf("granted" to grantedMapStringKey, "response" to responseMap))
-            }
-        } catch (e: Exception) {
-            Log.e(APP_TAG, "requestPermissions 예외: ${e.message}", e)
-            wrapper.error("PERMISSION_ERROR", "권한 요청 중 오류 발생", e.message)
-        }
-    }
-
-    private fun checkPermissionAndExecute(
-        permissionKey: PermissionKey, onGranted: () -> Unit, onDenied: () -> Unit
-    ) {
-        val permissionManager = HealthPermissionManager(mStore)
-        try {
-            val resultMap = permissionManager.isPermissionAcquired(setOf(permissionKey))
-            if (resultMap[permissionKey] == true) {
-                onGranted()
-            } else {
-                onDenied()
-            }
-        } catch (e: Exception) {
-            Log.e(APP_TAG, "권한 확인 중 오류", e)
-            onDenied()
-        }
-    }
-
-    private fun checkPermissionAndExecuteTotal(
-        permissionKeys: Set<PermissionKey>,
-        onGranted: (Set<PermissionKey>) -> Unit,
-        onDenied: (Set<PermissionKey>) -> Unit
-    ) {
-        val permissionManager = HealthPermissionManager(mStore)
-        try {
-            val resultMap = permissionManager.isPermissionAcquired(permissionKeys)
-            val granted = resultMap.filterValues { it }.keys
-            val denied = permissionKeys - granted
-
-            if (denied.isEmpty()) {
-                // 권한 모두 획득 상태
-                onGranted(granted)
-            } else if (granted.isNotEmpty()) {
-                // 일부 권한은 획득, 일부는 거부
-                // 상황에 맞게 분기하거나 onGranted + onDenied 모두 호출 가능
-                onGranted(granted)
-                onDenied(denied)
-            } else {
-                // 권한 모두 거부
-                onDenied(denied)
-            }
-        } catch (e: Exception) {
-            Log.e(APP_TAG, "권한 확인 중 오류", e)
-            onDenied(permissionKeys)
-        }
-    }
-
-    private fun registerObservers(enabledTypes: List<String>) {
-        activeObservers.forEach { (type, observer) ->
-            try {
-                HealthDataObserver.removeObserver(mStore, observer)
-            } catch (e: Exception) {
-                Log.e(APP_TAG, "기존 옵저버 제거 실패: ", e)
-            }
-        }
-        activeObservers.clear()
-
-        for (dataType in enabledTypes) {
-            try {
-                val handler = Handler(Looper.getMainLooper())
-                val observer = object : HealthDataObserver(handler) {
-                    override fun onChange(dataTypeName: String) {
-                        Log.d(APP_TAG, "Observer triggered for $dataType ($dataTypeName)")
-                        notifyFlutter(dataTypeName)
-                    }
-                }
-                HealthDataObserver.addObserver(mStore, dataType, observer)
-                activeObservers[dataType] = observer
-                Log.d(APP_TAG, "옵저버 등록 완료: $dataType")
-            } catch (e: SecurityException) {
-                Log.w(APP_TAG, "권한 부족으로 옵저버 등록 실패 (무시): $dataType")
-            } catch (e: Exception) {
-                Log.e(APP_TAG, "옵저버 등록 실패 [$dataType]: ", e)
-            }
-        }
-    }
-
-    private fun unregisterObservers() {
-        activeObservers.forEach { (type, observer) ->
-            try {
-                HealthDataObserver.removeObserver(mStore, observer)
-                Log.d(APP_TAG, "옵저버 제거 완료: $type")
-            } catch (e: Exception) {
-                Log.e(APP_TAG, "옵저버 제거 실패: $type", e)
-            }
-        }
-        activeObservers.clear()
-    }
-
-    private fun enableObservers(types: List<String>, wrapper: ResultWrapper) {
-        val results = mutableListOf<Map<String, Any>>()
-
-        for (type in types) {
-            try {
-                // 이미 등록되어 있으면 바로 true 반환
-                if (activeObservers.containsKey(type)) {
-                    results.add(mapOf("type" to type, "enabled" to true, "already" to true))
-                    continue
-                }
-
-                val handler = Handler(Looper.getMainLooper())
-                val observer = object : HealthDataObserver(handler) {
-                    override fun onChange(dataTypeName: String) {
-                        Log.d(APP_TAG, "Observer triggered for $type ($dataTypeName)")
-                        notifyFlutter(dataTypeName)
-                    }
-                }
-                try {
-                    HealthDataObserver.addObserver(mStore, type, observer)
-                    activeObservers[type] = observer
-                    results.add(mapOf("type" to (type ?: ""), "enabled" to true))
-                    Log.d(APP_TAG, "enableObservers: registered $type")
-                } catch (se: SecurityException) {
-                    // 권한이 없으면 실패
-                    results.add(mapOf("type" to (type ?: ""), "enabled" to false, "error" to "permission_denied"))
-                    Log.w(APP_TAG, "Enable observer security exception for $type: ${se.message}")
-                } catch (e: Exception) {
-                    results.add(mapOf("type" to (type ?: ""), "enabled" to false, "error" to (e.message ?: "")))
-                    Log.e(APP_TAG, "Enable observer failed: $type", e)
-                }
-            } catch (e: Exception) {
-                results.add(mapOf("type" to (type ?: ""), "enabled" to false, "error" to (e.message ?: "")))
-                Log.e(APP_TAG, "Enable observer unexpected error: $type", e)
-            }
-        }
-
-        wrapper.success(mapOf("results" to results))
-    }
-
-    private fun disableObservers(types: List<String>, wrapper: ResultWrapper) {
-        val results = mutableListOf<Map<String, Any>>()
-
-        for (type in types) {
-            val observer = activeObservers[type]
-            if (observer == null) {
-                results.add(mapOf("type" to (type ?: ""), "disabled" to false, "error" to "not_registered"))
-                return
-            }
-
-            try {
-                HealthDataObserver.removeObserver(mStore, observer)
-                activeObservers.remove(type)
-                results.add(mapOf("type" to (type ?: ""), "disabled" to true))
-                Log.d(APP_TAG, "disableObservers: removed $type")
-            } catch (e: Exception) {
-                results.add(mapOf("type" to (type ?: ""), "disabled" to false, "error" to (e.message ?: "")))
-                Log.e(APP_TAG, "Disable observer failed: $type", e)
-            }
-        }
-
-        wrapper.success(mapOf("results" to results))
-    }
-
-    fun getObserversStatus(types: List<String>, wrapper: ResultWrapper) {
-        val results = types.map { type ->
-            val exists = activeObservers.containsKey(type)
-            mapOf("type" to (type ?: ""), "enabled" to exists)
-        }
-        wrapper.success(mapOf("results" to results))
-    }
-
-    fun notifyFlutter(dataType: String) {
-        val payload = mapOf("type" to dataType)
-        Handler(Looper.getMainLooper()).post {
-            eventSinks.forEach { sink ->
-                sink.success(payload)
-            }
-        }
-    }
-
-    private fun saveToSharedPreferences(requested: Boolean) {
-        val prefs = context.getSharedPreferences("samsung_health_prefs", Context.MODE_PRIVATE)
-        prefs.edit().putBoolean("permission_requested", requested).apply()
-    }
-
-    private fun loadFromSharedPreferences(): Boolean {
-        val prefs = context.getSharedPreferences("samsung_health_prefs", Context.MODE_PRIVATE)
-        return prefs.getBoolean("permission_requested", false)
-    }
-
-    private fun clearPermissionRequestRecordInternal() {
-        try {
-            val sharedPref = activity?.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-            sharedPref?.edit()?.remove(PREF_KEY_PERMISSION_REQUESTED)?.apply()
-            Log.d(APP_TAG, "Permission request record cleared")
-        } catch (e: Exception) {
-            Log.e(APP_TAG, "Failed to clear permission request record", e)
-        }
-    }
-
-    private fun getTotalData(
-        start: Long,
-        end: Long,
-        wrapper: ResultWrapper,
-        grantedPermissions: Set<PermissionKey>,
-    ) {
-        /// 각 데이터들 비동기로 호출하고 결과값 맵에 담아 반환
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val exercise = async {
-                    if (grantedPermissions.contains(
-                            PermissionKey(
-                                Exercise.HEALTH_DATA_TYPE,
-                                PermissionType.READ
-                            )
-                        )
-                    ) getExerciseData(start, end)
-                    else emptyList()
-                }
-                val heartRate = async {
-                    if (grantedPermissions.contains(
-                            PermissionKey(
-                                HeartRate.HEALTH_DATA_TYPE,
-                                PermissionType.READ
-                            )
-                        )
-                    ) getHeartRateData(start, end)
-                    else emptyList()
-                }
-                val sleep = async {
-                    if (grantedPermissions.contains(
-                            PermissionKey(
-                                Sleep.HEALTH_DATA_TYPE,
-                                PermissionType.READ
-                            )
-                        )
-                    ) getSleepData(start, end)
-                    else emptyList()
-                }
-                val sleepStage = async {
-                    if (grantedPermissions.contains(
-                            PermissionKey(
-                                SleepStage.HEALTH_DATA_TYPE,
-                                PermissionType.READ
-                            )
-                        )
-                    ) getSleepStageData(start, end)
-                    else emptyList()
-                }
-                val steps = async {
-                    if (grantedPermissions.contains(
-                            PermissionKey(
-                                StepCount.HEALTH_DATA_TYPE,
-                                PermissionType.READ
-                            )
-                        )
-                    ) getStepData(start, end)
-                    else emptyList()
-                }
-                val nutrition = async {
-                    if (grantedPermissions.contains(
-                            PermissionKey(
-                                Nutrition.HEALTH_DATA_TYPE,
-                                PermissionType.READ
-                            )
-                        )
-                    ) getNutritionData(start, end)
-                    else emptyList()
-                }
-                val weight = async {
-                    if (grantedPermissions.contains(
-                            PermissionKey(
-                                Weight.HEALTH_DATA_TYPE,
-                                PermissionType.READ
-                            )
-                        )
-                    ) getWeightData(start, end)
-                    else emptyList()
-                }
-                val oxygenSaturation = async {
-                    if (grantedPermissions.contains(
-                            PermissionKey(
-                                OxygenSaturation.HEALTH_DATA_TYPE,
-                                PermissionType.READ
-                            )
-                        )
-                    ) getOxygenSaturationData(start, end)
-                    else emptyList()
-                }
-                val bodyTemperature = async {
-                    if (grantedPermissions.contains(
-                            PermissionKey(
-                                BodyTemperature.HEALTH_DATA_TYPE,
-                                PermissionType.READ
-                            )
-                        )
-                    ) getBodyTemperatureData(start, end)
-                    else emptyList()
-                }
+                val startTime = Instant.ofEpochMilli(start).atZone(ZoneOffset.systemDefault()).toLocalDateTime()
+                val endTime = Instant.ofEpochMilli(end).atZone(ZoneOffset.systemDefault()).toLocalDateTime()
 
-                val bloodGlucose = async {
-                    if (grantedPermissions.contains(
-                            PermissionKey(
-                                BloodGlucose.HEALTH_DATA_TYPE,
-                                PermissionType.READ
-                            )
-                        )
-                    ) getBloodGlucoseData(start, end)
-                    else emptyList()
-                }
+                val exercise = try { readExerciseData(store, startTime, endTime) } catch (e: Exception) { Log.e(APP_TAG, "Exercise error: ${e.message}"); emptyList() }
+                val heartRate = try { readHeartRateData(store, startTime, endTime) } catch (e: Exception) { Log.e(APP_TAG, "HeartRate error: ${e.message}"); emptyList() }
+                val sleep = try { readSleepData(store, startTime, endTime) } catch (e: Exception) { Log.e(APP_TAG, "Sleep error: ${e.message}"); emptyList() }
+                val steps = try { readStepData(store, startTime, endTime) } catch (e: Exception) { Log.e(APP_TAG, "Steps error: ${e.message}"); emptyList() }
+                val nutrition = try { readNutritionData(store, startTime, endTime) } catch (e: Exception) { Log.e(APP_TAG, "Nutrition error: ${e.message}"); emptyList() }
+                val weight = try { readWeightData(store, startTime, endTime) } catch (e: Exception) { Log.e(APP_TAG, "Weight error: ${e.message}"); emptyList() }
+                val bloodOxygen = try { readOxygenSaturationData(store, startTime, endTime) } catch (e: Exception) { Log.e(APP_TAG, "BloodOxygen error: ${e.message}"); emptyList() }
+                val bodyTemperature = try { readBodyTemperatureData(store, startTime, endTime) } catch (e: Exception) { Log.e(APP_TAG, "BodyTemp error: ${e.message}"); emptyList() }
+                val bloodGlucose = try { readBloodGlucoseData(store, startTime, endTime) } catch (e: Exception) { Log.e(APP_TAG, "BloodGlucose error: ${e.message}"); emptyList() }
 
                 val totalResult = mapOf(
-                    "exercise" to exercise.await(),
-                    "heart_rate" to heartRate.await(),
-                    "sleep" to sleep.await(),
-                    "sleep_stage" to sleepStage.await(),
-                    "step_count" to steps.await(),
-                    "nutrition" to nutrition.await(),
-                    "weight" to weight.await(),
-                    "oxygen_saturation" to oxygenSaturation.await(),
-                    "body_temperature" to bodyTemperature.await(),
-                    "blood_glucose" to bloodGlucose.await(),
+                    "exercise" to exercise,
+                    "heart_rate" to heartRate,
+                    "sleep" to sleep,
+                    "step_count" to steps,
+                    "nutrition" to nutrition,
+                    "weight" to weight,
+                    "oxygen_saturation" to bloodOxygen,
+                    "body_temperature" to bodyTemperature,
+                    "blood_glucose" to bloodGlucose,
                 )
+
                 withContext(Dispatchers.Main) {
                     wrapper.success(totalResult)
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-
                     wrapper.error("TOTAL_DATA_ERROR", "데이터 수집 실패: ${e.message}", null)
                 }
             }
-
         }
     }
 
-    /**
-     * 운동 조회
-     */
-    suspend fun getExerciseData(start: Long, end: Long): List<Map<String, Any>> = withContext(Dispatchers.Main) {
-        suspendCoroutine { cont ->
-            try {
-                Log.d(APP_TAG, "운동 데이터 시작")
-                val request = ReadRequest.Builder()
-                    .setDataType(HealthConstants.Exercise.HEALTH_DATA_TYPE)
-                    .setLocalTimeRange(
-                        HealthConstants.Exercise.START_TIME,
-                        HealthConstants.Exercise.TIME_OFFSET,
-                        start,
-                        end
-                    )
-                    .setSort(HealthConstants.Exercise.START_TIME, HealthDataResolver.SortOrder.DESC)
-                    .setProperties(
-                        arrayOf(
-                            HealthConstants.Exercise.DEVICE_UUID,
-                            HealthConstants.Exercise.EXERCISE_TYPE,
-                            HealthConstants.Exercise.START_TIME,
-                            HealthConstants.Exercise.END_TIME,
-                            HealthConstants.Exercise.TIME_OFFSET,
-                            HealthConstants.Exercise.DURATION,
-                            HealthConstants.Exercise.DISTANCE,
-                            HealthConstants.Exercise.CALORIE,
-                            HealthConstants.Exercise.MAX_HEART_RATE,
-                            HealthConstants.Exercise.MEAN_HEART_RATE,
-                            HealthConstants.Exercise.MIN_HEART_RATE,
-                            HealthConstants.Exercise.LIVE_DATA
-                        )
-                    ).build()
+    private fun getExerciseData(start: Long, end: Long, wrapper: ResultWrapper) {
+        readDataWithWrapper(start, end, wrapper) { store, startTime, endTime ->
+            readExerciseData(store, startTime, endTime)
+        }
+    }
 
-                val resolver = HealthDataResolver(mStore, null)
-                val resultList = mutableListOf<Map<String, Any>>()
-                resolver.read(request).setResultListener { result ->
-                    for (data in result) {
-                        resultList.add(
-                            mapOf(
-                                "device_uuid" to data.getString(HealthConstants.Exercise.DEVICE_UUID),
-                                "exercise_type" to data.getInt(HealthConstants.Exercise.EXERCISE_TYPE),
-                                "exercise_type_name" to ExerciseTypeMapper.getName(data.getInt(HealthConstants.Exercise.EXERCISE_TYPE)),
-                                "start_time" to data.getLong(HealthConstants.Exercise.START_TIME),
-                                "end_time" to data.getLong(HealthConstants.Exercise.END_TIME),
-                                "time_offset" to data.getLong(HealthConstants.Exercise.TIME_OFFSET),
-                                "duration" to data.getLong(HealthConstants.Exercise.DURATION),
-                                "distance" to data.getFloat(HealthConstants.Exercise.DISTANCE),
-                                "calorie" to data.getFloat(HealthConstants.Exercise.CALORIE),
-                                "max_heart_rate" to data.getFloat(HealthConstants.Exercise.MAX_HEART_RATE),
-                                "mean_heart_rate" to data.getFloat(HealthConstants.Exercise.MEAN_HEART_RATE),
-                                "min_heart_rate" to data.getFloat(HealthConstants.Exercise.MIN_HEART_RATE),
-                                "liveData" to data.getString(HealthConstants.Exercise.LIVE_DATA)
-                            )
-                        )
-                    }
-                    Log.d(APP_TAG, "운동 데이터 종료")
-                    cont.resume(resultList)
+    private fun getHeartRateData(start: Long, end: Long, wrapper: ResultWrapper) {
+        readDataWithWrapper(start, end, wrapper) { store, startTime, endTime ->
+            readHeartRateData(store, startTime, endTime)
+        }
+    }
+
+    private fun getSleepData(start: Long, end: Long, wrapper: ResultWrapper) {
+        readDataWithWrapper(start, end, wrapper) { store, startTime, endTime ->
+            readSleepData(store, startTime, endTime)
+        }
+    }
+
+    private fun getStepData(start: Long, end: Long, wrapper: ResultWrapper) {
+        readDataWithWrapper(start, end, wrapper) { store, startTime, endTime ->
+            readStepData(store, startTime, endTime)
+        }
+    }
+
+    private fun getNutritionData(start: Long, end: Long, wrapper: ResultWrapper) {
+        readDataWithWrapper(start, end, wrapper) { store, startTime, endTime ->
+            readNutritionData(store, startTime, endTime)
+        }
+    }
+
+    private fun getWeightData(start: Long, end: Long, wrapper: ResultWrapper) {
+        readDataWithWrapper(start, end, wrapper) { store, startTime, endTime ->
+            readWeightData(store, startTime, endTime)
+        }
+    }
+
+    private fun getOxygenSaturationData(start: Long, end: Long, wrapper: ResultWrapper) {
+        readDataWithWrapper(start, end, wrapper) { store, startTime, endTime ->
+            readOxygenSaturationData(store, startTime, endTime)
+        }
+    }
+
+    private fun getBodyTemperatureData(start: Long, end: Long, wrapper: ResultWrapper) {
+        readDataWithWrapper(start, end, wrapper) { store, startTime, endTime ->
+            readBodyTemperatureData(store, startTime, endTime)
+        }
+    }
+
+    private fun getBloodGlucoseData(start: Long, end: Long, wrapper: ResultWrapper) {
+        readDataWithWrapper(start, end, wrapper) { store, startTime, endTime ->
+            readBloodGlucoseData(store, startTime, endTime)
+        }
+    }
+
+    private fun readDataWithWrapper(
+        start: Long,
+        end: Long,
+        wrapper: ResultWrapper,
+        reader: suspend (HealthDataStore, LocalDateTime, LocalDateTime) -> List<Map<String, Any>>
+    ) {
+        val store = healthDataStore
+        if (store == null) {
+            wrapper.error("STORE_NOT_READY", "Samsung Health에 먼저 연결하세요", null)
+            return
+        }
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val startTime = Instant.ofEpochMilli(start).atZone(ZoneOffset.systemDefault()).toLocalDateTime()
+                val endTime = Instant.ofEpochMilli(end).atZone(ZoneOffset.systemDefault()).toLocalDateTime()
+                val data = reader(store, startTime, endTime)
+                withContext(Dispatchers.Main) {
+                    wrapper.success(data)
                 }
             } catch (e: Exception) {
-                Log.e(APP_TAG, "운동 데이터 Exception: ${e.message}")
-                cont.resume(emptyList())
+                Log.e(APP_TAG, "데이터 읽기 실패: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    wrapper.error("READ_ERROR", e.message, null)
+                }
             }
         }
     }
 
-    /**
-     * 심박 조회
-     */
-    private suspend fun getHeartRateData(start: Long, end: Long): List<Map<String, Any>> =
-        withContext(Dispatchers.Main) {
-            suspendCoroutine { cont ->
-                try {
-                    Log.d(APP_TAG, "심박 데이터 시작")
-                    val request = ReadRequest.Builder()
-                        .setDataType(HealthConstants.HeartRate.HEALTH_DATA_TYPE)
-                        .setLocalTimeRange(
-                            HealthConstants.HeartRate.START_TIME,
-                            HealthConstants.HeartRate.TIME_OFFSET,
-                            start,
-                            end
-                        )
-                        .setSort(HealthConstants.HeartRate.START_TIME, HealthDataResolver.SortOrder.DESC)
-                        .setProperties(
-                            arrayOf(
-                                HealthConstants.HeartRate.DEVICE_UUID,
-                                HealthConstants.HeartRate.START_TIME,
-                                HealthConstants.HeartRate.END_TIME,
-                                HealthConstants.HeartRate.TIME_OFFSET,
-                                HealthConstants.HeartRate.HEART_RATE,
-                                HealthConstants.HeartRate.HEART_BEAT_COUNT,
-                                HealthConstants.HeartRate.MIN,
-                                HealthConstants.HeartRate.MAX,
-                                HealthConstants.HeartRate.BINNING_DATA
-                            )
-                        ).build()
+    // ===== 데이터 읽기 함수들 =====
 
-                    val resolver = HealthDataResolver(mStore, null)
-                    val resultList = mutableListOf<Map<String, Any>>()
-                    resolver.read(request).setResultListener { result ->
-                        for (data in result) {
-                            resultList.add(
-                                mapOf(
-                                    "device_uuid" to data.getString(HealthConstants.HeartRate.DEVICE_UUID),
-                                    "start_time" to data.getLong(HealthConstants.HeartRate.START_TIME),
-                                    "end_time" to data.getLong(HealthConstants.HeartRate.END_TIME),
-                                    "time_offset" to data.getLong(HealthConstants.HeartRate.TIME_OFFSET),
-                                    "heart_rate" to data.getFloat(HealthConstants.HeartRate.HEART_RATE),
-                                    "heart_beat_count" to data.getLong(HealthConstants.HeartRate.HEART_BEAT_COUNT),
-                                    "min" to data.getFloat(HealthConstants.HeartRate.MIN),
-                                    "max" to data.getFloat(HealthConstants.HeartRate.MAX)
-                                )
-                            )
-                        }
-                        Log.d(APP_TAG, "심박 데이터 종료")
-                        cont.resume(resultList)
-                    }
-                } catch (e: Exception) {
-                    Log.e(APP_TAG, "심박 데이터 Exception: ${e.message}")
-                    cont.resume(emptyList())
-                }
+    private suspend fun readExerciseData(
+        store: HealthDataStore,
+        startTime: LocalDateTime,
+        endTime: LocalDateTime
+    ): List<Map<String, Any>> {
+        Log.d(APP_TAG, "운동 데이터 조회 시작")
+        val readRequest = DataTypes.EXERCISE.readDataRequestBuilder
+            .setLocalTimeFilter(LocalTimeFilter.of(startTime, endTime))
+            .setOrdering(Ordering.DESC)
+            .build()
+
+        val result = store.readData(readRequest)
+        val resultList = mutableListOf<Map<String, Any>>()
+
+        for (dataPoint in result.dataList) {
+            val exerciseType = dataPoint.getValue(DataType.ExerciseType.EXERCISE_TYPE)
+            val sessions = dataPoint.getValue(DataType.ExerciseType.SESSIONS)
+
+            sessions?.forEach { session ->
+                resultList.add(mapOf(
+                    "uid" to (dataPoint.uid ?: ""),
+                    "exercise_type" to (exerciseType?.ordinal ?: 0),
+                    "exercise_type_name" to (exerciseType?.name ?: "Unknown"),
+                    "start_time" to (session.startTime?.toEpochMilli() ?: 0L),
+                    "end_time" to (session.endTime?.toEpochMilli() ?: 0L),
+                    "duration" to (session.duration?.toMillis() ?: 0L),
+                    "calories" to (session.calories ?: 0f),
+                    "distance" to (session.distance ?: 0f),
+                    "max_heart_rate" to (session.maxHeartRate ?: 0f),
+                    "mean_heart_rate" to (session.meanHeartRate ?: 0f),
+                    "min_heart_rate" to (session.minHeartRate ?: 0f),
+                ))
             }
         }
 
-    /**
-     * 수면 조회
-     */
-    private suspend fun getSleepData(start: Long, end: Long): List<Map<String, Any>> =
-        withContext(Dispatchers.Main) {
-            suspendCoroutine { cont ->
-                try {
-                    Log.d(APP_TAG, "수면 데이터 시작")
-                    val adjustedStart = start - (24 * 60 * 60 * 1000) // 하루 전
-                    val request = ReadRequest.Builder()
-                        .setDataType(HealthConstants.Sleep.HEALTH_DATA_TYPE)
-                        .setLocalTimeRange(
-                            HealthConstants.Sleep.START_TIME,
-                            HealthConstants.Sleep.TIME_OFFSET,
-                            adjustedStart,
-                            end
-                        )
-                        .setSort(HealthConstants.Sleep.START_TIME, HealthDataResolver.SortOrder.DESC)
-                        .setProperties(
-                            arrayOf(
-                                HealthConstants.Sleep.DEVICE_UUID,
-                                HealthConstants.Sleep.START_TIME,
-                                HealthConstants.Sleep.END_TIME,
-                                HealthConstants.Sleep.TIME_OFFSET
-                            )
-                        ).build()
+        Log.d(APP_TAG, "운동 데이터 조회 완료: ${resultList.size}건")
+        return resultList
+    }
 
-                    val resolver = HealthDataResolver(mStore, null)
-                    val resultList = mutableListOf<Map<String, Any>>()
-                    resolver.read(request).setResultListener { result ->
-                        for (data in result) {
-                            resultList.add(
-                                mapOf(
-                                    "device_uuid" to data.getString(HealthConstants.Sleep.DEVICE_UUID),
-                                    "start_time" to data.getLong(HealthConstants.Sleep.START_TIME),
-                                    "end_time" to data.getLong(HealthConstants.Sleep.END_TIME),
-                                    "time_offset" to data.getLong(HealthConstants.Sleep.TIME_OFFSET)
-                                )
-                            )
-                        }
-                        Log.d(APP_TAG, "수면 데이터 종료")
-                        cont.resume(resultList)
-                    }
-                } catch (e: Exception) {
-                    Log.e(APP_TAG, "수면 데이터 Exception: ${e.message}")
-                    cont.resume(emptyList())
+    private suspend fun readHeartRateData(
+        store: HealthDataStore,
+        startTime: LocalDateTime,
+        endTime: LocalDateTime
+    ): List<Map<String, Any>> {
+        Log.d(APP_TAG, "심박 데이터 조회 시작")
+        val readRequest = DataTypes.HEART_RATE.readDataRequestBuilder
+            .setLocalTimeFilter(LocalTimeFilter.of(startTime, endTime))
+            .setOrdering(Ordering.DESC)
+            .build()
+
+        val result = store.readData(readRequest)
+        val resultList = mutableListOf<Map<String, Any>>()
+
+        for (dataPoint in result.dataList) {
+            val heartRate = dataPoint.getValue(DataType.HeartRateType.HEART_RATE)
+            val seriesData = dataPoint.getValue(DataType.HeartRateType.SERIES_DATA)
+
+            val dataMap = mutableMapOf<String, Any>(
+                "start_time" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
+                "end_time" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
+                "heart_rate" to (heartRate ?: 0f),
+            )
+
+            // 시리즈 데이터가 있으면 추가
+            seriesData?.let { series ->
+                val seriesList = series.map { s ->
+                    mapOf(
+                        "start_time" to (s.startTime?.toEpochMilli() ?: 0L),
+                        "heart_rate" to (s.heartRate ?: 0f)
+                    )
                 }
+                dataMap["series_data"] = seriesList
             }
+
+            resultList.add(dataMap)
         }
 
-    /**
-     * 수면 단계 조회
-     */
-    private suspend fun getSleepStageData(start: Long, end: Long): List<Map<String, Any>> =
-        withContext(Dispatchers.Main) {
-            suspendCoroutine { cont ->
-                try {
-                    Log.d(APP_TAG, "수면 단계 데이터 시작")
-                    val adjustedStart = start - (24 * 60 * 60 * 1000) // 하루 전
-                    val request = ReadRequest.Builder()
-                        .setDataType(HealthConstants.SleepStage.HEALTH_DATA_TYPE)
-                        .setLocalTimeRange(
-                            HealthConstants.SleepStage.START_TIME,
-                            HealthConstants.SleepStage.TIME_OFFSET,
-                            adjustedStart,
-                            end
-                        )
-                        .setSort(HealthConstants.SleepStage.START_TIME, HealthDataResolver.SortOrder.DESC)
-                        .setProperties(
-                            arrayOf(
-                                HealthConstants.SleepStage.DEVICE_UUID,
-                                HealthConstants.SleepStage.START_TIME,
-                                HealthConstants.SleepStage.END_TIME,
-                                HealthConstants.SleepStage.TIME_OFFSET,
-                                HealthConstants.SleepStage.SLEEP_ID,
-                                HealthConstants.SleepStage.STAGE,
-                            )
-                        ).build()
+        Log.d(APP_TAG, "심박 데이터 조회 완료: ${resultList.size}건")
+        return resultList
+    }
 
-                    val resolver = HealthDataResolver(mStore, null)
-                    val resultList = mutableListOf<Map<String, Any>>()
-                    resolver.read(request).setResultListener { result ->
-                        for (data in result) {
-                            resultList.add(
-                                mapOf(
-                                    "device_uuid" to data.getString(HealthConstants.SleepStage.DEVICE_UUID),
-                                    "start_time" to data.getLong(HealthConstants.SleepStage.START_TIME),
-                                    "end_time" to data.getLong(HealthConstants.SleepStage.END_TIME),
-                                    "time_offset" to data.getLong(HealthConstants.SleepStage.TIME_OFFSET),
-                                    "sleep_id" to data.getString(HealthConstants.SleepStage.SLEEP_ID),
-                                    "stage_type" to data.getInt(HealthConstants.SleepStage.STAGE),
-                                    "stage_type_name" to SleepTypeMapper.getName(data.getInt(HealthConstants.SleepStage.STAGE))
-                                )
-                            )
-                        }
-                        Log.d(APP_TAG, "수면 단계 데이터 종료")
-                        cont.resume(resultList)
-                    }
-                } catch (e: Exception) {
-                    Log.e(APP_TAG, "수면 단계 데이터 Exception: ${e.message}")
-                    cont.resume(emptyList())
+    private suspend fun readSleepData(
+        store: HealthDataStore,
+        startTime: LocalDateTime,
+        endTime: LocalDateTime
+    ): List<Map<String, Any>> {
+        Log.d(APP_TAG, "수면 데이터 조회 시작")
+        // 수면은 전날 시작될 수 있으므로 하루 전부터 조회
+        val adjustedStartTime = startTime.minusDays(1)
+
+        val readRequest = DataTypes.SLEEP.readDataRequestBuilder
+            .setLocalTimeFilter(LocalTimeFilter.of(adjustedStartTime, endTime))
+            .setOrdering(Ordering.DESC)
+            .build()
+
+        val result = store.readData(readRequest)
+        val resultList = mutableListOf<Map<String, Any>>()
+
+        for (dataPoint in result.dataList) {
+            val sleepSessions = dataPoint.getValue(DataType.SleepType.SESSIONS)
+
+            val sleepMap = mutableMapOf<String, Any>(
+                "uid" to (dataPoint.uid ?: ""),
+                "start_time" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
+                "end_time" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
+            )
+
+            // 세션 및 수면 단계 데이터 포함
+            sleepSessions?.let { sessions ->
+                val sessionsData = sessions.map { session ->
+                    val stagesData = session.stages?.map { stage ->
+                        mapOf(
+                            "stage_type" to (stage.stage?.ordinal ?: 0),
+                            "stage_type_name" to (stage.stage?.name ?: "Unknown"),
+                            "start_time" to (stage.startTime?.toEpochMilli() ?: 0L),
+                            "end_time" to (stage.endTime?.toEpochMilli() ?: 0L),
+                        )
+                    } ?: emptyList<Map<String, Any>>()
+
+                    mapOf(
+                        "start_time" to (session.startTime?.toEpochMilli() ?: 0L),
+                        "end_time" to (session.endTime?.toEpochMilli() ?: 0L),
+                        "duration" to (session.duration?.toMillis() ?: 0L),
+                        "stages" to stagesData
+                    )
                 }
+                sleepMap["sessions"] = sessionsData
             }
+
+            resultList.add(sleepMap)
         }
 
-    /**
-     * 걷기 조회(5분 누적)
-     */
-    private suspend fun getStepData(start: Long, end: Long): List<Map<String, Any>> =
-        withContext(Dispatchers.Main) {
-            suspendCoroutine { cont ->
-                try {
-                    Log.d(APP_TAG, "걷기 데이터 시작")
-                    val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-                    sdf.timeZone = TimeZone.getDefault()
+        Log.d(APP_TAG, "수면 데이터 조회 완료: ${resultList.size}건")
+        return resultList
+    }
 
-                    val request: AggregateRequest = AggregateRequest.Builder()
-                        .setDataType(StepCount.HEALTH_DATA_TYPE)
-                        .addFunction(AggregateFunction.SUM, StepCount.COUNT, "total_step")
-                        .addFunction(AggregateFunction.SUM, StepCount.CALORIE, "total_calorie")
-                        .addFunction(AggregateFunction.SUM, StepCount.DISTANCE, "total_distance")
-                        .setLocalTimeRange(
-                            StepCount.START_TIME,
-                            StepCount.TIME_OFFSET,
-                            start,
-                            end
-                        )
-                        .setTimeGroup(
-                            AggregateRequest.TimeGroupUnit.MINUTELY,
-                            5,
-                            HealthConstants.StepCount.START_TIME,
-                            StepCount.TIME_OFFSET,
-                            "minute"
-                        )
-                        .setSort(HealthConstants.StepCount.START_TIME, HealthDataResolver.SortOrder.DESC)
-                        .build()
+    private suspend fun readStepData(
+        store: HealthDataStore,
+        startTime: LocalDateTime,
+        endTime: LocalDateTime
+    ): List<Map<String, Any>> {
+        Log.d(APP_TAG, "걸음 데이터 조회 시작")
 
-                    val resolver = HealthDataResolver(mStore, null)
-                    val hourlyStepList = mutableListOf<Map<String, Any>>()
-                    resolver.aggregate(request).setResultListener { dataResult ->
-                        for (data in dataResult) {
-                            val timeStr = data.getString("minute") ?: continue
-                            val steps = data.getInt("total_step")
-                            val calorie = data.getFloat("total_calorie")
-                            val distance = data.getFloat("total_distance")
+        // 새 SDK는 집계 데이터 조회 - DataType.StepsType.TOTAL.requestBuilder 사용
+        val readRequest = DataType.StepsType.TOTAL.requestBuilder
+            .setLocalTimeFilter(LocalTimeFilter.of(startTime, endTime))
+            .build()
 
-                            val timestamp = try {
-                                sdf.parse(timeStr)?.time ?: continue
-                            } catch (e: Exception) {
-                                Log.e(APP_TAG, "날짜 파싱 오류: $timeStr", e)
-                                continue
-                            }
+        val result = store.aggregateData(readRequest)
+        val resultList = mutableListOf<Map<String, Any>>()
 
-                            hourlyStepList.add(
-                                mapOf(
-                                    "timestamp" to timestamp,
-                                    "time_str" to timeStr,
-                                    "steps" to steps,
-                                    "calorie" to calorie,
-                                    "distance" to distance
-                                )
-                            )
-                        }
-                        Log.d(APP_TAG, "걷기 데이터 종료")
-                        cont.resume(hourlyStepList)
-                    }
-                } catch (e: Exception) {
-                    Log.e(APP_TAG, "걷기 데이터 Exception: ${e.message}")
-                    cont.resume(emptyList())
-                }
-
-            }
+        for (aggregateData in result.dataList) {
+            resultList.add(mapOf(
+                "start_time" to (aggregateData.startTime?.toEpochMilli() ?: 0L),
+                "end_time" to (aggregateData.endTime?.toEpochMilli() ?: 0L),
+                "steps" to (aggregateData.value ?: 0L),
+            ))
         }
 
-    /**
-     * 영양소 조회
-     */
-    private suspend fun getNutritionData(start: Long, end: Long): List<Map<String, Any>> =
-        withContext(Dispatchers.Main) {
-            suspendCoroutine { cont ->
-                try {
-                    Log.d(APP_TAG, "영양소 데이터 시작")
-                    val request = ReadRequest.Builder()
-                        .setDataType(Nutrition.HEALTH_DATA_TYPE)
-                        .setLocalTimeRange(
-                            HealthConstants.Nutrition.START_TIME,
-                            HealthConstants.Nutrition.TIME_OFFSET,
-                            start,
-                            end
-                        )
-                        .setSort(HealthConstants.Nutrition.START_TIME, HealthDataResolver.SortOrder.DESC)
-                        .setProperties(
-                            arrayOf(
-                                HealthConstants.Nutrition.DEVICE_UUID,
-                                HealthConstants.Nutrition.START_TIME,
-                                HealthConstants.Nutrition.TIME_OFFSET,
-                                HealthConstants.Nutrition.MEAL_TYPE,
-                                HealthConstants.Nutrition.TITLE,
-                                HealthConstants.Nutrition.CALORIE,
-                                HealthConstants.Nutrition.TOTAL_FAT,
-                                HealthConstants.Nutrition.SATURATED_FAT,
-                                HealthConstants.Nutrition.POLYSATURATED_FAT,
-                                HealthConstants.Nutrition.MONOSATURATED_FAT,
-                                HealthConstants.Nutrition.TRANS_FAT,
-                                HealthConstants.Nutrition.CARBOHYDRATE,
-                                HealthConstants.Nutrition.DIETARY_FIBER,
-                                HealthConstants.Nutrition.SUGAR,
-                                HealthConstants.Nutrition.PROTEIN,
-                                HealthConstants.Nutrition.CHOLESTEROL,
-                                HealthConstants.Nutrition.SODIUM,
-                                HealthConstants.Nutrition.POTASSIUM,
-                                HealthConstants.Nutrition.VITAMIN_A,
-                                HealthConstants.Nutrition.VITAMIN_C,
-                                HealthConstants.Nutrition.CALCIUM,
-                                HealthConstants.Nutrition.IRON
-                            )
-                        ).build()
+        Log.d(APP_TAG, "걸음 데이터 조회 완료: ${resultList.size}건")
+        return resultList
+    }
 
-                    val resolver = HealthDataResolver(mStore, null)
-                    val nutritionList = mutableListOf<Map<String, Any>>()
-                    resolver.read(request).setResultListener { dataResult ->
-                        for (data in dataResult) {
-                            nutritionList.add(
-                                mapOf(
-                                    "device_uuid" to data.getString(HealthConstants.Nutrition.DEVICE_UUID),
-                                    "start_time" to data.getLong(HealthConstants.Nutrition.START_TIME),
-                                    "time_offset" to data.getLong(HealthConstants.Nutrition.TIME_OFFSET),
-                                    "meal_type" to data.getInt(HealthConstants.Nutrition.MEAL_TYPE),
-                                    "meal_type_name" to MealTypeMapper.getName(data.getInt(HealthConstants.Nutrition.MEAL_TYPE)),
-                                    "title" to data.getString(HealthConstants.Nutrition.TITLE),
-                                    "calorie" to data.getFloat(HealthConstants.Nutrition.CALORIE),
-                                    "total_fat" to data.getFloat(HealthConstants.Nutrition.TOTAL_FAT),
-                                    "saturated_fat" to data.getFloat(HealthConstants.Nutrition.SATURATED_FAT),
-                                    "polysaturated_fat" to data.getFloat(HealthConstants.Nutrition.POLYSATURATED_FAT),
-                                    "monosaturated_fat" to data.getFloat(HealthConstants.Nutrition.MONOSATURATED_FAT),
-                                    "trans_fat" to data.getFloat(HealthConstants.Nutrition.TRANS_FAT),
-                                    "carbohydrate" to data.getFloat(HealthConstants.Nutrition.CARBOHYDRATE),
-                                    "dietary_fiber" to data.getFloat(HealthConstants.Nutrition.DIETARY_FIBER),
-                                    "sugar" to data.getFloat(HealthConstants.Nutrition.SUGAR),
-                                    "protein" to data.getFloat(HealthConstants.Nutrition.PROTEIN),
-                                    "cholesterol" to data.getFloat(HealthConstants.Nutrition.CHOLESTEROL),
-                                    "sodium" to data.getFloat(HealthConstants.Nutrition.SODIUM),
-                                    "potassium" to data.getFloat(HealthConstants.Nutrition.POTASSIUM),
-                                    "vitamin_a" to data.getFloat(HealthConstants.Nutrition.VITAMIN_A),
-                                    "vitamin_c" to data.getFloat(HealthConstants.Nutrition.VITAMIN_C),
-                                    "calcium" to data.getFloat(HealthConstants.Nutrition.CALCIUM),
-                                    "iron" to data.getFloat(HealthConstants.Nutrition.IRON)
-                                )
-                            )
-                        }
-                        Log.d(APP_TAG, "영양소 데이터 종료")
-                        cont.resume(nutritionList)
-                    }
-                } catch (e: Exception) {
-                    Log.e(APP_TAG, "영양소 데이터 Exception: ${e.message}")
-                    cont.resume(emptyList())
-                }
-            }
+    private suspend fun readNutritionData(
+        store: HealthDataStore,
+        startTime: LocalDateTime,
+        endTime: LocalDateTime
+    ): List<Map<String, Any>> {
+        Log.d(APP_TAG, "영양 데이터 조회 시작")
+        val readRequest = DataTypes.NUTRITION.readDataRequestBuilder
+            .setLocalTimeFilter(LocalTimeFilter.of(startTime, endTime))
+            .setOrdering(Ordering.DESC)
+            .build()
+
+        val result = store.readData(readRequest)
+        val resultList = mutableListOf<Map<String, Any>>()
+
+        for (dataPoint in result.dataList) {
+            resultList.add(mapOf(
+                "start_time" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
+                "title" to (dataPoint.getValue(DataType.NutritionType.TITLE) ?: ""),
+                "meal_type" to (dataPoint.getValue(DataType.NutritionType.MEAL_TYPE)?.ordinal ?: 0),
+                "meal_type_name" to (dataPoint.getValue(DataType.NutritionType.MEAL_TYPE)?.name ?: "Unknown"),
+                "calories" to (dataPoint.getValue(DataType.NutritionType.CALORIES) ?: 0f),
+                "total_fat" to (dataPoint.getValue(DataType.NutritionType.TOTAL_FAT) ?: 0f),
+                "saturated_fat" to (dataPoint.getValue(DataType.NutritionType.SATURATED_FAT) ?: 0f),
+                "protein" to (dataPoint.getValue(DataType.NutritionType.PROTEIN) ?: 0f),
+                "carbohydrate" to (dataPoint.getValue(DataType.NutritionType.CARBOHYDRATE) ?: 0f),
+                "sugar" to (dataPoint.getValue(DataType.NutritionType.SUGAR) ?: 0f),
+                "dietary_fiber" to (dataPoint.getValue(DataType.NutritionType.DIETARY_FIBER) ?: 0f),
+                "sodium" to (dataPoint.getValue(DataType.NutritionType.SODIUM) ?: 0f),
+                "potassium" to (dataPoint.getValue(DataType.NutritionType.POTASSIUM) ?: 0f),
+                "calcium" to (dataPoint.getValue(DataType.NutritionType.CALCIUM) ?: 0f),
+                "iron" to (dataPoint.getValue(DataType.NutritionType.IRON) ?: 0f),
+            ))
         }
 
-    /**
-     * 무게 조회
-     */
-    private suspend fun getWeightData(start: Long, end: Long): List<Map<String, Any>> =
-        withContext(Dispatchers.Main) {
-            suspendCoroutine { cont ->
-                try {
-                    Log.d(APP_TAG, "무게 데이터 시작")
-                    val request = ReadRequest.Builder()
-                        .setDataType(Weight.HEALTH_DATA_TYPE)
-                        .setLocalTimeRange(
-                            HealthConstants.Weight.START_TIME,
-                            HealthConstants.Weight.TIME_OFFSET,
-                            start,
-                            end
-                        )
-                        .setSort(HealthConstants.Weight.START_TIME, HealthDataResolver.SortOrder.DESC)
-                        .setProperties(
-                            arrayOf(
-                                HealthConstants.Weight.DEVICE_UUID,
-                                HealthConstants.Weight.START_TIME,
-                                HealthConstants.Weight.TIME_OFFSET,
-                                HealthConstants.Weight.WEIGHT,
-                                HealthConstants.Weight.HEIGHT,
-                                HealthConstants.Weight.BODY_FAT,
-                                HealthConstants.Weight.SKELETAL_MUSCLE,
-                                HealthConstants.Weight.MUSCLE_MASS,
-                                HealthConstants.Weight.BASAL_METABOLIC_RATE,
-                                HealthConstants.Weight.BODY_FAT_MASS,
-                                HealthConstants.Weight.FAT_FREE_MASS,
-                                HealthConstants.Weight.FAT_FREE,
-                                HealthConstants.Weight.SKELETAL_MUSCLE_MASS,
-                                HealthConstants.Weight.TOTAL_BODY_WATER
-                            )
-                        ).build()
+        Log.d(APP_TAG, "영양 데이터 조회 완료: ${resultList.size}건")
+        return resultList
+    }
 
-                    val resolver = HealthDataResolver(mStore, null)
-                    val weightList = mutableListOf<Map<String, Any>>()
-                    resolver.read(request).setResultListener { dataResult ->
-                        for (data in dataResult) {
-                            weightList.add(
-                                mapOf(
-                                    "device_uuid" to data.getString(HealthConstants.Weight.DEVICE_UUID),
-                                    "start_time" to data.getLong(HealthConstants.Weight.START_TIME),
-                                    "time_offset" to data.getLong(HealthConstants.Weight.TIME_OFFSET),
-                                    "weight" to data.getFloat(HealthConstants.Weight.WEIGHT),
-                                    "height" to data.getFloat(HealthConstants.Weight.HEIGHT),
-                                    "body_fat" to data.getFloat(HealthConstants.Weight.BODY_FAT),
-                                    "skeletal_muscle" to data.getFloat(HealthConstants.Weight.SKELETAL_MUSCLE),
-                                    "muscle_mass" to data.getFloat(HealthConstants.Weight.MUSCLE_MASS),
-                                    "basal_metabolic_rate" to data.getInt(HealthConstants.Weight.BASAL_METABOLIC_RATE),
-                                    "body_fat_mass" to data.getFloat(HealthConstants.Weight.BODY_FAT_MASS),
-                                    "fat_free_mass" to data.getFloat(HealthConstants.Weight.FAT_FREE_MASS),
-                                    "fat_free" to data.getFloat(HealthConstants.Weight.FAT_FREE),
-                                    "skeletal_muscle_mass" to data.getFloat(HealthConstants.Weight.SKELETAL_MUSCLE_MASS),
-                                    "total_body_water" to data.getFloat(HealthConstants.Weight.TOTAL_BODY_WATER)
-                                )
-                            )
-                        }
-                        Log.d(APP_TAG, "무게 데이터 종료")
-                        cont.resume(weightList)
-                    }
-                } catch (e: Exception) {
-                    Log.e(APP_TAG, "무게 데이터 Exception: ${e.message}")
-                    cont.resume(emptyList())
-                }
-            }
+    private suspend fun readWeightData(
+        store: HealthDataStore,
+        startTime: LocalDateTime,
+        endTime: LocalDateTime
+    ): List<Map<String, Any>> {
+        Log.d(APP_TAG, "체중 데이터 조회 시작")
+        val readRequest = DataTypes.BODY_COMPOSITION.readDataRequestBuilder
+            .setLocalTimeFilter(LocalTimeFilter.of(startTime, endTime))
+            .setOrdering(Ordering.DESC)
+            .build()
+
+        val result = store.readData(readRequest)
+        val resultList = mutableListOf<Map<String, Any>>()
+
+        for (dataPoint in result.dataList) {
+            resultList.add(mapOf(
+                "start_time" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
+                "weight" to (dataPoint.getValue(DataType.BodyCompositionType.WEIGHT) ?: 0f),
+                "height" to (dataPoint.getValue(DataType.BodyCompositionType.HEIGHT) ?: 0f),
+                "body_fat" to (dataPoint.getValue(DataType.BodyCompositionType.BODY_FAT) ?: 0f),
+                "skeletal_muscle" to (dataPoint.getValue(DataType.BodyCompositionType.SKELETAL_MUSCLE) ?: 0f),
+                "basal_metabolic_rate" to (dataPoint.getValue(DataType.BodyCompositionType.BASAL_METABOLIC_RATE) ?: 0f),
+            ))
         }
 
-    /**
-     * 산소 포화도 조회
-     */
-    private suspend fun getOxygenSaturationData(start: Long, end: Long): List<Map<String, Any>> =
-        withContext(Dispatchers.Main) {
-            suspendCoroutine { cont ->
-                try {
-                    Log.d(APP_TAG, "산소 포화도 데이터 시작")
-                    val request = ReadRequest.Builder()
-                        .setDataType(OxygenSaturation.HEALTH_DATA_TYPE)
-                        .setLocalTimeRange(
-                            HealthConstants.OxygenSaturation.START_TIME,
-                            HealthConstants.OxygenSaturation.TIME_OFFSET,
-                            start,
-                            end
-                        )
-                        .setSort(HealthConstants.OxygenSaturation.START_TIME, HealthDataResolver.SortOrder.DESC)
-                        .setProperties(
-                            arrayOf(
-                                HealthConstants.OxygenSaturation.DEVICE_UUID,
-                                HealthConstants.OxygenSaturation.START_TIME,
-                                HealthConstants.OxygenSaturation.END_TIME,
-                                HealthConstants.OxygenSaturation.TIME_OFFSET,
-                                HealthConstants.OxygenSaturation.SPO2,
-                                HealthConstants.OxygenSaturation.HEART_RATE
-                            )
-                        ).build()
+        Log.d(APP_TAG, "체중 데이터 조회 완료: ${resultList.size}건")
+        return resultList
+    }
 
-                    val resolver = HealthDataResolver(mStore, null)
-                    val oxygenSaturationList = mutableListOf<Map<String, Any>>()
-                    resolver.read(request).setResultListener { dataResult ->
-                        for (data in dataResult) {
-                            oxygenSaturationList.add(
-                                mapOf(
-                                    "device_uuid" to data.getString(HealthConstants.OxygenSaturation.DEVICE_UUID),
-                                    "start_time" to data.getLong(HealthConstants.OxygenSaturation.START_TIME),
-                                    "end_time" to data.getLong(HealthConstants.OxygenSaturation.END_TIME),
-                                    "time_offset" to data.getLong(HealthConstants.OxygenSaturation.TIME_OFFSET),
-                                    "spo2" to data.getFloat(HealthConstants.OxygenSaturation.SPO2),
-                                    "heart_rate" to data.getFloat(HealthConstants.OxygenSaturation.HEART_RATE)
-                                )
-                            )
-                        }
-                        Log.d(APP_TAG, "산소 포화도 데이터 종료")
-                        cont.resume(oxygenSaturationList)
-                    }
-                } catch (e: Exception) {
-                    Log.e(APP_TAG, "산소 포화도 데이터 Exception: ${e.message}")
-                    cont.resume(emptyList())
-                }
-            }
+    private suspend fun readOxygenSaturationData(
+        store: HealthDataStore,
+        startTime: LocalDateTime,
+        endTime: LocalDateTime
+    ): List<Map<String, Any>> {
+        Log.d(APP_TAG, "산소포화도 데이터 조회 시작")
+        val readRequest = DataTypes.BLOOD_OXYGEN.readDataRequestBuilder
+            .setLocalTimeFilter(LocalTimeFilter.of(startTime, endTime))
+            .setOrdering(Ordering.DESC)
+            .build()
+
+        val result = store.readData(readRequest)
+        val resultList = mutableListOf<Map<String, Any>>()
+
+        for (dataPoint in result.dataList) {
+            resultList.add(mapOf(
+                "start_time" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
+                "end_time" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
+                "spo2" to (dataPoint.getValue(DataType.BloodOxygenType.OXYGEN_SATURATION) ?: 0f),
+            ))
         }
 
-    /**
-     * 체온 조회
-     */
-    private suspend fun getBodyTemperatureData(start: Long, end: Long): List<Map<String, Any>> =
-        withContext(Dispatchers.Main) {
-            suspendCoroutine { cont ->
-                try {
-                    Log.d(APP_TAG, "체온 데이터 시작")
-                    val request = ReadRequest.Builder()
-                        .setDataType(BodyTemperature.HEALTH_DATA_TYPE)
-                        .setLocalTimeRange(
-                            HealthConstants.BodyTemperature.START_TIME,
-                            HealthConstants.BodyTemperature.TIME_OFFSET,
-                            start,
-                            end
-                        )
-                        .setSort(HealthConstants.BodyTemperature.START_TIME, HealthDataResolver.SortOrder.DESC)
-                        .setProperties(
-                            arrayOf(
-                                HealthConstants.BodyTemperature.DEVICE_UUID,
-                                HealthConstants.BodyTemperature.START_TIME,
-                                HealthConstants.BodyTemperature.TIME_OFFSET,
-                                HealthConstants.BodyTemperature.TEMPERATURE,
-                            )
-                        ).build()
+        Log.d(APP_TAG, "산소포화도 데이터 조회 완료: ${resultList.size}건")
+        return resultList
+    }
 
-                    val resolver = HealthDataResolver(mStore, null)
-                    val bodyTemperatureList = mutableListOf<Map<String, Any>>()
-                    resolver.read(request).setResultListener { dataResult ->
-                        for (data in dataResult) {
-                            bodyTemperatureList.add(
-                                mapOf(
-                                    "device_uuid" to data.getString(HealthConstants.BodyTemperature.DEVICE_UUID),
-                                    "start_time" to data.getLong(HealthConstants.BodyTemperature.START_TIME),
-                                    "time_offset" to data.getLong(HealthConstants.BodyTemperature.TIME_OFFSET),
-                                    "temperature" to data.getFloat(HealthConstants.BodyTemperature.TEMPERATURE),
-                                )
-                            )
-                        }
-                        Log.d(APP_TAG, "체온 데이터 종료")
-                        cont.resume(bodyTemperatureList)
-                    }
-                } catch (e: Exception) {
-                    Log.e(APP_TAG, "체온 데이터 Exception: ${e.message}")
-                    cont.resume(emptyList())
-                }
-            }
+    private suspend fun readBodyTemperatureData(
+        store: HealthDataStore,
+        startTime: LocalDateTime,
+        endTime: LocalDateTime
+    ): List<Map<String, Any>> {
+        Log.d(APP_TAG, "체온 데이터 조회 시작")
+        val readRequest = DataTypes.BODY_TEMPERATURE.readDataRequestBuilder
+            .setLocalTimeFilter(LocalTimeFilter.of(startTime, endTime))
+            .setOrdering(Ordering.DESC)
+            .build()
+
+        val result = store.readData(readRequest)
+        val resultList = mutableListOf<Map<String, Any>>()
+
+        for (dataPoint in result.dataList) {
+            resultList.add(mapOf(
+                "start_time" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
+                "temperature" to (dataPoint.getValue(DataType.BodyTemperatureType.BODY_TEMPERATURE) ?: 0f),
+            ))
         }
 
-    /**
-     * 혈당 조회
-     */
-    private suspend fun getBloodGlucoseData(start: Long, end: Long): List<Map<String, Any>> =
-        withContext(Dispatchers.Main) {
-            suspendCoroutine { cont ->
-                try {
-                    Log.d(APP_TAG, "혈당 데이터 시작")
-                    val request = ReadRequest.Builder()
-                        .setDataType(BloodGlucose.HEALTH_DATA_TYPE)
-                        .setLocalTimeRange(
-                            HealthConstants.BloodGlucose.START_TIME,
-                            HealthConstants.BloodGlucose.TIME_OFFSET,
-                            start,
-                            end
-                        )
-                        .setSort(HealthConstants.BloodGlucose.START_TIME, HealthDataResolver.SortOrder.DESC)
-                        .setProperties(
-                            arrayOf(
-                                HealthConstants.BloodGlucose.DEVICE_UUID,
-                                HealthConstants.BloodGlucose.START_TIME,
-                                HealthConstants.BloodGlucose.TIME_OFFSET,
-                                HealthConstants.BloodGlucose.GLUCOSE,
-                                HealthConstants.BloodGlucose.MEASUREMENT_TYPE,
-                                HealthConstants.BloodGlucose.MEAL_TIME,
-                                HealthConstants.BloodGlucose.MEAL_TYPE,
-                            )
-                        ).build()
+        Log.d(APP_TAG, "체온 데이터 조회 완료: ${resultList.size}건")
+        return resultList
+    }
 
-                    val resolver = HealthDataResolver(mStore, null)
-                    val bloodGlucoseList = mutableListOf<Map<String, Any>>()
-                    resolver.read(request).setResultListener { dataResult ->
-                        for (data in dataResult) {
-                            val glucoseMmol = data.getFloat(HealthConstants.BloodGlucose.GLUCOSE)
-                            val glucoseMgdl = glucoseMmol * 18.018f
+    private suspend fun readBloodGlucoseData(
+        store: HealthDataStore,
+        startTime: LocalDateTime,
+        endTime: LocalDateTime
+    ): List<Map<String, Any>> {
+        Log.d(APP_TAG, "혈당 데이터 조회 시작")
+        val readRequest = DataTypes.BLOOD_GLUCOSE.readDataRequestBuilder
+            .setLocalTimeFilter(LocalTimeFilter.of(startTime, endTime))
+            .setOrdering(Ordering.DESC)
+            .build()
 
-                            bloodGlucoseList.add(
-                                mapOf(
-                                    "device_uuid" to data.getString(HealthConstants.BloodGlucose.DEVICE_UUID),
-                                    "start_time" to data.getLong(HealthConstants.BloodGlucose.START_TIME),
-                                    "time_offset" to data.getLong(HealthConstants.BloodGlucose.TIME_OFFSET),
-                                    "glucose_mmol" to glucoseMmol,
-                                    "glucose_mgdl" to glucoseMgdl,
-                                    "measurement_type" to data.getFloat(HealthConstants.BloodGlucose.MEASUREMENT_TYPE),
-                                    "meal_time" to data.getFloat(HealthConstants.BloodGlucose.MEAL_TIME),
-                                    "meal_type" to data.getFloat(HealthConstants.BloodGlucose.MEAL_TYPE),
-                                )
-                            )
-                        }
-                        Log.d(APP_TAG, "혈당 데이터 종료")
-                        cont.resume(bloodGlucoseList)
-                    }
-                } catch (e: Exception) {
-                    Log.e(APP_TAG, "혈당 데이터 Exception: ${e.message}")
-                    cont.resume(emptyList())
-                }
-            }
+        val result = store.readData(readRequest)
+        val resultList = mutableListOf<Map<String, Any>>()
+
+        for (dataPoint in result.dataList) {
+            val glucoseMmol = dataPoint.getValue(DataType.BloodGlucoseType.GLUCOSE_LEVEL) ?: 0f
+            val glucoseMgdl = glucoseMmol * 18.018f
+
+            resultList.add(mapOf(
+                "start_time" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
+                "glucose_mmol" to glucoseMmol,
+                "glucose_mgdl" to glucoseMgdl,
+                "measurement_type" to (dataPoint.getValue(DataType.BloodGlucoseType.MEASUREMENT_TYPE)?.ordinal ?: 0),
+                "meal_status" to (dataPoint.getValue(DataType.BloodGlucoseType.MEAL_STATUS)?.ordinal ?: 0),
+            ))
         }
+
+        Log.d(APP_TAG, "혈당 데이터 조회 완료: ${resultList.size}건")
+        return resultList
+    }
+
+    // ===== EventChannel 구현 =====
 
     override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-        events?.let {
-            eventSinks.add(it)
-            if (::mStore.isInitialized) {
-                val enabledTypes = observedDataTypes.filter { activeObservers.containsKey(it) }
-
-                registerObservers(enabledTypes)
-            } else {
-                Log.w(APP_TAG, "Store not initialized yet, observer not registered")
-            }
-        }
+        events?.let { eventSinks.add(it) }
     }
 
     override fun onCancel(arguments: Any?) {
         eventSinks.clear()
-        if (::mStore.isInitialized) {
-            unregisterObservers()
-        }
     }
+
+    // ===== FlutterPlugin 생명주기 =====
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
     }
+
+    // ===== ActivityAware 구현 =====
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
@@ -1598,149 +807,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     override fun onDetachedFromActivityForConfigChanges() {
         activity = null
     }
-
-    object ExerciseTypeMapper {
-        private val typeMap = mapOf(
-            1001 to "Walking",
-            1002 to "Running",
-            2001 to "Baseball, general",
-            2002 to "Softball, general",
-            2003 to "Cricket",
-            3001 to "Golf, general",
-            3002 to "Billiards",
-            3003 to "Bowling, alley",
-            4001 to "Hockey",
-            4002 to "Rugby, touch, non-competitive",
-            4003 to "Basketball, general",
-            4004 to "Football, general (Soccer)",
-            4005 to "Handball, general",
-            4006 to "American football, general, touch",
-            5001 to "Volleyball, general, 6~9 member team, non-competitive",
-            5002 to "Beach volleyball",
-            6001 to "Squash, general",
-            6002 to "Tennis, general",
-            6003 to "Badminton, competitive",
-            6004 to "Table tennis",
-            6005 to "Racquetball, general",
-            7001 to "T'ai chi, general(- Deprecated, use 7003 (Martial arts)",
-            7002 to "Boxing, in ring",
-            7003 to "Martial arts, moderate pace (Judo, Jujitsu, Karate, Taekwondo)",
-            8001 to "Ballet, general, rehearsal or class",
-            8002 to "Dancing, general (Fork, Irish step, Polka)",
-            8003 to "Ballroom dancing, fast",
-            9001 to "Pilates",
-            9002 to "Yoga",
-            10001 to "Stretching",
-            10002 to "Jump rope, moderate pace (100~120 skips/min), 2 foot skip",
-            10003 to "Hula-hooping",
-            10004 to "Push-ups (Press-ups)",
-            10005 to "Pull-ups (Chin-up)",
-            10006 to "Sit-ups",
-            10007 to "Circuit training, moderate effort",
-            10008 to "Mountain climbers",
-            10009 to "Jumping Jacks",
-            10010 to "Burpee",
-            10011 to "Bench press",
-            10012 to "Squats",
-            10013 to "Lunges",
-            10014 to "Leg presses",
-            10015 to "Leg extensions",
-            10016 to "Leg curls",
-            10017 to "Back extensions",
-            10018 to "Lat pull-downs",
-            10019 to "Deadlifts",
-            10020 to "ShoulderPresses",
-            10021 to "Front raises",
-            10022 to "Lateral raises",
-            10023 to "Crunches",
-            10024 to "Leg raises",
-            10025 to "Plank",
-            10026 to "Arm curls",
-            10027 to "Arm extensions",
-            11001 to "Inline skating, moderate pace",
-            11002 to "Hang gliding",
-            11003 to "Pistol shooting",
-            11004 to "Archery, non-hunting",
-            11005 to "Horseback riding, general",
-            11007 to "Cycling",
-            11008 to "Flying disc, general, playing",
-            11009 to "Roller skating",
-            12001 to "Aerobics, general",
-            13001 to "Hiking",
-            13002 to "Rock climbing, low to moderate difficulty",
-            13003 to "Backpacking",
-            13004 to "Mountain biking, general",
-            13005 to "Orienteering",
-            14001 to "Swimming, general, leisurely, not lap swimming",
-            14002 to "Aquarobics",
-            14003 to "Canoeing, general, for pleasure",
-            14004 to "Sailing, leisure, ocean sailing",
-            14005 to "Scuba diving, general",
-            14006 to "Snorkeling",
-            14007 to "Kayaking, moderate effort",
-            14008 to "Kitesurfing",
-            14009 to "Rafting",
-            14010 to "Rowing machine, general, for pleasure",
-            14011 to "Windsurfing, general",
-            14012 to "Yachting, leisure",
-            14013 to "Water skiing",
-            15001 to "Step machine",
-            15002 to "Weight machine",
-            15003 to "Exercise bike, Moderate to vigorous effort (90-100 watts)",
-            15004 to "Rowing machine",
-            15005 to "Treadmill, combination of jogging and walking",
-            15006 to "Elliptical trainer, moderate effort",
-            16001 to "Cross-country skiing, general, moderate speed (4.0~4.9 mph)",
-            16002 to "Skiing, general, downhill, moderate effort",
-            16003 to "Ice dancing",
-            16004 to "Ice skating, general",
-            16006 to "Ice hockey, general",
-            16007 to "Snowboarding, general, moderate effort",
-            16008 to "Alpine skiing, general, moderate effort",
-            16009 to "Snowshoeing, moderate effort"
-        )
-
-        fun getName(type: Int): String {
-            return typeMap[type] ?: "Unknown"
-        }
-    }
-
-    object SleepTypeMapper {
-        private val map = mapOf(
-            40001 to "Awake", 40002 to "Light", 40003 to "Deep", 40004 to "REM"
-        )
-
-        fun getName(type: Int): String {
-            return map[type] ?: "Unknown"
-        }
-    }
-
-    object MealTypeMapper {
-        private val map = mapOf(
-            100001 to "Breakfast",
-            100002 to "Lunch",
-            100003 to "Dinner",
-            100004 to "Morning Snack",
-            100005 to "Afternoon Snack",
-            100006 to "Evening Snack"
-        )
-
-        fun getName(type: Int): String {
-            return map[type] ?: "Unknown"
-        }
-    }
-
-    object SourceTypeMapper {
-        private val map = mapOf(
-            -2 to "All", -1 to "Partner App", 0 to "Phone Only"
-        )
-
-        fun getName(type: Int): String {
-            return map[type] ?: "Unknown"
-        }
-    }
 }
 
+/** Result 중복 호출 방지 래퍼 */
 class ResultWrapper(private val result: MethodChannel.Result) {
     private var isResultSent = false
 

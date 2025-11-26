@@ -4,70 +4,84 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 class MockSamsungHealthPluginPlatform with MockPlatformInterfaceMixin implements FlutterSamsungHealthPlatform {
-
   @override
-  Future<Map<String, dynamic>> connect() {
-    // TODO: implement connect
-    throw UnimplementedError();
+  Future<Map<String, dynamic>> isSamsungHealthInstalled() async {
+    return {'isInstalled': true};
   }
 
   @override
-  Future<Map<String, dynamic>> requestPermissions() {
-    // TODO: implement requestPermissions
-    throw UnimplementedError();
+  Future<Map<String, dynamic>> openSamsungHealth() async {
+    return {'action': 'success'};
   }
 
   @override
-  Future<Map<String, dynamic>> getGrantedPermissions() {
-    // TODO: implement getGrantedPermissions
-    throw UnimplementedError();
+  Future<Map<String, dynamic>> connect() async {
+    return {'isConnect': true};
   }
 
   @override
-  Future<Map<String, List<Map<String, dynamic>>>> getTotalData(int start, int end) {
-    // TODO: implement getTotalData
-    throw UnimplementedError();
+  Future<Map<String, dynamic>> disconnect() async {
+    return {'isConnect': false};
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getExerciseSessions(int start, int end) {
-    // TODO: implement getExerciseSessions
-    throw UnimplementedError();
+  Future<Map<String, dynamic>> requestPermissions(List<String>? types) async {
+    return {'isGranted': true};
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getHeartRateData(int start, int end) {
-    // TODO: implement getHeartRateData
-    throw UnimplementedError();
-  }
-  @override
-  Future<List<Map<String, dynamic>>> getHeartRate5minSeries(int start, int end) {
-    // TODO: implement getHeartRate5minSeries
-    throw UnimplementedError();
+  Future<Map<String, dynamic>> getGrantedPermissions() async {
+    return {'granted': [], 'isGranted': false};
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getSleepData(int start, int end) {
-    // TODO: implement getSleepData
-    throw UnimplementedError();
+  Future<Map<String, List<Map<String, dynamic>>>> getTotalData(int start, int end) async {
+    return {};
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getSleepStageData(int start, int end) {
-    // TODO: implement getSleepStageData
-    throw UnimplementedError();
+  Future<List<Map<String, dynamic>>> getExerciseData(int start, int end) async {
+    return [];
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getStepCountSeries(int start, int end) {
-    // TODO: implement getStepCountSeries
-    throw UnimplementedError();
+  Future<List<Map<String, dynamic>>> getHeartRateData(int start, int end) async {
+    return [];
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getNutritionData(int start, int end) {
-    // TODO: implement getNutritionData
-    throw UnimplementedError();
+  Future<List<Map<String, dynamic>>> getSleepData(int start, int end) async {
+    return [];
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getStepData(int start, int end) async {
+    return [];
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getNutritionData(int start, int end) async {
+    return [];
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getWeightData(int start, int end) async {
+    return [];
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getOxygenSaturationData(int start, int end) async {
+    return [];
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getBodyTemperatureData(int start, int end) async {
+    return [];
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getBloodGlucoseData(int start, int end) async {
+    return [];
   }
 }
 
