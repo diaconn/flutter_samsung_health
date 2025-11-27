@@ -354,36 +354,28 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
 
         CoroutineScope(Dispatchers.Main).launch {
             runCatching {
-                val grantedPermissions = store.getGrantedPermissions(permissionsToRequest)
-
-                if (grantedPermissions.containsAll(permissionsToRequest)) {
-                    val grantedMap = permissionsToRequest.associate {
-                        _getDataTypeNameForPermission(it) to true
-                    }
-                    wrapper.success(mapOf("granted" to grantedMap, "message" to "모든 권한 허용됨"))
-                } else {
-                    store.requestPermissions(permissionsToRequest, act)
-                    kotlinx.coroutines.delay(1500) // 권한 다이얼로그 처리 대기
-                    
-                    val finalGrantedPermissions = store.getGrantedPermissions(permissionsToRequest)
-                    val grantedMap = permissionsToRequest.associate {
-                        _getDataTypeNameForPermission(it) to finalGrantedPermissions.contains(it)
-                    }
-
-                    val response = mutableMapOf<String, Any>("granted" to grantedMap)
-                    val deniedList = permissionsToRequest
-                        .filter { !finalGrantedPermissions.contains(it) }
-                        .map { _getDataTypeNameForPermission(it) }
-
-                    if (deniedList.isNotEmpty()) {
-                        response["denied_permissions"] = deniedList
-                        response["message"] = "일부 권한이 거부되었습니다"
-                    } else {
-                        response["message"] = "모든 권한 허용됨"
-                    }
-
-                    wrapper.success(response)
+                // 항상 권한 다이얼로그 표시
+                store.requestPermissions(permissionsToRequest, act)
+                kotlinx.coroutines.delay(1500) // 권한 다이얼로그 처리 대기
+                
+                val finalGrantedPermissions = store.getGrantedPermissions(permissionsToRequest)
+                val grantedMap = permissionsToRequest.associate {
+                    _getDataTypeNameForPermission(it) to finalGrantedPermissions.contains(it)
                 }
+
+                val response = mutableMapOf<String, Any>("granted" to grantedMap)
+                val deniedList = permissionsToRequest
+                    .filter { !finalGrantedPermissions.contains(it) }
+                    .map { _getDataTypeNameForPermission(it) }
+
+                if (deniedList.isNotEmpty()) {
+                    response["denied_permissions"] = deniedList
+                    response["message"] = "일부 권한이 거부되었습니다"
+                } else {
+                    response["message"] = "모든 권한 허용됨"
+                }
+
+                wrapper.success(response)
             }.onFailure { error ->
                 Log.e(APP_TAG, "권한 요청 실패: ${error.message}")
 
