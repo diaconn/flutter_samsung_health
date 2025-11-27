@@ -63,7 +63,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             "exercise", "com.samsung.health.exercise" -> Permission.of(DataTypes.EXERCISE, AccessType.READ)
             "heart_rate", "com.samsung.health.heart_rate" -> Permission.of(DataTypes.HEART_RATE, AccessType.READ)
             "sleep", "com.samsung.health.sleep" -> Permission.of(DataTypes.SLEEP, AccessType.READ)
-            "steps", "com.samsung.health.step" -> Permission.of(DataTypes.STEPS, AccessType.READ)
+            "steps", "com.samsung.health.steps" -> Permission.of(DataTypes.STEPS, AccessType.READ)
             "nutrition", "com.samsung.health.nutrition" -> Permission.of(DataTypes.NUTRITION, AccessType.READ)
             "body_composition", "com.samsung.health.body_composition" -> Permission.of(DataTypes.BODY_COMPOSITION, AccessType.READ)
             "blood_oxygen", "com.samsung.health.blood_oxygen" -> Permission.of(DataTypes.BLOOD_OXYGEN, AccessType.READ)
@@ -387,7 +387,13 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         CoroutineScope(Dispatchers.Main).launch {
             runCatching {
                 // 먼저 현재 권한 상태 확인
+                Log.d(APP_TAG, "현재 권한 상태 확인 중...")
                 val grantedPermissions = store.getGrantedPermissions(permissionsToRequest)
+                Log.d(APP_TAG, "이미 허용된 권한 수: ${grantedPermissions.size}/${permissionsToRequest.size}")
+                
+                grantedPermissions.forEach { permission ->
+                    Log.d(APP_TAG, "허용된 권한: ${getDataTypeNameForPermission(permission)}")
+                }
 
                 if (grantedPermissions.containsAll(permissionsToRequest)) {
                     Log.i(APP_TAG, "모든 권한이 이미 허용됨")
@@ -400,8 +406,15 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     Log.i(APP_TAG, "권한 요청 실행")
 
                     runCatching {
+                        Log.d(APP_TAG, "권한 요청 시작 - 요청할 권한:")
+                        permissionsToRequest.forEach { permission ->
+                            Log.d(APP_TAG, "  - ${getDataTypeNameForPermission(permission)}")
+                        }
+                        
                         // Samsung Health Data SDK 1.0.0의 올바른 권한 요청 방식
+                        Log.d(APP_TAG, "store.requestPermissions 호출")
                         store.requestPermissions(permissionsToRequest, act)
+                        Log.d(APP_TAG, "store.requestPermissions 호출 완료")
 
                         // 권한 다이얼로그가 표시되고 사용자 응답을 기다리기 위한 지연
                         kotlinx.coroutines.delay(1000)
@@ -411,9 +424,11 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         val maxAttempts = 10
                         var newGrantedPermissions = setOf<Permission>()
 
+                        Log.d(APP_TAG, "권한 상태 확인 시작")
                         while (attempts < maxAttempts) {
                             kotlinx.coroutines.delay(500) // 0.5초 대기
                             newGrantedPermissions = store.getGrantedPermissions(permissionsToRequest)
+                            Log.d(APP_TAG, "시도 ${attempts + 1}: 새로운 권한 수 ${newGrantedPermissions.size}")
 
                             // 이전 권한 상태와 비교하여 변경이 있었는지 확인
                             if (newGrantedPermissions != grantedPermissions) {
