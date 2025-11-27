@@ -168,8 +168,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         Log.d(APP_TAG, "isSamsungHealthInstalled() 호출")
         val resultMap = mutableMapOf<String, Any>()
         try {
-            context.packageManager.getPackageInfo("com.sec.android.app.shealth", 0)
+            val packageInfo = context.packageManager.getPackageInfo("com.sec.android.app.shealth", 0)
             resultMap["isInstalled"] = true
+            resultMap["versionName"] = packageInfo.versionName ?: "Unknown"
         } catch (e: Exception) {
             resultMap["isInstalled"] = false
         }
