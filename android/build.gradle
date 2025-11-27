@@ -54,13 +54,8 @@ android {
     dependencies {
         testImplementation("org.jetbrains.kotlin:kotlin-test")
         testImplementation("org.mockito:mockito-core:5.0.0")
-        compileOnly(name: "samsung-health-data-api-1.0.0", ext: "aar")
-//        implementation fileTree(dir: "libs", include: ["*.aar"])
-        implementation "com.google.android.libraries.healthdata:health-data-api:1.1.0-alpha01"
-//        implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar"))))
-//        implementation files("libs/samsung-health-data-api-1.0.0.aar")
-//        implementation(name: "samsung-health-data-api-1.0.0", ext: "aar")
-//        api files("libs/samsung-health-data-api-1.0.0.aar")
+        // Samsung Health Data SDK - API로 변경하여 외부 앱으로 전파
+        api(name: "samsung-health-data-api-1.0.0", ext: "aar")
         implementation("com.google.code.gson:gson:2.9.0")
     }
 

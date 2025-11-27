@@ -14,35 +14,17 @@ dependencies:
       ref: master
 ```
 
-> ⚠️ 이 플러그인은 삼성의 `samsung-health-data-api-1.0.0.aar` 파일을 필요로 하며, 이 파일은 앱 프로젝트에 **직접 포함**해야 합니다.
+> ✅ 이 플러그인은 Samsung Health Data SDK AAR 파일을 자동으로 포함하므로 별도 설정이 불필요합니다.
 
 ---
 
 ## 🔧 Android 앱 설정
 
-### 1. `.aar` 파일 추가
+### 1. Android 버전 요구사항
 
-`samsung-health-data-api-1.0.0.aar` 파일을 다운로드하여 다음 위치에 넣어주세요:
-
-```
-my_flutter_app/
-└── android/
-    └── app/
-        └── libs/
-            └── samsung-health-data-api-1.0.0.aar
-```
-
-### 2. `android/app/build.gradle` 수정
-
-다음 내용을 추가하세요:
+앱의 `android/app/build.gradle`에서 다음 설정을 확인하세요:
 
 ```gradle
-repositories {
-    flatDir {
-        dirs 'libs'
-    }
-}
-
 android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -57,13 +39,9 @@ android {
         minSdk = 29  // Samsung Health Data SDK requires API 29+
     }
 }
-
-dependencies {
-    implementation(name: 'samsung-health-data-api-1.0.0', ext: 'aar')
-}
 ```
 
-### 3. Proguard 설정 (릴리즈 빌드 시 필수)
+### 2. Proguard 설정 (릴리즈 빌드 시 필수)
 
 `android/app/proguard-rules.pro` 파일에 다음을 추가하세요:
 
