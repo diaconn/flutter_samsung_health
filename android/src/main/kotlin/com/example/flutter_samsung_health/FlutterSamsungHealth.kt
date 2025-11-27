@@ -359,6 +359,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         }
 
         Log.d(APP_TAG, "입력받은 권한 타입들: $types")
+        Log.d(APP_TAG, "타입 개수: ${types.size}")
 
         val permissionsToRequest = if (types.isEmpty()) {
             Log.d(APP_TAG, "모든 권한 요청")
@@ -366,13 +367,17 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         } else {
             Log.d(APP_TAG, "특정 권한 요청 시작")
             val mappedPermissions = types.mapNotNull { type ->
+                Log.d(APP_TAG, "매핑 시도: $type")
                 val permission = getPermissionForType(type)
                 if (permission == null) {
                     Log.w(APP_TAG, "매핑 실패한 타입: $type")
+                } else {
+                    Log.d(APP_TAG, "매핑 성공: $type -> ${permission.dataType}")
                 }
                 permission
             }.toSet()
             Log.d(APP_TAG, "매핑된 권한 수: ${mappedPermissions.size}")
+            Log.d(APP_TAG, "전체 allPermissions 크기: ${allPermissions.size}")
             mappedPermissions
         }
 
@@ -385,10 +390,13 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         }
 
         CoroutineScope(Dispatchers.Main).launch {
+            Log.d(APP_TAG, "CoroutineScope 시작")
             runCatching {
                 // 먼저 현재 권한 상태 확인
                 Log.d(APP_TAG, "현재 권한 상태 확인 중...")
+                Log.d(APP_TAG, "store.getGrantedPermissions 호출 전")
                 val grantedPermissions = store.getGrantedPermissions(permissionsToRequest)
+                Log.d(APP_TAG, "store.getGrantedPermissions 호출 완료")
                 Log.d(APP_TAG, "이미 허용된 권한 수: ${grantedPermissions.size}/${permissionsToRequest.size}")
                 
                 grantedPermissions.forEach { permission ->
@@ -477,10 +485,14 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     }
                 }
             }.onFailure { error ->
-                Log.e(APP_TAG, "권한 요청 실패: ${error.message}", error)
+                Log.e(APP_TAG, "권한 요청 실패: ${error.javaClass.simpleName}")
+                Log.e(APP_TAG, "에러 메시지: ${error.message}")
+                Log.e(APP_TAG, "스택 트레이스:", error)
 
                 when (error) {
                     is ResolvablePlatformException -> {
+                        Log.e(APP_TAG, "ResolvablePlatformException 발생")
+                        Log.e(APP_TAG, "hasResolution: ${error.hasResolution}")
                         if (error.hasResolution && act != null) {
                             Log.i(APP_TAG, "권한 요청 중 ResolvablePlatformException 발생 - 해결 시도")
                             runCatching {
@@ -492,9 +504,15 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         wrapper.error("PERMISSION_RESOLVABLE_ERROR", "사용자 액션이 필요합니다: ${error.message}", null)
                     }
                     is HealthDataException -> {
+                        Log.e(APP_TAG, "HealthDataException 발생")
                         wrapper.error("PERMISSION_HEALTH_DATA_ERROR", "Samsung Health 오류: ${error.message}", null)
                     }
+                    is SecurityException -> {
+                        Log.e(APP_TAG, "SecurityException 발생")
+                        wrapper.error("PERMISSION_SECURITY_ERROR", "보안 오류: ${error.message}", null)
+                    }
                     else -> {
+                        Log.e(APP_TAG, "기타 예외: ${error.javaClass.simpleName}")
                         wrapper.error("PERMISSION_ERROR", "권한 요청 실패: ${error.message}", null)
                     }
                 }
