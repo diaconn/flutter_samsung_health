@@ -310,7 +310,11 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     private fun disconnect(wrapper: ResultWrapper) {
         Log.d(APP_TAG, "disconnect() 호출")
         healthDataStore = null
-        val resultMap = mutableMapOf<String, Any>("isConnect" to false)
+        val resultMap = mutableMapOf<String, Any>(
+            "isConnect" to false,
+            "action" to "disconnected",
+            "message" to "연결이 해제되었습니다"
+        )
         wrapper.success(resultMap)
     }
 
