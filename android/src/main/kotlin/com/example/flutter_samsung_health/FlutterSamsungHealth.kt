@@ -56,36 +56,23 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     )
 
     // DataType 문자열 → Permission 매핑
-    private fun getPermissionForType(type: String): Permission? {
-        Log.d(APP_TAG, "getPermissionForType() 호출: $type")
-
-        val permission = when (type) {
-            "exercise", "com.samsung.health.exercise" -> Permission.of(DataTypes.EXERCISE, AccessType.READ)
-            "heart_rate", "com.samsung.health.heart_rate" -> Permission.of(DataTypes.HEART_RATE, AccessType.READ)
-            "sleep", "com.samsung.health.sleep" -> Permission.of(DataTypes.SLEEP, AccessType.READ)
-            "steps", "com.samsung.health.steps" -> Permission.of(DataTypes.STEPS, AccessType.READ)
-            "nutrition", "com.samsung.health.nutrition" -> Permission.of(DataTypes.NUTRITION, AccessType.READ)
-            "body_composition", "com.samsung.health.body_composition" -> Permission.of(DataTypes.BODY_COMPOSITION, AccessType.READ)
-            "blood_oxygen", "com.samsung.health.blood_oxygen" -> Permission.of(DataTypes.BLOOD_OXYGEN, AccessType.READ)
-            "body_temperature", "com.samsung.health.body_temperature" -> Permission.of(DataTypes.BODY_TEMPERATURE, AccessType.READ)
-            "blood_glucose", "com.samsung.health.blood_glucose" -> Permission.of(DataTypes.BLOOD_GLUCOSE, AccessType.READ)
-            else -> {
-                Log.w(APP_TAG, "알 수 없는 권한 타입: $type")
-                null
-            }
+    private fun _getPermissionForType(type: String): Permission? {
+        return when (type) {
+            "exercise" -> Permission.of(DataTypes.EXERCISE, AccessType.READ)
+            "heart_rate" -> Permission.of(DataTypes.HEART_RATE, AccessType.READ)
+            "sleep" -> Permission.of(DataTypes.SLEEP, AccessType.READ)
+            "steps" -> Permission.of(DataTypes.STEPS, AccessType.READ)
+            "nutrition" -> Permission.of(DataTypes.NUTRITION, AccessType.READ)
+            "body_composition" -> Permission.of(DataTypes.BODY_COMPOSITION, AccessType.READ)
+            "blood_oxygen" -> Permission.of(DataTypes.BLOOD_OXYGEN, AccessType.READ)
+            "body_temperature" -> Permission.of(DataTypes.BODY_TEMPERATURE, AccessType.READ)
+            "blood_glucose" -> Permission.of(DataTypes.BLOOD_GLUCOSE, AccessType.READ)
+            else -> null
         }
-
-        if (permission != null) {
-            Log.d(APP_TAG, "권한 매핑 성공: $type -> ${permission.dataType}")
-        } else {
-            Log.e(APP_TAG, "권한 매핑 실패: $type")
-        }
-
-        return permission
     }
 
     // Permission → 문자열 타입명 변환
-    private fun getDataTypeNameForPermission(permission: Permission): String {
+    private fun _getDataTypeNameForPermission(permission: Permission): String {
         return when (permission.dataType) {
             DataTypes.EXERCISE -> "exercise"
             DataTypes.HEART_RATE -> "heart_rate"
@@ -338,181 +325,74 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
 
         val act = activity
         if (act == null) {
-            Log.e(APP_TAG, "Activity가 null입니다. 권한 다이얼로그를 표시할 수 없습니다.")
-            wrapper.error("ACTIVITY_NOT_READY", "Activity가 없습니다. 앱이 포그라운드에 있는지 확인하세요.", null)
+            wrapper.error("ACTIVITY_NOT_READY", "Activity가 없습니다", null)
             return
         }
 
-        Log.d(APP_TAG, "Activity 확인됨: ${act.javaClass.simpleName}")
-
-        // Activity가 유효한지 추가 확인
-        if (act.isDestroyed) {
-            Log.e(APP_TAG, "Activity가 destroyed 상태입니다")
-            wrapper.error("ACTIVITY_DESTROYED", "Activity가 종료된 상태입니다", null)
+        if (act.isDestroyed || act.isFinishing) {
+            wrapper.error("ACTIVITY_INVALID", "Activity가 유효하지 않습니다", null)
             return
         }
-
-        if (act.isFinishing) {
-            Log.e(APP_TAG, "Activity가 finishing 상태입니다")
-            wrapper.error("ACTIVITY_FINISHING", "Activity가 종료 중입니다", null)
-            return
-        }
-
-        Log.d(APP_TAG, "입력받은 권한 타입들: $types")
-        Log.d(APP_TAG, "타입 개수: ${types.size}")
 
         val permissionsToRequest = if (types.isEmpty()) {
-            Log.d(APP_TAG, "모든 권한 요청")
             allPermissions
         } else {
-            Log.d(APP_TAG, "특정 권한 요청 시작")
-            val mappedPermissions = types.mapNotNull { type ->
-                Log.d(APP_TAG, "매핑 시도: $type")
-                val permission = getPermissionForType(type)
-                if (permission == null) {
-                    Log.w(APP_TAG, "매핑 실패한 타입: $type")
-                } else {
-                    Log.d(APP_TAG, "매핑 성공: $type -> ${permission.dataType}")
-                }
-                permission
+            types.mapNotNull { type ->
+                _getPermissionForType(type)
             }.toSet()
-            Log.d(APP_TAG, "매핑된 권한 수: ${mappedPermissions.size}")
-            Log.d(APP_TAG, "전체 allPermissions 크기: ${allPermissions.size}")
-            mappedPermissions
         }
 
-        Log.d(APP_TAG, "최종 요청할 권한 수: ${permissionsToRequest.size}")
-
         if (permissionsToRequest.isEmpty()) {
-            Log.e(APP_TAG, "요청할 권한이 없습니다 - 모든 권한 매핑 실패")
             wrapper.success(mapOf("granted" to emptyMap<String, Boolean>(), "message" to "요청할 권한이 없습니다"))
             return
         }
 
         CoroutineScope(Dispatchers.Main).launch {
-            Log.d(APP_TAG, "CoroutineScope 시작")
             runCatching {
-                // 먼저 현재 권한 상태 확인
-                Log.d(APP_TAG, "현재 권한 상태 확인 중...")
-                Log.d(APP_TAG, "store.getGrantedPermissions 호출 전")
                 val grantedPermissions = store.getGrantedPermissions(permissionsToRequest)
-                Log.d(APP_TAG, "store.getGrantedPermissions 호출 완료")
-                Log.d(APP_TAG, "이미 허용된 권한 수: ${grantedPermissions.size}/${permissionsToRequest.size}")
-                
-                grantedPermissions.forEach { permission ->
-                    Log.d(APP_TAG, "허용된 권한: ${getDataTypeNameForPermission(permission)}")
-                }
 
                 if (grantedPermissions.containsAll(permissionsToRequest)) {
-                    Log.i(APP_TAG, "모든 권한이 이미 허용됨")
                     val grantedMap = permissionsToRequest.associate {
-                        getDataTypeNameForPermission(it) to true
+                        _getDataTypeNameForPermission(it) to true
                     }
                     wrapper.success(mapOf("granted" to grantedMap, "message" to "모든 권한 허용됨"))
                 } else {
-                    // 권한 요청 실행 - 비동기 처리
-                    Log.i(APP_TAG, "권한 요청 실행")
-
-                    runCatching {
-                        Log.d(APP_TAG, "권한 요청 시작 - 요청할 권한:")
-                        permissionsToRequest.forEach { permission ->
-                            Log.d(APP_TAG, "  - ${getDataTypeNameForPermission(permission)}")
-                        }
-                        
-                        // Samsung Health Data SDK 1.0.0의 올바른 권한 요청 방식
-                        Log.d(APP_TAG, "store.requestPermissions 호출")
-                        store.requestPermissions(permissionsToRequest, act)
-                        Log.d(APP_TAG, "store.requestPermissions 호출 완료")
-
-                        // 권한 다이얼로그가 표시되고 사용자 응답을 기다리기 위한 지연
-                        kotlinx.coroutines.delay(1000)
-
-                        // 권한 요청 결과 확인 - 여러 번 시도
-                        var attempts = 0
-                        val maxAttempts = 10
-                        var newGrantedPermissions = setOf<Permission>()
-
-                        Log.d(APP_TAG, "권한 상태 확인 시작")
-                        while (attempts < maxAttempts) {
-                            kotlinx.coroutines.delay(500) // 0.5초 대기
-                            newGrantedPermissions = store.getGrantedPermissions(permissionsToRequest)
-                            Log.d(APP_TAG, "시도 ${attempts + 1}: 새로운 권한 수 ${newGrantedPermissions.size}")
-
-                            // 이전 권한 상태와 비교하여 변경이 있었는지 확인
-                            if (newGrantedPermissions != grantedPermissions) {
-                                Log.i(APP_TAG, "권한 상태 변경 감지됨")
-                                break
-                            }
-
-                            attempts++
-                            Log.d(APP_TAG, "권한 확인 시도: $attempts/$maxAttempts")
-                        }
-
-                        val grantedMap = permissionsToRequest.associate {
-                            getDataTypeNameForPermission(it) to newGrantedPermissions.contains(it)
-                        }
-                        val deniedList = permissionsToRequest
-                            .filter { !newGrantedPermissions.contains(it) }
-                            .map { getDataTypeNameForPermission(it) }
-
-                        val response = mutableMapOf<String, Any>("granted" to grantedMap)
-                        if (deniedList.isNotEmpty()) {
-                            response["denied_permissions"] = deniedList
-                            response["message"] = "일부 권한이 거부되었습니다"
-                            Log.w(APP_TAG, "거부된 권한: $deniedList")
-                        } else {
-                            response["message"] = "모든 권한 허용됨"
-                            Log.i(APP_TAG, "모든 권한 허용됨")
-                        }
-
-                        response["attempts_used"] = attempts
-                        wrapper.success(response)
-
-                    }.onFailure { requestError ->
-                        Log.e(APP_TAG, "권한 요청 처리 중 오류: ${requestError.message}")
-
-                        // 권한 요청 실패 시 현재 상태라도 반환
-                        val currentGranted = store.getGrantedPermissions(permissionsToRequest)
-                        val fallbackMap = permissionsToRequest.associate {
-                            getDataTypeNameForPermission(it) to currentGranted.contains(it)
-                        }
-
-                        wrapper.success(mapOf(
-                            "granted" to fallbackMap,
-                            "message" to "권한 요청 중 오류 발생, 현재 상태 반환: ${requestError.message}",
-                            "error_during_request" to true
-                        ))
+                    store.requestPermissions(permissionsToRequest, act)
+                    kotlinx.coroutines.delay(1500) // 권한 다이얼로그 처리 대기
+                    
+                    val finalGrantedPermissions = store.getGrantedPermissions(permissionsToRequest)
+                    val grantedMap = permissionsToRequest.associate {
+                        _getDataTypeNameForPermission(it) to finalGrantedPermissions.contains(it)
                     }
+
+                    val response = mutableMapOf<String, Any>("granted" to grantedMap)
+                    val deniedList = permissionsToRequest
+                        .filter { !finalGrantedPermissions.contains(it) }
+                        .map { _getDataTypeNameForPermission(it) }
+
+                    if (deniedList.isNotEmpty()) {
+                        response["denied_permissions"] = deniedList
+                        response["message"] = "일부 권한이 거부되었습니다"
+                    } else {
+                        response["message"] = "모든 권한 허용됨"
+                    }
+
+                    wrapper.success(response)
                 }
             }.onFailure { error ->
-                Log.e(APP_TAG, "권한 요청 실패: ${error.javaClass.simpleName}")
-                Log.e(APP_TAG, "에러 메시지: ${error.message}")
-                Log.e(APP_TAG, "스택 트레이스:", error)
+                Log.e(APP_TAG, "권한 요청 실패: ${error.message}")
 
                 when (error) {
                     is ResolvablePlatformException -> {
-                        Log.e(APP_TAG, "ResolvablePlatformException 발생")
-                        Log.e(APP_TAG, "hasResolution: ${error.hasResolution}")
-                        if (error.hasResolution && act != null) {
-                            Log.i(APP_TAG, "권한 요청 중 ResolvablePlatformException 발생 - 해결 시도")
-                            runCatching {
-                                error.resolve(act)
-                            }.onFailure { resolveError ->
-                                Log.e(APP_TAG, "권한 해결 실패: ${resolveError.message}")
-                            }
+                        if (error.hasResolution) {
+                            runCatching { error.resolve(act) }
                         }
                         wrapper.error("PERMISSION_RESOLVABLE_ERROR", "사용자 액션이 필요합니다: ${error.message}", null)
                     }
                     is HealthDataException -> {
-                        Log.e(APP_TAG, "HealthDataException 발생")
                         wrapper.error("PERMISSION_HEALTH_DATA_ERROR", "Samsung Health 오류: ${error.message}", null)
                     }
-                    is SecurityException -> {
-                        Log.e(APP_TAG, "SecurityException 발생")
-                        wrapper.error("PERMISSION_SECURITY_ERROR", "보안 오류: ${error.message}", null)
-                    }
                     else -> {
-                        Log.e(APP_TAG, "기타 예외: ${error.javaClass.simpleName}")
                         wrapper.error("PERMISSION_ERROR", "권한 요청 실패: ${error.message}", null)
                     }
                 }
@@ -532,7 +412,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         CoroutineScope(Dispatchers.Main).launch {
             runCatching {
                 val grantedPermissions = store.getGrantedPermissions(allPermissions)
-                val grantedList = grantedPermissions.map { getDataTypeNameForPermission(it) }
+                val grantedList = grantedPermissions.map { _getDataTypeNameForPermission(it) }
                 Log.i(APP_TAG, "권한 조회 성공: ${grantedList.size}개 권한 허용됨")
                 wrapper.success(grantedList)
             }.onFailure { error ->
