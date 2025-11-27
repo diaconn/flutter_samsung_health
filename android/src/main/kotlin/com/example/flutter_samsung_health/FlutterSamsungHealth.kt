@@ -212,31 +212,52 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         Log.d(APP_TAG, "connect() 호출")
         val resultMap = mutableMapOf<String, Any>()
 
-        try {
+        runCatching {
             healthDataStore = HealthDataService.getStore(context)
-            Log.d(APP_TAG, "Samsung Health 연결 성공")
+        }.onSuccess {
+            Log.i(APP_TAG, "Health data service is connected")
             resultMap["isConnect"] = true
+            resultMap["message"] = "Connected successfully"
             wrapper.success(resultMap)
-        } catch (e: ResolvablePlatformException) {
-            Log.e(APP_TAG, "연결 실패 (해결 가능): ${e.message}")
-            if (e.hasResolution && activity != null) {
-                e.resolve(activity!!)
+        }.onFailure { error ->
+            Log.e(APP_TAG, "연결 실패: ${error.message}")
+            
+            when (error) {
+                is ResolvablePlatformException -> {
+                    if (error.hasResolution && activity != null) {
+                        Log.i(APP_TAG, "ResolvablePlatformException - attempting to resolve")
+                        resultMap["isConnect"] = false
+                        resultMap["error"] = "user_action_required"
+                        resultMap["message"] = "사용자 액션이 필요합니다. Samsung Health 설정을 확인하세요."
+                        resultMap["resolvable"] = true
+                        
+                        // 비동기적으로 resolve 실행
+                        runCatching {
+                            error.resolve(activity!!)
+                        }.onFailure { resolveError ->
+                            Log.e(APP_TAG, "Resolution failed: ${resolveError.message}")
+                            resultMap["message"] = "권한 요청 실패: ${resolveError.message}"
+                        }
+                    } else {
+                        resultMap["isConnect"] = false
+                        resultMap["error"] = "resolvable_no_activity"
+                        resultMap["message"] = "Activity가 없어 권한 요청을 할 수 없습니다."
+                        resultMap["resolvable"] = false
+                    }
+                }
+                is HealthDataException -> {
+                    resultMap["isConnect"] = false
+                    resultMap["error"] = "health_data_exception"
+                    resultMap["message"] = error.message ?: "Samsung Health 데이터 오류"
+                    resultMap["resolvable"] = false
+                }
+                else -> {
+                    resultMap["isConnect"] = false
+                    resultMap["error"] = "unknown"
+                    resultMap["message"] = error.message ?: "알 수 없는 오류"
+                    resultMap["resolvable"] = false
+                }
             }
-            resultMap["isConnect"] = false
-            resultMap["error"] = "resolvable"
-            resultMap["message"] = e.message ?: "Unknown error"
-            wrapper.success(resultMap)
-        } catch (e: HealthDataException) {
-            Log.e(APP_TAG, "연결 실패: ${e.message}")
-            resultMap["isConnect"] = false
-            resultMap["error"] = "health_data_exception"
-            resultMap["message"] = e.message ?: "Unknown error"
-            wrapper.success(resultMap)
-        } catch (e: Exception) {
-            Log.e(APP_TAG, "연결 실패: ${e.message}")
-            resultMap["isConnect"] = false
-            resultMap["error"] = "unknown"
-            resultMap["message"] = e.message ?: "Unknown error"
             wrapper.success(resultMap)
         }
     }
@@ -275,16 +296,19 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         }
 
         CoroutineScope(Dispatchers.Main).launch {
-            try {
+            runCatching {
+                // 먼저 현재 권한 상태 확인
                 val grantedPermissions = store.getGrantedPermissions(permissionsToRequest)
 
                 if (grantedPermissions.containsAll(permissionsToRequest)) {
-                    Log.d(APP_TAG, "모든 권한이 이미 허용됨")
+                    Log.i(APP_TAG, "모든 권한이 이미 허용됨")
                     val grantedMap = permissionsToRequest.associate {
                         getDataTypeNameForPermission(it) to true
                     }
                     wrapper.success(mapOf("granted" to grantedMap, "message" to "모든 권한 허용됨"))
                 } else {
+                    // 권한 요청 실행
+                    Log.i(APP_TAG, "권한 요청 실행")
                     store.requestPermissions(permissionsToRequest, act)
 
                     // 권한 요청 후 다시 확인
@@ -299,14 +323,34 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     val response = mutableMapOf<String, Any>("granted" to grantedMap)
                     if (deniedList.isNotEmpty()) {
                         response["denied_permissions"] = deniedList
+                        response["message"] = "일부 권한이 거부되었습니다"
                     } else {
                         response["message"] = "모든 권한 허용됨"
                     }
                     wrapper.success(response)
                 }
-            } catch (e: Exception) {
-                Log.e(APP_TAG, "권한 요청 실패: ${e.message}", e)
-                wrapper.error("PERMISSION_ERROR", e.message, null)
+            }.onFailure { error ->
+                Log.e(APP_TAG, "권한 요청 실패: ${error.message}", error)
+                
+                when (error) {
+                    is ResolvablePlatformException -> {
+                        if (error.hasResolution && act != null) {
+                            Log.i(APP_TAG, "권한 요청 중 ResolvablePlatformException 발생 - 해결 시도")
+                            runCatching {
+                                error.resolve(act)
+                            }.onFailure { resolveError ->
+                                Log.e(APP_TAG, "권한 해결 실패: ${resolveError.message}")
+                            }
+                        }
+                        wrapper.error("PERMISSION_RESOLVABLE_ERROR", "사용자 액션이 필요합니다: ${error.message}", null)
+                    }
+                    is HealthDataException -> {
+                        wrapper.error("PERMISSION_HEALTH_DATA_ERROR", "Samsung Health 오류: ${error.message}", null)
+                    }
+                    else -> {
+                        wrapper.error("PERMISSION_ERROR", "권한 요청 실패: ${error.message}", null)
+                    }
+                }
             }
         }
     }
@@ -321,13 +365,22 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         }
 
         CoroutineScope(Dispatchers.Main).launch {
-            try {
+            runCatching {
                 val grantedPermissions = store.getGrantedPermissions(allPermissions)
                 val grantedList = grantedPermissions.map { getDataTypeNameForPermission(it) }
+                Log.i(APP_TAG, "권한 조회 성공: ${grantedList.size}개 권한 허용됨")
                 wrapper.success(grantedList)
-            } catch (e: Exception) {
-                Log.e(APP_TAG, "권한 조회 실패: ${e.message}", e)
-                wrapper.error("PERMISSION_QUERY_ERROR", e.message, null)
+            }.onFailure { error ->
+                Log.e(APP_TAG, "권한 조회 실패: ${error.message}", error)
+                
+                when (error) {
+                    is HealthDataException -> {
+                        wrapper.error("PERMISSION_QUERY_HEALTH_DATA_ERROR", "Samsung Health 오류: ${error.message}", null)
+                    }
+                    else -> {
+                        wrapper.error("PERMISSION_QUERY_ERROR", "권한 조회 실패: ${error.message}", null)
+                    }
+                }
             }
         }
     }
@@ -340,19 +393,47 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         }
 
         CoroutineScope(Dispatchers.IO).launch {
-            try {
+            runCatching {
                 val startTime = Instant.ofEpochMilli(start).atZone(ZoneOffset.systemDefault()).toLocalDateTime()
                 val endTime = Instant.ofEpochMilli(end).atZone(ZoneOffset.systemDefault()).toLocalDateTime()
+                Log.i(APP_TAG, "전체 데이터 조회 시작: ${startTime} ~ ${endTime}")
 
-                val exercise = try { readExerciseData(store, startTime, endTime) } catch (e: Exception) { Log.e(APP_TAG, "Exercise error: ${e.message}"); emptyList() }
-                val heartRate = try { readHeartRateData(store, startTime, endTime) } catch (e: Exception) { Log.e(APP_TAG, "HeartRate error: ${e.message}"); emptyList() }
-                val sleep = try { readSleepData(store, startTime, endTime) } catch (e: Exception) { Log.e(APP_TAG, "Sleep error: ${e.message}"); emptyList() }
-                val steps = try { readStepData(store, startTime, endTime) } catch (e: Exception) { Log.e(APP_TAG, "Steps error: ${e.message}"); emptyList() }
-                val nutrition = try { readNutritionData(store, startTime, endTime) } catch (e: Exception) { Log.e(APP_TAG, "Nutrition error: ${e.message}"); emptyList() }
-                val weight = try { readWeightData(store, startTime, endTime) } catch (e: Exception) { Log.e(APP_TAG, "Weight error: ${e.message}"); emptyList() }
-                val bloodOxygen = try { readOxygenSaturationData(store, startTime, endTime) } catch (e: Exception) { Log.e(APP_TAG, "BloodOxygen error: ${e.message}"); emptyList() }
-                val bodyTemperature = try { readBodyTemperatureData(store, startTime, endTime) } catch (e: Exception) { Log.e(APP_TAG, "BodyTemp error: ${e.message}"); emptyList() }
-                val bloodGlucose = try { readBloodGlucoseData(store, startTime, endTime) } catch (e: Exception) { Log.e(APP_TAG, "BloodGlucose error: ${e.message}"); emptyList() }
+                // 각 데이터 타입별로 runCatching을 사용하여 개별 실패를 처리
+                val exercise = runCatching { readExerciseData(store, startTime, endTime) }
+                    .onFailure { Log.w(APP_TAG, "Exercise 데이터 조회 실패: ${it.message}") }
+                    .getOrElse { emptyList() }
+                    
+                val heartRate = runCatching { readHeartRateData(store, startTime, endTime) }
+                    .onFailure { Log.w(APP_TAG, "HeartRate 데이터 조회 실패: ${it.message}") }
+                    .getOrElse { emptyList() }
+                    
+                val sleep = runCatching { readSleepData(store, startTime, endTime) }
+                    .onFailure { Log.w(APP_TAG, "Sleep 데이터 조회 실패: ${it.message}") }
+                    .getOrElse { emptyList() }
+                    
+                val steps = runCatching { readStepData(store, startTime, endTime) }
+                    .onFailure { Log.w(APP_TAG, "Steps 데이터 조회 실패: ${it.message}") }
+                    .getOrElse { emptyList() }
+                    
+                val nutrition = runCatching { readNutritionData(store, startTime, endTime) }
+                    .onFailure { Log.w(APP_TAG, "Nutrition 데이터 조회 실패: ${it.message}") }
+                    .getOrElse { emptyList() }
+                    
+                val weight = runCatching { readWeightData(store, startTime, endTime) }
+                    .onFailure { Log.w(APP_TAG, "Weight 데이터 조회 실패: ${it.message}") }
+                    .getOrElse { emptyList() }
+                    
+                val bloodOxygen = runCatching { readOxygenSaturationData(store, startTime, endTime) }
+                    .onFailure { Log.w(APP_TAG, "BloodOxygen 데이터 조회 실패: ${it.message}") }
+                    .getOrElse { emptyList() }
+                    
+                val bodyTemperature = runCatching { readBodyTemperatureData(store, startTime, endTime) }
+                    .onFailure { Log.w(APP_TAG, "BodyTemp 데이터 조회 실패: ${it.message}") }
+                    .getOrElse { emptyList() }
+                    
+                val bloodGlucose = runCatching { readBloodGlucoseData(store, startTime, endTime) }
+                    .onFailure { Log.w(APP_TAG, "BloodGlucose 데이터 조회 실패: ${it.message}") }
+                    .getOrElse { emptyList() }
 
                 val totalResult = mapOf(
                     "exercise" to exercise,
@@ -366,12 +447,23 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     "blood_glucose" to bloodGlucose,
                 )
 
+                Log.i(APP_TAG, "전체 데이터 조회 완료")
+                totalResult
+            }.onSuccess { result ->
                 withContext(Dispatchers.Main) {
-                    wrapper.success(totalResult)
+                    wrapper.success(result)
                 }
-            } catch (e: Exception) {
+            }.onFailure { error ->
+                Log.e(APP_TAG, "전체 데이터 조회 실패: ${error.message}", error)
                 withContext(Dispatchers.Main) {
-                    wrapper.error("TOTAL_DATA_ERROR", "데이터 수집 실패: ${e.message}", null)
+                    when (error) {
+                        is HealthDataException -> {
+                            wrapper.error("TOTAL_DATA_HEALTH_ERROR", "Samsung Health 오류: ${error.message}", null)
+                        }
+                        else -> {
+                            wrapper.error("TOTAL_DATA_ERROR", "데이터 수집 실패: ${error.message}", null)
+                        }
+                    }
                 }
             }
         }
@@ -444,17 +536,30 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         }
 
         CoroutineScope(Dispatchers.IO).launch {
-            try {
+            runCatching {
                 val startTime = Instant.ofEpochMilli(start).atZone(ZoneOffset.systemDefault()).toLocalDateTime()
                 val endTime = Instant.ofEpochMilli(end).atZone(ZoneOffset.systemDefault()).toLocalDateTime()
-                val data = reader(store, startTime, endTime)
+                Log.i(APP_TAG, "데이터 읽기 시작: ${startTime} ~ ${endTime}")
+                reader(store, startTime, endTime)
+            }.onSuccess { data ->
+                Log.i(APP_TAG, "데이터 읽기 성공: ${data.size}건")
                 withContext(Dispatchers.Main) {
                     wrapper.success(data)
                 }
-            } catch (e: Exception) {
-                Log.e(APP_TAG, "데이터 읽기 실패: ${e.message}", e)
+            }.onFailure { error ->
+                Log.e(APP_TAG, "데이터 읽기 실패: ${error.message}", error)
                 withContext(Dispatchers.Main) {
-                    wrapper.error("READ_ERROR", e.message, null)
+                    when (error) {
+                        is HealthDataException -> {
+                            wrapper.error("READ_HEALTH_DATA_ERROR", "Samsung Health 데이터 오류: ${error.message}", null)
+                        }
+                        is SecurityException -> {
+                            wrapper.error("READ_PERMISSION_ERROR", "권한이 없습니다: ${error.message}", null)
+                        }
+                        else -> {
+                            wrapper.error("READ_ERROR", "데이터 읽기 실패: ${error.message}", null)
+                        }
+                    }
                 }
             }
         }
