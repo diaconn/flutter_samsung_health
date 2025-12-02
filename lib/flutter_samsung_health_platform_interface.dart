@@ -62,7 +62,7 @@ abstract class FlutterSamsungHealthPlatform extends PlatformInterface {
   Future<List<Map<String, dynamic>>> getNutritionData(int start, int end);
 
   /// 체중/신체 구성 조회
-  Future<List<Map<String, dynamic>>> getBodyMeasurementData(int start, int end);
+  Future<List<Map<String, dynamic>>> getBodyCompositionData(int start, int end);
 
   /// 산소 포화도 조회
   Future<List<Map<String, dynamic>>> getOxygenSaturationData(int start, int end);

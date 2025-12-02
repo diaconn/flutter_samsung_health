@@ -146,10 +146,10 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 getNutritionData(start, end, wrapper)
             }
 
-            "getBodyMeasurementData" -> {
+            "getBodyCompositionData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
-                getBodyMeasurementData(start, end, wrapper)
+                getBodyCompositionData(start, end, wrapper)
             }
 
             "getOxygenSaturationData" -> {
@@ -477,8 +477,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     .onFailure { Log.w(APP_TAG, "Nutrition 데이터 조회 실패: ${it.message}") }
                     .getOrElse { emptyList() }
 
-                val bodyMeasurement = runCatching { readBodyMeasurementData(store, startTime, endTime) }
-                    .onFailure { Log.w(APP_TAG, "BodyMeasurement 데이터 조회 실패: ${it.message}") }
+                val bodyComposition = runCatching { readBodyCompositionData(store, startTime, endTime) }
+                    .onFailure { Log.w(APP_TAG, "BodyComposition 데이터 조회 실패: ${it.message}") }
                     .getOrElse { emptyList() }
 
                 val bloodOxygen = runCatching { readOxygenSaturationData(store, startTime, endTime) }
@@ -499,7 +499,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     "sleep" to sleep,
                     "step_count" to steps,
                     "nutrition" to nutrition,
-                    "body_measurement" to bodyMeasurement,
+                    "body_composition" to bodyComposition,
                     "oxygen_saturation" to bloodOxygen,
                     "body_temperature" to bodyTemperature,
                     "blood_glucose" to bloodGlucose,
@@ -558,9 +558,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         }
     }
 
-    private fun getBodyMeasurementData(start: Long, end: Long, wrapper: ResultWrapper) {
+    private fun getBodyCompositionData(start: Long, end: Long, wrapper: ResultWrapper) {
         readDataWithWrapper(start, end, wrapper) { store, startTime, endTime ->
-            readBodyMeasurementData(store, startTime, endTime)
+            readBodyCompositionData(store, startTime, endTime)
         }
     }
 
@@ -844,7 +844,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         return resultList
     }
 
-    private suspend fun readBodyMeasurementData(
+    private suspend fun readBodyCompositionData(
         store: HealthDataStore,
         startTime: LocalDateTime,
         endTime: LocalDateTime
