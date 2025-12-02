@@ -146,8 +146,8 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
 
   /// 신체 조회
   @override
-  Future<List<Map<String, dynamic>>> getWeightData(int start, int end) async {
-    final result = await methodChannel.invokeMethod<List>('getWeightData', {
+  Future<List<Map<String, dynamic>>> getBodyMeasurementData(int start, int end) async {
+    final result = await methodChannel.invokeMethod<List>('getBodyMeasurementData', {
       'start': start,
       'end': end,
     });

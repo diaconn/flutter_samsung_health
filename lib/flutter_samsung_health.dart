@@ -80,11 +80,11 @@ class FlutterSamsungHealth {
   }
 
   /// 신체 조회
-  Future<List<Map<String, dynamic>>> getWeightData({
+  Future<List<Map<String, dynamic>>> getBodyMeasurementData({
     required int start,
     required int end,
   }) {
-    return FlutterSamsungHealthPlatform.instance.getWeightData(start, end);
+    return FlutterSamsungHealthPlatform.instance.getBodyMeasurementData(start, end);
   }
 
   /// 산소 포화도 조회

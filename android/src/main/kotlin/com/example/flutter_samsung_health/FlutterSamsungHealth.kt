@@ -108,57 +108,68 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 val types = call.argument<List<String>>("types") ?: emptyList()
                 requestPermissions(types, wrapper)
             }
+
             "getGrantedPermissions" -> getGrantedPermissions(wrapper)
             "getTotalData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
                 getTotalData(start, end, wrapper)
             }
+
             "getExerciseData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
                 getExerciseData(start, end, wrapper)
             }
+
             "getHeartRateData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
                 getHeartRateData(start, end, wrapper)
             }
+
             "getSleepData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
                 getSleepData(start, end, wrapper)
             }
+
             "getStepData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
                 getStepData(start, end, wrapper)
             }
+
             "getNutritionData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
                 getNutritionData(start, end, wrapper)
             }
-            "getWeightData" -> {
+
+            "getBodyMeasurementData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
-                getWeightData(start, end, wrapper)
+                getBodyMeasurementData(start, end, wrapper)
             }
+
             "getOxygenSaturationData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
                 getOxygenSaturationData(start, end, wrapper)
             }
+
             "getBodyTemperatureData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
                 getBodyTemperatureData(start, end, wrapper)
             }
+
             "getBloodGlucoseData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
                 getBloodGlucoseData(start, end, wrapper)
             }
+
             "openSamsungHealthPermissions" -> openSamsungHealthPermissions(wrapper)
             else -> wrapper.notImplemented()
         }
@@ -291,12 +302,14 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         resultMap["resolvable"] = false
                     }
                 }
+
                 is HealthDataException -> {
                     resultMap["isConnect"] = false
                     resultMap["error"] = "health_data_exception"
                     resultMap["message"] = error.message ?: "Samsung Health 데이터 오류"
                     resultMap["resolvable"] = false
                 }
+
                 else -> {
                     resultMap["isConnect"] = false
                     resultMap["error"] = "unknown"
@@ -357,7 +370,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 // 항상 권한 다이얼로그 표시
                 store.requestPermissions(permissionsToRequest, act)
                 kotlinx.coroutines.delay(1500) // 권한 다이얼로그 처리 대기
-                
+
                 val finalGrantedPermissions = store.getGrantedPermissions(permissionsToRequest)
                 val grantedMap = permissionsToRequest.associate {
                     _getDataTypeNameForPermission(it) to finalGrantedPermissions.contains(it)
@@ -386,9 +399,11 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         }
                         wrapper.error("PERMISSION_RESOLVABLE_ERROR", "사용자 액션이 필요합니다: ${error.message}", null)
                     }
+
                     is HealthDataException -> {
                         wrapper.error("PERMISSION_HEALTH_DATA_ERROR", "Samsung Health 오류: ${error.message}", null)
                     }
+
                     else -> {
                         wrapper.error("PERMISSION_ERROR", "권한 요청 실패: ${error.message}", null)
                     }
@@ -419,6 +434,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     is HealthDataException -> {
                         wrapper.error("PERMISSION_QUERY_HEALTH_DATA_ERROR", "Samsung Health 오류: ${error.message}", null)
                     }
+
                     else -> {
                         wrapper.error("PERMISSION_QUERY_ERROR", "권한 조회 실패: ${error.message}", null)
                     }
@@ -461,8 +477,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     .onFailure { Log.w(APP_TAG, "Nutrition 데이터 조회 실패: ${it.message}") }
                     .getOrElse { emptyList() }
 
-                val weight = runCatching { readWeightData(store, startTime, endTime) }
-                    .onFailure { Log.w(APP_TAG, "Weight 데이터 조회 실패: ${it.message}") }
+                val bodyMeasurement = runCatching { readBodyMeasurementData(store, startTime, endTime) }
+                    .onFailure { Log.w(APP_TAG, "BodyMeasurement 데이터 조회 실패: ${it.message}") }
                     .getOrElse { emptyList() }
 
                 val bloodOxygen = runCatching { readOxygenSaturationData(store, startTime, endTime) }
@@ -483,7 +499,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     "sleep" to sleep,
                     "step_count" to steps,
                     "nutrition" to nutrition,
-                    "weight" to weight,
+                    "body_measurement" to bodyMeasurement,
                     "oxygen_saturation" to bloodOxygen,
                     "body_temperature" to bodyTemperature,
                     "blood_glucose" to bloodGlucose,
@@ -502,6 +518,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         is HealthDataException -> {
                             wrapper.error("TOTAL_DATA_HEALTH_ERROR", "Samsung Health 오류: ${error.message}", null)
                         }
+
                         else -> {
                             wrapper.error("TOTAL_DATA_ERROR", "데이터 수집 실패: ${error.message}", null)
                         }
@@ -541,9 +558,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         }
     }
 
-    private fun getWeightData(start: Long, end: Long, wrapper: ResultWrapper) {
+    private fun getBodyMeasurementData(start: Long, end: Long, wrapper: ResultWrapper) {
         readDataWithWrapper(start, end, wrapper) { store, startTime, endTime ->
-            readWeightData(store, startTime, endTime)
+            readBodyMeasurementData(store, startTime, endTime)
         }
     }
 
@@ -595,9 +612,11 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         is HealthDataException -> {
                             wrapper.error("READ_HEALTH_DATA_ERROR", "Samsung Health 데이터 오류: ${error.message}", null)
                         }
+
                         is SecurityException -> {
                             wrapper.error("READ_PERMISSION_ERROR", "권한이 없습니다: ${error.message}", null)
                         }
+
                         else -> {
                             wrapper.error("READ_ERROR", "데이터 읽기 실패: ${error.message}", null)
                         }
@@ -622,47 +641,34 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
 
         val result = store.readData(readRequest)
         val resultList = mutableListOf<Map<String, Any>>()
-        Log.d(APP_TAG, "운동 데이터 조회 결과: ${result.dataList.size}개 데이터 포인트")
 
         for (dataPoint in result.dataList) {
-            Log.v(APP_TAG, "운동 데이터 포인트 UID: ${dataPoint.uid}")
+            Log.v(APP_TAG, "=== 운동 DataPoint 원본 데이터 ===")
+            Log.v(APP_TAG, "DataPoint: $dataPoint")
+            
             val exerciseType = dataPoint.getValue(DataType.ExerciseType.EXERCISE_TYPE)
             val sessions = dataPoint.getValue(DataType.ExerciseType.SESSIONS)
             
-            Log.v(APP_TAG, "운동 타입: ${exerciseType?.name} (${exerciseType?.ordinal}), 세션 수: ${sessions?.size ?: 0}")
+            Log.v(APP_TAG, "ExerciseType: $exerciseType")
+            Log.v(APP_TAG, "Sessions: $sessions")
 
             sessions?.forEach { session ->
                 val sessionData = mapOf(
                     "uid" to (dataPoint.uid ?: ""),
-                    "data_point_start_time" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
-                    "data_point_end_time" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
+                    "start_time" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
+                    "end_time" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
                     "exercise_type" to (exerciseType?.ordinal ?: 0),
                     "exercise_type_name" to (exerciseType?.name ?: "Unknown"),
-                    "session_start_time" to (session.startTime?.toEpochMilli() ?: 0L),
-                    "session_end_time" to (session.endTime?.toEpochMilli() ?: 0L),
                     "duration" to (session.duration?.toMillis() ?: 0L),
                     "calories" to (session.calories ?: 0f),
                     "distance" to (session.distance ?: 0f),
                     "max_heart_rate" to (session.maxHeartRate ?: 0f),
                     "mean_heart_rate" to (session.meanHeartRate ?: 0f),
                     "min_heart_rate" to (session.minHeartRate ?: 0f),
-                    // 추가 필드들은 Samsung Health SDK에서 지원하지 않을 수 있음
-                    // "steps" to (session.steps ?: 0L),
-                    // "speed" to (session.speed ?: 0f),
-                    // "pace" to (session.pace ?: 0f),
-                    // "incline" to (session.incline ?: 0f),
-                    // "altitude" to (session.altitude ?: 0f),
-                    // "decline" to (session.decline ?: 0f),
-                    // "floor_climbed" to (session.floorClimbed ?: 0f),
-                    // "location_data" to (session.locationData?.toString() ?: "")
-                    "available_fields" to "duration,calories,distance,heart_rate_metrics"
                 )
-                Log.v(APP_TAG, "운동 세션 데이터: ${sessionData}")
                 resultList.add(sessionData)
             }
         }
-
-        Log.d(APP_TAG, "운동 데이터 조회 완료: ${resultList.size}건")
         return resultList
     }
 
@@ -679,24 +685,17 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
 
         val result = store.readData(readRequest)
         val resultList = mutableListOf<Map<String, Any>>()
-        Log.d(APP_TAG, "심박 데이터 조회 결과: ${result.dataList.size}개 데이터 포인트")
 
         for (dataPoint in result.dataList) {
-            Log.v(APP_TAG, "심박 데이터 포인트 UID: ${dataPoint.uid}")
-            val heartRate = dataPoint.getValue(DataType.HeartRateType.HEART_RATE)
             val seriesData = dataPoint.getValue(DataType.HeartRateType.SERIES_DATA)
-            val minHeartRate = dataPoint.getValue(DataType.HeartRateType.MIN_HEART_RATE)
-            val maxHeartRate = dataPoint.getValue(DataType.HeartRateType.MAX_HEART_RATE)
-            
-            Log.v(APP_TAG, "심박 데이터: HR=${heartRate}, Min=${minHeartRate}, Max=${maxHeartRate}, 시리즈 수=${seriesData?.size ?: 0}")
 
             val dataMap = mutableMapOf<String, Any>(
                 "uid" to (dataPoint.uid ?: ""),
                 "start_time" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
                 "end_time" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
-                "heart_rate" to (heartRate ?: 0f),
-                "min_heart_rate" to (minHeartRate ?: 0f),
-                "max_heart_rate" to (maxHeartRate ?: 0f),
+                "heart_rate" to (dataPoint.getValue(DataType.HeartRateType.HEART_RATE) ?: 0f),
+                "min_heart_rate" to (dataPoint.getValue(DataType.HeartRateType.MIN_HEART_RATE) ?: 0f),
+                "max_heart_rate" to (dataPoint.getValue(DataType.HeartRateType.MAX_HEART_RATE) ?: 0f),
                 "series_count" to (seriesData?.size ?: 0)
             )
 
@@ -709,14 +708,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     )
                 }
                 dataMap["series_data"] = seriesList
-                Log.v(APP_TAG, "시리즈 데이터 추가: ${seriesList.size}개")
             }
-
-            Log.v(APP_TAG, "심박 데이터 맵: ${dataMap}")
             resultList.add(dataMap)
         }
-
-        Log.d(APP_TAG, "심박 데이터 조회 완료: ${resultList.size}건")
         return resultList
     }
 
@@ -735,22 +729,17 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
 
         val result = store.readData(readRequest)
         val resultList = mutableListOf<Map<String, Any>>()
-        Log.d(APP_TAG, "수면 데이터 조회 결과: ${result.dataList.size}개 데이터 포인트")
 
         for (dataPoint in result.dataList) {
-            Log.v(APP_TAG, "수면 데이터 포인트 UID: ${dataPoint.uid}")
             val sleepSessions = dataPoint.getValue(DataType.SleepType.SESSIONS)
-            val sleepScore = dataPoint.getValue(DataType.SleepType.SLEEP_SCORE)
             val totalDuration = dataPoint.getValue(DataType.SleepType.DURATION)
-            
-            Log.v(APP_TAG, "수면 데이터: Score=${sleepScore}, Duration=${totalDuration}, 세션 수=${sleepSessions?.size ?: 0}")
 
             val sleepMap = mutableMapOf<String, Any>(
                 "uid" to (dataPoint.uid ?: ""),
                 "start_time" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
                 "end_time" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
                 "duration" to (totalDuration?.toMillis() ?: 0L),
-                "sleep_score" to (sleepScore ?: 0f),
+                "sleep_score" to (dataPoint.getValue(DataType.SleepType.SLEEP_SCORE) ?: 0f),
                 "session_count" to (sleepSessions?.size ?: 0)
             )
 
@@ -763,8 +752,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                             "stage_type_name" to (stage.stage?.name ?: "Unknown"),
                             "start_time" to (stage.startTime?.toEpochMilli() ?: 0L),
                             "end_time" to (stage.endTime?.toEpochMilli() ?: 0L),
-                            // "duration" to (stage.duration?.toMillis() ?: 0L) // 지원하지 않는 필드일 수 있음
-                            "stage_duration" to 0L
                         )
                     } ?: emptyList<Map<String, Any>>()
 
@@ -772,7 +759,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                         "session_start_time" to (session.startTime?.toEpochMilli() ?: 0L),
                         "session_end_time" to (session.endTime?.toEpochMilli() ?: 0L),
                         "session_duration" to (session.duration?.toMillis() ?: 0L),
-                        // "sleep_efficiency" to (session.sleepEfficiency ?: 0f), // 지원하지 않는 필드일 수 있음
                         "sleep_session_id" to (session.toString().hashCode()),
                         "stages" to stagesData,
                         "stage_count" to stagesData.size
@@ -781,12 +767,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 sleepMap["sessions"] = sessionsData
                 Log.v(APP_TAG, "수면 세션 데이터 추가: ${sessionsData.size}개")
             }
-
-            Log.v(APP_TAG, "수면 데이터 맵: ${sleepMap}")
             resultList.add(sleepMap)
         }
-
-        Log.d(APP_TAG, "수면 데이터 조회 완료: ${resultList.size}건")
         return resultList
     }
 
@@ -804,7 +786,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
 
         val result = store.aggregateData(readRequest)
         val resultList = mutableListOf<Map<String, Any>>()
-        Log.d(APP_TAG, "걸음 집계 데이터 조회 결과: ${result.dataList.size}개 데이터 포인트")
 
         for (aggregateData in result.dataList) {
             val stepData = mapOf(
@@ -813,11 +794,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 "steps" to (aggregateData.value ?: 0L),
                 "data_type" to "TOTAL_STEPS"
             )
-            Log.v(APP_TAG, "걸음 데이터: ${stepData}")
             resultList.add(stepData)
         }
-
-        Log.d(APP_TAG, "걸음 데이터 조회 완료: ${resultList.size}건")
         return resultList
     }
 
@@ -834,30 +812,22 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
 
         val result = store.readData(readRequest)
         val resultList = mutableListOf<Map<String, Any>>()
-        Log.d(APP_TAG, "영양 데이터 조회 결과: ${result.dataList.size}개 데이터 포인트")
 
         for (dataPoint in result.dataList) {
-            Log.v(APP_TAG, "영양 데이터 포인트 UID: ${dataPoint.uid}")
-            val title = dataPoint.getValue(DataType.NutritionType.TITLE) ?: ""
             val mealType = dataPoint.getValue(DataType.NutritionType.MEAL_TYPE)
-            val calories = dataPoint.getValue(DataType.NutritionType.CALORIES) ?: 0f
-            
-            Log.v(APP_TAG, "영양 데이터: Title=$title, MealType=${mealType?.name}, Calories=$calories")
-            
+
             val nutritionData = mapOf(
                 "uid" to (dataPoint.uid ?: ""),
                 "start_time" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
                 "end_time" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
-                "title" to title,
+                "title" to (dataPoint.getValue(DataType.NutritionType.TITLE) ?: ""),
                 "meal_type" to (mealType?.ordinal ?: 0),
                 "meal_type_name" to (mealType?.name ?: "Unknown"),
-                "calories" to calories,
+                "calories" to (dataPoint.getValue(DataType.NutritionType.CALORIES) ?: 0f),
                 "total_fat" to (dataPoint.getValue(DataType.NutritionType.TOTAL_FAT) ?: 0f),
                 "saturated_fat" to (dataPoint.getValue(DataType.NutritionType.SATURATED_FAT) ?: 0f),
-                // "trans_fat" to (dataPoint.getValue(DataType.NutritionType.TRANS_FAT) ?: 0f),
-                // "cholesterol" to (dataPoint.getValue(DataType.NutritionType.CHOLESTEROL) ?: 0f),
-                "trans_fat" to 0f,
-                "cholesterol" to 0f,
+                "trans_fat" to (dataPoint.getValue(DataType.NutritionType.TRANS_FAT) ?: 0f),
+                "cholesterol" to (dataPoint.getValue(DataType.NutritionType.CHOLESTEROL) ?: 0f),
                 "protein" to (dataPoint.getValue(DataType.NutritionType.PROTEIN) ?: 0f),
                 "carbohydrate" to (dataPoint.getValue(DataType.NutritionType.CARBOHYDRATE) ?: 0f),
                 "sugar" to (dataPoint.getValue(DataType.NutritionType.SUGAR) ?: 0f),
@@ -866,29 +836,20 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 "potassium" to (dataPoint.getValue(DataType.NutritionType.POTASSIUM) ?: 0f),
                 "calcium" to (dataPoint.getValue(DataType.NutritionType.CALCIUM) ?: 0f),
                 "iron" to (dataPoint.getValue(DataType.NutritionType.IRON) ?: 0f),
-                // 비타민 필드들은 Samsung Health SDK에서 지원하지 않을 수 있음
-                // "vitamin_a" to (dataPoint.getValue(DataType.NutritionType.VITAMIN_A) ?: 0f),
-                // "vitamin_c" to (dataPoint.getValue(DataType.NutritionType.VITAMIN_C) ?: 0f),
-                // "vitamin_d" to (dataPoint.getValue(DataType.NutritionType.VITAMIN_D) ?: 0f),
-                // "vitamin_e" to (dataPoint.getValue(DataType.NutritionType.VITAMIN_E) ?: 0f),
-                // "vitamin_k" to (dataPoint.getValue(DataType.NutritionType.VITAMIN_K) ?: 0f)
-                "nutrition_category" to "basic_nutrients"
+                "vitamin_a" to (dataPoint.getValue(DataType.NutritionType.VITAMIN_A) ?: 0f),
+                "vitamin_c" to (dataPoint.getValue(DataType.NutritionType.VITAMIN_C) ?: 0f),
             )
-            
-            Log.v(APP_TAG, "영양 데이터 맵: ${nutritionData}")
             resultList.add(nutritionData)
         }
-
-        Log.d(APP_TAG, "영양 데이터 조회 완료: ${resultList.size}건")
         return resultList
     }
 
-    private suspend fun readWeightData(
+    private suspend fun readBodyMeasurementData(
         store: HealthDataStore,
         startTime: LocalDateTime,
         endTime: LocalDateTime
     ): List<Map<String, Any>> {
-        Log.d(APP_TAG, "체중 데이터 조회 시작 - 시작시간: $startTime, 끝시간: $endTime")
+        Log.d(APP_TAG, "신체 데이터 조회 시작 - 시작시간: $startTime, 끝시간: $endTime")
         val readRequest = DataTypes.BODY_COMPOSITION.readDataRequestBuilder
             .setLocalTimeFilter(LocalTimeFilter.of(startTime, endTime))
             .setOrdering(Ordering.DESC)
@@ -896,38 +857,21 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
 
         val result = store.readData(readRequest)
         val resultList = mutableListOf<Map<String, Any>>()
-        Log.d(APP_TAG, "체중 데이터 조회 결과: ${result.dataList.size}개 데이터 포인트")
 
         for (dataPoint in result.dataList) {
-            Log.v(APP_TAG, "체중 데이터 포인트 UID: ${dataPoint.uid}")
-            val weight = dataPoint.getValue(DataType.BodyCompositionType.WEIGHT) ?: 0f
-            val height = dataPoint.getValue(DataType.BodyCompositionType.HEIGHT) ?: 0f
-            val bodyFat = dataPoint.getValue(DataType.BodyCompositionType.BODY_FAT) ?: 0f
-            
-            Log.v(APP_TAG, "체중 데이터: Weight=$weight, Height=$height, BodyFat=$bodyFat")
-            
             val bodyData = mapOf(
                 "uid" to (dataPoint.uid ?: ""),
                 "start_time" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
                 "end_time" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
-                "weight" to weight,
-                "height" to height,
-                "body_fat" to bodyFat,
+                "weight" to (dataPoint.getValue(DataType.BodyCompositionType.WEIGHT) ?: 0f),
+                "height" to (dataPoint.getValue(DataType.BodyCompositionType.HEIGHT) ?: 0f),
+                "body_fat" to (dataPoint.getValue(DataType.BodyCompositionType.BODY_FAT) ?: 0f),
                 "skeletal_muscle" to (dataPoint.getValue(DataType.BodyCompositionType.SKELETAL_MUSCLE) ?: 0f),
                 "basal_metabolic_rate" to (dataPoint.getValue(DataType.BodyCompositionType.BASAL_METABOLIC_RATE) ?: 0f),
-                // 고급 체성분 필드들은 Samsung Health SDK에서 지원하지 않을 수 있음
-                // "body_water" to (dataPoint.getValue(DataType.BodyCompositionType.BODY_WATER) ?: 0f),
-                // "visceral_fat_level" to (dataPoint.getValue(DataType.BodyCompositionType.VISCERAL_FAT_LEVEL) ?: 0f),
-                // "bone_mass" to (dataPoint.getValue(DataType.BodyCompositionType.BONE_MASS) ?: 0f),
-                // "muscle_mass" to (dataPoint.getValue(DataType.BodyCompositionType.MUSCLE_MASS) ?: 0f)
-                "body_composition_category" to "basic_metrics"
+                "muscle_mass" to (dataPoint.getValue(DataType.BodyCompositionType.MUSCLE_MASS) ?: 0f)
             )
-            
-            Log.v(APP_TAG, "체중 데이터 맵: ${bodyData}")
             resultList.add(bodyData)
         }
-
-        Log.d(APP_TAG, "체중 데이터 조회 완료: ${resultList.size}건")
         return resultList
     }
 
@@ -944,29 +888,16 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
 
         val result = store.readData(readRequest)
         val resultList = mutableListOf<Map<String, Any>>()
-        Log.d(APP_TAG, "산소포화도 데이터 조회 결과: ${result.dataList.size}개 데이터 포인트")
 
         for (dataPoint in result.dataList) {
-            Log.v(APP_TAG, "산소포화도 데이터 포인트 UID: ${dataPoint.uid}")
-            val oxygenSaturation = dataPoint.getValue(DataType.BloodOxygenType.OXYGEN_SATURATION) ?: 0f
-            // val heartRate = dataPoint.getValue(DataType.BloodOxygenType.HEART_RATE) ?: 0f // HEART_RATE 필드가 지원되지 않음
-            
-            Log.v(APP_TAG, "산소포화도 데이터: SpO2=$oxygenSaturation")
-            
             val oxygenData = mapOf(
                 "uid" to (dataPoint.uid ?: ""),
                 "start_time" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
                 "end_time" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
-                "oxygen_saturation" to oxygenSaturation,
-                "spo2" to oxygenSaturation
-                // "heart_rate" to heartRate // 산소포화도 데이터에서는 심박수가 지원되지 않을 수 있음
+                "oxygen_saturation" to (dataPoint.getValue(DataType.BloodOxygenType.OXYGEN_SATURATION) ?: 0f),
             )
-            
-            Log.v(APP_TAG, "산소포화도 데이터 맵: ${oxygenData}")
             resultList.add(oxygenData)
         }
-
-        Log.d(APP_TAG, "산소포화도 데이터 조회 완료: ${resultList.size}건")
         return resultList
     }
 
@@ -983,29 +914,19 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
 
         val result = store.readData(readRequest)
         val resultList = mutableListOf<Map<String, Any>>()
-        Log.d(APP_TAG, "체온 데이터 조회 결과: ${result.dataList.size}개 데이터 포인트")
 
         for (dataPoint in result.dataList) {
-            Log.v(APP_TAG, "체온 데이터 포인트 UID: ${dataPoint.uid}")
-            val temperature = dataPoint.getValue(DataType.BodyTemperatureType.BODY_TEMPERATURE) ?: 0f
-            
-            Log.v(APP_TAG, "체온 데이터: Temperature=${temperature}°C")
-            
+            val temperature = dataPoint.getValue(DataType.BodyTemperatureType.BODY_TEMPERATURE) ?: 0f;
+
             val temperatureData = mapOf(
                 "uid" to (dataPoint.uid ?: ""),
                 "start_time" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
                 "end_time" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
                 "temperature" to temperature,
-                "body_temperature" to temperature,
-                "temperature_celsius" to temperature,
                 "temperature_fahrenheit" to ((temperature * 9 / 5) + 32)
             )
-            
-            Log.v(APP_TAG, "체온 데이터 맵: ${temperatureData}")
             resultList.add(temperatureData)
         }
-
-        Log.d(APP_TAG, "체온 데이터 조회 완료: ${resultList.size}건")
         return resultList
     }
 
@@ -1022,22 +943,17 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
 
         val result = store.readData(readRequest)
         val resultList = mutableListOf<Map<String, Any>>()
-        Log.d(APP_TAG, "혈당 데이터 조회 결과: ${result.dataList.size}개 데이터 포인트")
 
         for (dataPoint in result.dataList) {
-            Log.v(APP_TAG, "혈당 데이터 포인트 UID: ${dataPoint.uid}")
             val glucoseMmol = dataPoint.getValue(DataType.BloodGlucoseType.GLUCOSE_LEVEL) ?: 0f
             val glucoseMgdl = glucoseMmol * 18.018f
             val measurementType = dataPoint.getValue(DataType.BloodGlucoseType.MEASUREMENT_TYPE)
             val mealStatus = dataPoint.getValue(DataType.BloodGlucoseType.MEAL_STATUS)
-            
-            Log.v(APP_TAG, "혈당 데이터: Glucose=${glucoseMmol}mmol/L (${glucoseMgdl}mg/dL), MeasurementType=${measurementType?.name}, MealStatus=${mealStatus?.name}")
 
             val glucoseData = mapOf(
                 "uid" to (dataPoint.uid ?: ""),
                 "start_time" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
                 "end_time" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
-                "glucose_level" to glucoseMmol,
                 "glucose_mmol" to glucoseMmol,
                 "glucose_mgdl" to glucoseMgdl,
                 "measurement_type" to (measurementType?.ordinal ?: 0),
@@ -1045,12 +961,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 "meal_status" to (mealStatus?.ordinal ?: 0),
                 "meal_status_name" to (mealStatus?.name ?: "Unknown")
             )
-            
-            Log.v(APP_TAG, "혈당 데이터 맵: ${glucoseData}")
             resultList.add(glucoseData)
         }
-
-        Log.d(APP_TAG, "혈당 데이터 조회 완료: ${resultList.size}건")
         return resultList
     }
 
