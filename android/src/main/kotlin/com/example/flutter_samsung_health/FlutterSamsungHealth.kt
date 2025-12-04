@@ -458,8 +458,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
 
         CoroutineScope(Dispatchers.IO).launch {
             runCatching {
-                val startTime = Instant.ofEpochMilli(start).atZone(ZoneOffset.systemDefault()).toLocalDateTime()
-                val endTime = Instant.ofEpochMilli(end).atZone(ZoneOffset.systemDefault()).toLocalDateTime()
                 Log.i(APP_TAG, "전체 데이터 조회 시작: ${startTime} ~ ${endTime}")
 
                 // 각 데이터 타입별로 runCatching을 사용하여 개별 실패를 처리
