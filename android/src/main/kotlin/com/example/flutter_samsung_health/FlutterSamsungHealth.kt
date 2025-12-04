@@ -458,6 +458,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
 
         CoroutineScope(Dispatchers.IO).launch {
             runCatching {
+                val startTime = Instant.ofEpochMilli(start).atZone(ZoneOffset.UTC).toLocalDateTime()
+                val endTime = Instant.ofEpochMilli(end).atZone(ZoneOffset.UTC).toLocalDateTime()
                 Log.i(APP_TAG, "전체 데이터 조회 시작: ${startTime} ~ ${endTime}")
 
                 // 각 데이터 타입별로 runCatching을 사용하여 개별 실패를 처리
@@ -606,8 +608,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
 
         CoroutineScope(Dispatchers.IO).launch {
             runCatching {
-                val startTime = Instant.ofEpochMilli(start).atZone(ZoneOffset.systemDefault()).toLocalDateTime()
-                val endTime = Instant.ofEpochMilli(end).atZone(ZoneOffset.systemDefault()).toLocalDateTime()
+                val startTime = Instant.ofEpochMilli(start).atZone(ZoneOffset.UTC).toLocalDateTime()
+                val endTime = Instant.ofEpochMilli(end).atZone(ZoneOffset.UTC).toLocalDateTime()
                 Log.d(APP_TAG, "데이터 읽기: ${startTime} ~ ${endTime}")
                 reader(store, startTime, endTime)
             }.onSuccess { data ->
@@ -832,8 +834,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 }
                 
                 val stepData = mapOf(
-                    "start_time" to currentTime.toEpochSecond(ZoneOffset.systemDefault().rules.getOffset(currentTime)) * 1000,
-                    "end_time" to actualEnd.toEpochSecond(ZoneOffset.systemDefault().rules.getOffset(actualEnd)) * 1000,
+                    "start_time" to currentTime.toEpochSecond(ZoneOffset.UTC) * 1000,
+                    "end_time" to actualEnd.toEpochSecond(ZoneOffset.UTC) * 1000,
                     "steps" to intervalSteps,
                     "interval_minutes" to 5,
                     "data_type" to "FIVE_MINUTE_STEPS"
@@ -844,8 +846,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 Log.w(APP_TAG, "5분 구간 걸음수 조회 실패 ($currentTime ~ $actualEnd): ${e.message}")
                 // 실패한 구간도 0으로라도 넣어줄지 결정
                 val stepData = mapOf(
-                    "start_time" to currentTime.toEpochSecond(ZoneOffset.systemDefault().rules.getOffset(currentTime)) * 1000,
-                    "end_time" to actualEnd.toEpochSecond(ZoneOffset.systemDefault().rules.getOffset(actualEnd)) * 1000,
+                    "start_time" to currentTime.toEpochSecond(ZoneOffset.UTC) * 1000,
+                    "end_time" to actualEnd.toEpochSecond(ZoneOffset.UTC) * 1000,
                     "steps" to 0L,
                     "interval_minutes" to 5,
                     "data_type" to "FIVE_MINUTE_STEPS",
