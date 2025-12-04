@@ -120,10 +120,22 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
         .toList();
   }
 
-  /// 걸음 조회 (집계 데이터)
+  /// 걸음 조회
   @override
-  Future<List<Map<String, dynamic>>> getStepData(int start, int end) async {
-    final result = await methodChannel.invokeMethod<List>('getStepData', {
+  Future<List<Map<String, dynamic>>> getStepsData(int start, int end) async {
+    final result = await methodChannel.invokeMethod<List>('getStepsData', {
+      'start': start,
+      'end': end,
+    });
+    return (result ?? [])
+        .map((item) => Map<String, dynamic>.from((item as Map).map((key, value) => MapEntry(key.toString(), value))))
+        .toList();
+  }
+
+  /// 5분 간격 걸음 조회
+  @override
+  Future<List<Map<String, dynamic>>> getFiveMinuteStepsData(int start, int end) async {
+    final result = await methodChannel.invokeMethod<List>('getFiveMinuteStepsData', {
       'start': start,
       'end': end,
     });

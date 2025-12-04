@@ -63,12 +63,20 @@ class FlutterSamsungHealth {
     return FlutterSamsungHealthPlatform.instance.getSleepData(start, end);
   }
 
-  /// 걸음 조회 (집계 데이터)
-  Future<List<Map<String, dynamic>>> getStepData({
+  /// 걸음 조회
+  Future<List<Map<String, dynamic>>> getStepsData({
     required int start,
     required int end,
   }) {
-    return FlutterSamsungHealthPlatform.instance.getStepData(start, end);
+    return FlutterSamsungHealthPlatform.instance.getStepsData(start, end);
+  }
+
+  /// 5분 간격 걸음 조회
+  Future<List<Map<String, dynamic>>> getFiveMinuteStepsData({
+    required int start,
+    required int end,
+  }) {
+    return FlutterSamsungHealthPlatform.instance.getFiveMinuteStepsData(start, end);
   }
 
   /// 영양소 조회

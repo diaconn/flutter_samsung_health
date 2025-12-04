@@ -134,10 +134,16 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 getSleepData(start, end, wrapper)
             }
 
-            "getStepData" -> {
+            "getStepsData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
-                getStepData(start, end, wrapper)
+                getStepsData(start, end, wrapper)
+            }
+
+            "getFiveMinuteStepsData" -> {
+                val start = call.argument<Long>("start")!!
+                val end = call.argument<Long>("end")!!
+                getFiveMinuteStepsData(start, end, wrapper)
             }
 
             "getNutritionData" -> {
@@ -469,7 +475,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                     .onFailure { Log.w(APP_TAG, "Sleep 데이터 조회 실패: ${it.message}") }
                     .getOrElse { emptyList() }
 
-                val steps = runCatching { readStepData(store, startTime, endTime) }
+                val steps = runCatching { readStepsData(store, startTime, endTime) }
                     .onFailure { Log.w(APP_TAG, "Steps 데이터 조회 실패: ${it.message}") }
                     .getOrElse { emptyList() }
 
@@ -546,9 +552,15 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         }
     }
 
-    private fun getStepData(start: Long, end: Long, wrapper: ResultWrapper) {
+    private fun getStepsData(start: Long, end: Long, wrapper: ResultWrapper) {
         readDataWithWrapper(start, end, wrapper) { store, startTime, endTime ->
-            readStepData(store, startTime, endTime)
+            readStepsData(store, startTime, endTime)
+        }
+    }
+
+    private fun getFiveMinuteStepsData(start: Long, end: Long, wrapper: ResultWrapper) {
+        readDataWithWrapper(start, end, wrapper) { store, startTime, endTime ->
+            readFiveMinuteStepsData(store, startTime, endTime)
         }
     }
 
@@ -598,7 +610,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             runCatching {
                 val startTime = Instant.ofEpochMilli(start).atZone(ZoneOffset.systemDefault()).toLocalDateTime()
                 val endTime = Instant.ofEpochMilli(end).atZone(ZoneOffset.systemDefault()).toLocalDateTime()
-                Log.i(APP_TAG, "데이터 읽기 시작: ${startTime} ~ ${endTime}")
+                Log.d(APP_TAG, "데이터 읽기: ${startTime} ~ ${endTime}")
                 reader(store, startTime, endTime)
             }.onSuccess { data ->
                 Log.i(APP_TAG, "데이터 읽기 성공: ${data.size}건")
@@ -766,116 +778,88 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         return resultList
     }
 
-    private suspend fun readStepData(
+    private suspend fun readStepsData(
         store: HealthDataStore,
         startTime: LocalDateTime,
         endTime: LocalDateTime
     ): List<Map<String, Any>> {
         Log.d(APP_TAG, "걸음 데이터 조회 시작 - 시작시간: $startTime, 끝시간: $endTime")
 
+        // 새 SDK는 집계 데이터 조회 - DataType.StepsType.TOTAL.requestBuilder 사용
+        val readRequest = DataType.StepsType.TOTAL.requestBuilder
+            .setLocalTimeFilter(LocalTimeFilter.of(startTime, endTime))
+            .build()
+
+        val result = store.aggregateData(readRequest)
         val resultList = mutableListOf<Map<String, Any>>()
+
+        for (aggregateData in result.dataList) {
+            val stepData = mapOf(
+                "start_time" to (aggregateData.startTime?.toEpochMilli() ?: 0L),
+                "end_time" to (aggregateData.endTime?.toEpochMilli() ?: 0L),
+                "steps" to (aggregateData.value ?: 0L),
+                "data_type" to "TOTAL_STEPS"
+            )
+            resultList.add(stepData)
+        }
+        return resultList
+    }
+
+    private suspend fun readFiveMinuteStepsData(
+        store: HealthDataStore,
+        startTime: LocalDateTime,
+        endTime: LocalDateTime
+    ): List<Map<String, Any>> {
+        Log.d(APP_TAG, "5분 간격 걸음 데이터 조회: $startTime ~ $endTime")
         
-        // 걸음수 집계 데이터
-        try {
-            val stepsRequest = DataType.StepsType.TOTAL.requestBuilder
-                .setLocalTimeFilter(LocalTimeFilter.of(startTime, endTime))
-                .build()
-            val stepsResult = store.aggregateData(stepsRequest)
+        val resultList = mutableListOf<Map<String, Any>>()
+        var currentTime = startTime
+        
+        // 5분씩 증가하면서 구간별 조회
+        while (currentTime.isBefore(endTime)) {
+            val intervalEnd = currentTime.plusMinutes(5)
+            val actualEnd = if (intervalEnd.isAfter(endTime)) endTime else intervalEnd
             
-            Log.v(APP_TAG, "=== 걸음수 집계 데이터 ===")
-            for (aggregateData in stepsResult.dataList) {
-                Log.v(APP_TAG, "StepsAggregate: $aggregateData")
+            try {
+                // 각 5분 구간의 걸음수 집계
+                val readRequest = DataType.StepsType.TOTAL.requestBuilder
+                    .setLocalTimeFilter(LocalTimeFilter.of(currentTime, actualEnd))
+                    .build()
+                
+                val result = store.aggregateData(readRequest)
+                
+                var intervalSteps = 0L
+                for (aggregateData in result.dataList) {
+                    intervalSteps += aggregateData.value ?: 0L
+                }
+                
                 val stepData = mapOf(
-                    "start_time" to (aggregateData.startTime?.toEpochMilli() ?: 0L),
-                    "end_time" to (aggregateData.endTime?.toEpochMilli() ?: 0L),
-                    "steps" to (aggregateData.value ?: 0L),
-                    "data_type" to "TOTAL_STEPS"
+                    "start_time" to currentTime.toEpochSecond(ZoneOffset.systemDefault().rules.getOffset(currentTime)) * 1000,
+                    "end_time" to actualEnd.toEpochSecond(ZoneOffset.systemDefault().rules.getOffset(actualEnd)) * 1000,
+                    "steps" to intervalSteps,
+                    "interval_minutes" to 5,
+                    "data_type" to "FIVE_MINUTE_STEPS"
+                )
+                resultList.add(stepData)
+                
+            } catch (e: Exception) {
+                Log.w(APP_TAG, "5분 구간 걸음수 조회 실패 ($currentTime ~ $actualEnd): ${e.message}")
+                // 실패한 구간도 0으로라도 넣어줄지 결정
+                val stepData = mapOf(
+                    "start_time" to currentTime.toEpochSecond(ZoneOffset.systemDefault().rules.getOffset(currentTime)) * 1000,
+                    "end_time" to actualEnd.toEpochSecond(ZoneOffset.systemDefault().rules.getOffset(actualEnd)) * 1000,
+                    "steps" to 0L,
+                    "interval_minutes" to 5,
+                    "data_type" to "FIVE_MINUTE_STEPS",
+                    "error" to true
                 )
                 resultList.add(stepData)
             }
-        } catch (e: Exception) {
-            Log.w(APP_TAG, "걸음수 집계 조회 실패: ${e.message}")
+            
+            currentTime = currentTime.plusMinutes(5)
         }
         
-        // 칼로리 집계 데이터 시도 - Exercise 데이터에서 칼로리 총합 구하기
-        Log.v(APP_TAG, "=== 칼로리 집계 (Exercise 기반) ===")
-        try {
-            val exerciseRequest = DataTypes.EXERCISE.readDataRequestBuilder
-                .setLocalTimeFilter(LocalTimeFilter.of(startTime, endTime))
-                .build()
-            val exerciseResult = store.readData(exerciseRequest)
-            
-            var totalCalories = 0f
-            for (dataPoint in exerciseResult.dataList) {
-                val sessions = dataPoint.getValue(DataType.ExerciseType.SESSIONS)
-                sessions?.forEach { session ->
-                    totalCalories += session.calories ?: 0f
-                }
-            }
-            
-            if (totalCalories > 0) {
-                val caloriesData = mapOf(
-                    "start_time" to startTime.toEpochSecond(ZoneOffset.systemDefault().rules.getOffset(startTime)) * 1000,
-                    "end_time" to endTime.toEpochSecond(ZoneOffset.systemDefault().rules.getOffset(endTime)) * 1000,
-                    "calories" to totalCalories,
-                    "data_type" to "TOTAL_CALORIES_FROM_EXERCISE"
-                )
-                resultList.add(caloriesData)
-                Log.v(APP_TAG, "총 운동 칼로리: $totalCalories")
-            }
-        } catch (e: Exception) {
-            Log.w(APP_TAG, "운동 기반 칼로리 집계 실패: ${e.message}")
-        }
-        
-        // 거리 집계 데이터 시도 - Exercise 데이터에서 거리 총합 구하기
-        Log.v(APP_TAG, "=== 거리 집계 (Exercise 기반) ===")
-        try {
-            val exerciseRequest = DataTypes.EXERCISE.readDataRequestBuilder
-                .setLocalTimeFilter(LocalTimeFilter.of(startTime, endTime))
-                .build()
-            val exerciseResult = store.readData(exerciseRequest)
-            
-            var totalDistance = 0f
-            for (dataPoint in exerciseResult.dataList) {
-                val sessions = dataPoint.getValue(DataType.ExerciseType.SESSIONS)
-                sessions?.forEach { session ->
-                    totalDistance += session.distance ?: 0f
-                }
-            }
-            
-            if (totalDistance > 0) {
-                val distanceData = mapOf(
-                    "start_time" to startTime.toEpochSecond(ZoneOffset.systemDefault().rules.getOffset(startTime)) * 1000,
-                    "end_time" to endTime.toEpochSecond(ZoneOffset.systemDefault().rules.getOffset(endTime)) * 1000,
-                    "distance" to totalDistance,
-                    "data_type" to "TOTAL_DISTANCE_FROM_EXERCISE"
-                )
-                resultList.add(distanceData)
-                Log.v(APP_TAG, "총 운동 거리: $totalDistance")
-            }
-        } catch (e: Exception) {
-            Log.w(APP_TAG, "운동 기반 거리 집계 실패: ${e.message}")
-        }
-        
-        // 사용 가능한 모든 DataType 확인 (디버깅용)
-        Log.v(APP_TAG, "=== 사용 가능한 DataType들 확인 ===")
-        try {
-            val dataTypeClass = DataType::class.java
-            val innerClasses = dataTypeClass.declaredClasses
-            
-            for (innerClass in innerClasses) {
-                Log.v(APP_TAG, "DataType 내부 클래스: ${innerClass.simpleName}")
-                try {
-                    val totalField = innerClass.getDeclaredField("TOTAL")
-                    Log.v(APP_TAG, "  -> TOTAL 필드 있음: ${totalField.type}")
-                } catch (e: Exception) {
-                    // TOTAL 필드 없음
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(APP_TAG, "DataType 분석 실패: ${e.message}")
-        }
-        
+        Log.d(APP_TAG, "5분 간격 조회 완료: ${resultList.size}개 구간")
         return resultList
     }
 
