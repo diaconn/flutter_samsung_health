@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.samsung.android.sdk.health.data.HealthDataService
 import com.samsung.android.sdk.health.data.HealthDataStore
@@ -13,6 +15,10 @@ import com.samsung.android.sdk.health.data.request.DataType
 import com.samsung.android.sdk.health.data.request.DataTypes
 import com.samsung.android.sdk.health.data.request.LocalTimeFilter
 import com.samsung.android.sdk.health.data.request.Ordering
+import com.samsung.android.sdk.health.data.request.InstantTimeFilter
+import com.samsung.android.sdk.health.data.data.HealthDataPoint
+import com.samsung.android.sdk.health.data.data.Change
+import com.samsung.android.sdk.health.data.data.ChangeType
 import com.samsung.android.sdk.health.data.error.ResolvablePlatformException
 import com.samsung.android.sdk.health.data.error.HealthDataException
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -25,6 +31,12 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Instant
@@ -38,6 +50,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
     private lateinit var context: Context
     private var healthDataStore: HealthDataStore? = null
     private var activity: Activity? = null
+    
+    // EventChannel에 연결된 리스너들 (여러 개 리스너 지원)
     private val eventSinks = mutableListOf<EventChannel.EventSink>()
 
     private val APP_TAG: String = "FlutterSamsungHealth"
@@ -84,6 +98,354 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             DataTypes.BODY_TEMPERATURE -> "body_temperature"
             DataTypes.BLOOD_GLUCOSE -> "blood_glucose"
             else -> permission.dataType.toString()
+        }
+    }
+
+    private enum class ObservedType {
+        EXERCISE,
+        NUTRITION,
+        BLOOD_GLUCOSE
+    }
+
+    private var exerciseChangeLastSync: Instant = Instant.EPOCH
+    private var nutritionChangeLastSync: Instant = Instant.EPOCH
+    private var bloodGlucoseChangeLastSync: Instant = Instant.EPOCH
+
+    private var changeScope: CoroutineScope? = null
+    private val changeJobs = mutableMapOf<ObservedType, Job>()
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    /**
+     * Flutter에서 전송된 구독 타입 목록을 ObservedType Set으로 변환
+     * @param arguments Flutter receiveBroadcastStream()의 인자 (예: ['exercise', 'nutrition'])
+     * @return 감시할 데이터 타입 Set (기본값: 전체 타입)
+     */
+    private fun parseObservedTypes(arguments: Any?): Set<ObservedType> {
+        // 인자가 없으면 "전체 타입 구독"이 기본값
+        if (arguments !is List<*>) {
+            return setOf(
+                ObservedType.EXERCISE,
+                ObservedType.NUTRITION,
+                ObservedType.BLOOD_GLUCOSE
+            )
+        }
+
+        val names = arguments.mapNotNull { it as? String }
+        val set = names.mapNotNull { name ->
+            when (name.lowercase()) {
+                "exercise" -> ObservedType.EXERCISE
+                "nutrition" -> ObservedType.NUTRITION
+                "blood_glucose" -> ObservedType.BLOOD_GLUCOSE
+                else -> null
+            }
+        }.toSet()
+
+        // 아무 것도 매칭되지 않으면 역시 전체 타입을 기본으로
+        return if (set.isEmpty()) {
+            setOf(
+                ObservedType.EXERCISE,
+                ObservedType.NUTRITION,
+                ObservedType.BLOOD_GLUCOSE
+            )
+        } else {
+            se
+        }
+    }
+
+    /**
+     * 운동 데이터 변경 이벤트를 Flutter 전송용 Map으로 변환
+     * - UPSERT: 새로 추가/수정된 운동 데이터의 상세 정보 포함
+     * - DELETE: 삭제된 데이터의 UID만 포함
+     * @param change Samsung Health Change<HealthDataPoint> 객체
+     * @return Flutter EventChannel로 전송할 Map 데이터
+     */
+    private fun mapExerciseChange(change: Change<HealthDataPoint>): Map<String, Any?> {
+        // 삭제 이벤트일 때는 uid만 넘긴다
+        if (change.changeType == ChangeType.DELETE) {
+            return mapOf(
+                "data_type" to "exercise",
+                "change_type" to "DELETE",
+                "uid" to change.deleteDataUid
+            )
+        }
+
+        val dp = change.upsertDataPoint
+        val exerciseType = dp.getValue(DataType.ExerciseType.EXERCISE_TYPE)
+        val sessions = dp.getValue(DataType.ExerciseType.SESSIONS)
+
+        // 첫 번째 세션의 정보만 포함 (필요시 전체 세션 배열로 확장 가능)
+        val session = sessions?.firstOrNull()
+
+        return mapOf(
+            "data_type" to "exercise",
+            "change_type" to "UPSERT",
+            "uid" to (dp.uid ?: ""),
+            "start_time" to (dp.startTime?.toEpochMilli() ?: 0L),
+            "end_time" to (dp.endTime?.toEpochMilli() ?: 0L),
+            "exercise_type" to (exerciseType?.ordinal ?: 0),
+            "exercise_type_name" to (exerciseType?.name ?: "Unknown"),
+            "duration" to (session?.duration?.toMillis() ?: 0L),
+            "calories" to (session?.calories ?: 0f),
+            "distance" to (session?.distance ?: 0f),
+            "max_heart_rate" to (session?.maxHeartRate ?: 0f),
+            "mean_heart_rate" to (session?.meanHeartRate ?: 0f),
+            "min_heart_rate" to (session?.minHeartRate ?: 0f),
+        )
+    }
+
+    /**
+     * 영양 데이터 변경 이벤트를 Flutter 전송용 Map으로 변환
+     * @param change Samsung Health Change<HealthDataPoint> 객체
+     * @return Flutter EventChannel로 전송할 Map 데이터
+     */
+    private fun mapNutritionChange(change: Change<HealthDataPoint>): Map<String, Any?> {
+        if (change.changeType == ChangeType.DELETE) {
+            return mapOf(
+                "data_type" to "nutrition",
+                "change_type" to "DELETE",
+                "uid" to change.deleteDataUid
+            )
+        }
+
+        val dp = change.upsertDataPoint
+        val mealType = dp.getValue(DataType.NutritionType.MEAL_TYPE)
+
+        return mapOf(
+            "data_type" to "nutrition",
+            "change_type" to "UPSERT",
+            "uid" to (dp.uid ?: ""),
+            "start_time" to (dp.startTime?.toEpochMilli() ?: 0L),
+            "end_time" to (dp.endTime?.toEpochMilli() ?: 0L),
+            "title" to (dp.getValue(DataType.NutritionType.TITLE) ?: ""),
+            "meal_type" to (mealType?.ordinal ?: 0),
+            "meal_type_name" to (mealType?.name ?: "Unknown"),
+            "calories" to (dp.getValue(DataType.NutritionType.CALORIES) ?: 0f),
+            "total_fat" to (dp.getValue(DataType.NutritionType.TOTAL_FAT) ?: 0f),
+            "protein" to (dp.getValue(DataType.NutritionType.PROTEIN) ?: 0f),
+            "carbohydrate" to (dp.getValue(DataType.NutritionType.CARBOHYDRATE) ?: 0f),
+        )
+    }
+
+    /**
+     * 혈당 데이터 변경 이벤트를 Flutter 전송용 Map으로 변환
+     * @param change Samsung Health Change<HealthDataPoint> 객체
+     * @return Flutter EventChannel로 전송할 Map 데이터
+     */
+    private fun mapBloodGlucoseChange(change: Change<HealthDataPoint>): Map<String, Any?> {
+        if (change.changeType == ChangeType.DELETE) {
+            return mapOf(
+                "data_type" to "blood_glucose",
+                "change_type" to "DELETE",
+                "uid" to change.deleteDataUid
+            )
+        }
+
+        val dp = change.upsertDataPoint
+        val glucoseMmol = dp.getValue(DataType.BloodGlucoseType.GLUCOSE_LEVEL) ?: 0f
+        val glucoseMgdl = glucoseMmol * 18.018f  // mmol/L to mg/dL 변환
+        val measurementType = dp.getValue(DataType.BloodGlucoseType.MEASUREMENT_TYPE)
+        val mealStatus = dp.getValue(DataType.BloodGlucoseType.MEAL_STATUS)
+
+        return mapOf(
+            "data_type" to "blood_glucose",
+            "change_type" to "UPSERT",
+            "uid" to (dp.uid ?: ""),
+            "start_time" to (dp.startTime?.toEpochMilli() ?: 0L),
+            "end_time" to (dp.endTime?.toEpochMilli() ?: 0L),
+            "glucose_mmol" to glucoseMmol,
+            "glucose_mgdl" to glucoseMgdl,
+            "measurement_type" to (measurementType?.ordinal ?: 0),
+            "measurement_type_name" to (measurementType?.name ?: "Unknown"),
+            "meal_status" to (mealStatus?.ordinal ?: 0),
+            "meal_status_name" to (mealStatus?.name ?: "Unknown"),
+        )
+    }
+
+    /**
+     * EventChannel에 연결된 모든 sink로 이벤트를 전송
+     * - Handler를 사용해 메인 스레드에서 안전하게 전송
+     * - 전송 실패한 리스너는 자동으로 제거
+     * @param event Flutter로 전송할 변경 이벤트 Map
+     */
+    private fun sendEventToSinks(event: Map<String, Any?>) {
+        if (eventSinks.isEmpty()) return
+
+        mainHandler.post {
+            val iterator = eventSinks.iterator()
+            while (iterator.hasNext()) {
+                try {
+                    iterator.next().success(event)
+                } catch (e: Exception) {
+                    Log.e(APP_TAG, "EventSink 전송 중 오류: ${e.message}", e)
+                    iterator.remove() // 실패한 sink는 제거
+                }
+            }
+        }
+    }
+
+    /**
+     * 실시간 변경 감시 시작
+     * - 첫 EventChannel 리스너 연결 시 호출
+     * - 타입별로 독립적인 코루틴으로 변경 감시 시작
+     * @param observedTypes 감시할 데이터 타입 Set
+     */
+    private fun startChangeObservers(observedTypes: Set<ObservedType>) {
+        val store = healthDataStore
+        if (store == null) {
+            Log.w(APP_TAG, "startChangeObservers() 호출 시 store가 null입니다. connect() 후 다시 시도해야 합니다.")
+            return
+        }
+
+        if (changeScope != null) {
+            Log.d(APP_TAG, "Change observers already running, 무시")
+            return
+        }
+
+        Log.d(APP_TAG, "Change observers 시작 - observedTypes=$observedTypes")
+
+        // 최근 1분 전부터 변경 내역을 조회하도록 초기값 설정
+        val now = Instant.now()
+        exerciseChangeLastSync = now.minusSeconds(60)
+        nutritionChangeLastSync = now.minusSeconds(60)
+        bloodGlucoseChangeLastSync = now.minusSeconds(60)
+
+        changeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        // 요청된 타입별로 감시 코루틴 시작
+        if (ObservedType.EXERCISE in observedTypes) {
+            changeJobs[ObservedType.EXERCISE] = changeScope!!.launch {
+                observeExerciseChanges(store)
+            }
+        }
+        if (ObservedType.NUTRITION in observedTypes) {
+            changeJobs[ObservedType.NUTRITION] = changeScope!!.launch {
+                observeNutritionChanges(store)
+            }
+        }
+        if (ObservedType.BLOOD_GLUCOSE in observedTypes) {
+            changeJobs[ObservedType.BLOOD_GLUCOSE] = changeScope!!.launch {
+                observeBloodGlucoseChanges(store)
+            }
+        }
+    }
+
+    /**
+     * 실시간 변경 감시 중단중
+     * - EventChannel이 모두 끊기거나 disconnect()/onDetachedFromEngine()에서 호출
+     */
+    private fun stopChangeObservers() {
+        Log.d(APP_TAG, "Change observers 중단")
+        
+        // 모든 감시 Job 취소
+        changeJobs.values.forEach { it.cancel() }
+        changeJobs.clear()
+        
+        // 코루틴 스코프 취소
+        changeScope?.cancel()
+        changeScope = null
+    }
+
+    /**
+     * 운동 데이터 변경 감시 루프 (폴링 방식)
+     * - while(isActive)로 무한 반복하며 변경사항 체크
+     * - readChanges() API로 마지막 sync 이후 변경분만 조회
+     * - 변경 발견 시 즉시 EventChannel로 이벤트 전송
+     * @param store HealthDataStore 인스턴스
+     * @param pollIntervalMillis 폴링 간격 (기본 10초)
+     */
+    private suspend fun observeExerciseChanges(store: HealthDataStore, pollIntervalMillis: Long = 10_000L) {
+        while (currentCoroutineContext().isActive) {
+            try {
+                val end = Instant.now()
+                val request = DataTypes.EXERCISE.changedDataRequestBuilder
+                    .setChangeTimeFilter(InstantTimeFilter.of(exerciseChangeLastSync, end))
+                    .build()
+
+                val response = store.readChanges(request)
+                val changes = response.dataList
+
+                // 변경 내용이 있으면 EventChannel로 전송
+                for (change in changes) {
+                    val event = mapExerciseChange(change)
+                    sendEventToSinks(event)
+                    Log.d(APP_TAG, "운동 데이터 변경 감지: ${change.changeType} - ${event["uid"]}")
+                }
+
+                // 가장 최근 changeTime 기준으로 lastSync 갱신
+                changes.maxByOrNull { it.changeTime }?.let {
+                    exerciseChangeLastSync = it.changeTime.plusNanos(1)
+                }
+                
+            } catch (e: Exception) {
+                Log.e(APP_TAG, "observeExerciseChanges 오류: ${e.message}", e)
+            }
+
+            delay(pollIntervalMillis)
+        }
+    }
+
+    /**
+     * 영양 데이터 변경 감시 루프
+     */
+    private suspend fun observeNutritionChanges(store: HealthDataStore, pollIntervalMillis: Long = 10_000L) {
+        while (currentCoroutineContext().isActive) {
+            try {
+                val end = Instant.now()
+                val request = DataTypes.NUTRITION.changedDataRequestBuilder
+                    .setChangeTimeFilter(InstantTimeFilter.of(nutritionChangeLastSync, end))
+                    .build()
+
+                val response = store.readChanges(request)
+                val changes = response.dataList
+
+                for (change in changes) {
+                    val event = mapNutritionChange(change)
+                    sendEventToSinks(event)
+                    Log.d(APP_TAG, "영양 데이터 변경 감지: ${change.changeType} - ${event["uid"]}")
+                }
+
+                changes.maxByOrNull { it.changeTime }?.let {
+                    nutritionChangeLastSync = it.changeTime.plusNanos(1)
+                }
+                
+            } catch (e: Exception) {
+                Log.e(APP_TAG, "observeNutritionChanges 오류: ${e.message}", e)
+            }
+
+            delay(pollIntervalMillis)
+        }
+    }
+
+    /**
+     * 혈당 데이터 변경 감시 루프
+     */
+    private suspend fun observeBloodGlucoseChanges(store: HealthDataStore, pollIntervalMillis: Long = 10_000L) {
+        while (currentCoroutineContext().isActive) {
+            try {
+                val end = Instant.now()
+                val request = DataTypes.BLOOD_GLUCOSE.changedDataRequestBuilder
+                    .setChangeTimeFilter(InstantTimeFilter.of(bloodGlucoseChangeLastSync, end))
+                    .build()
+
+                val response = store.readChanges(request)
+                val changes = response.dataList
+
+                for (change in changes) {
+                    val event = mapBloodGlucoseChange(change)
+                    sendEventToSinks(event)
+                    Log.d(APP_TAG, "혈당 데이터 변경 감지: ${change.changeType} - ${event["uid"]}")
+                }
+
+                changes.maxByOrNull { it.changeTime }?.let {
+                    bloodGlucoseChangeLastSync = it.changeTime.plusNanos(1)
+                }
+                
+            } catch (e: Exception) {
+                Log.e(APP_TAG, "observeBloodGlucoseChanges 오류: ${e.message}", e)
+            }
+
+            delay(pollIntervalMillis)
         }
     }
 
@@ -1037,20 +1399,39 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         return resultList
     }
 
-    // ===== EventChannel 구현 =====
-
-    override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-        events?.let { eventSinks.add(it) }
-    }
-
-    override fun onCancel(arguments: Any?) {
-        eventSinks.clear()
-    }
 
     // ===== FlutterPlugin 생명주기 =====
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
+        // 엔진에서 분리될 때도 변경 감시 정리
+        stopChangeObservers()
+    }
+
+    // ===== EventChannel.StreamHandler 구현 =====
+    
+    /**
+     * EventChannel 생명주기 관리
+     * - onListen: 리스너 등록 및 첫 연결시 Observer 시작
+     * - onCancel: 모든 리스너 해제시 Observer 중단
+     */
+    override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+        Log.d(APP_TAG, "EventChannel onListen() 호출 - arguments=$arguments")
+        events?.let { eventSinks.add(it) }
+
+        // "첫 번째 리스너"가 붙을 때 변경 감시 시작
+        if (eventSinks.size == 1) {
+            val observedTypes = parseObservedTypes(arguments)
+            Log.d(APP_TAG, "첫 번째 리스너 연결, 감시 시작: $observedTypes")
+            startChangeObservers(observedTypes)
+        }
+    }
+
+    override fun onCancel(arguments: Any?) {
+        Log.d(APP_TAG, "EventChannel onCancel() 호출")
+        eventSinks.clear()
+        // 더 이상 리스너가 없으면 변경 감시도 중단
+        stopChangeObservers()
     }
 
     // ===== ActivityAware 구현 =====
