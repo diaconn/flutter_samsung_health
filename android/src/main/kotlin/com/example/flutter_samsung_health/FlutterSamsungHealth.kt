@@ -362,8 +362,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
             resultMap["message"] = "Connected successfully"
             wrapper.success(resultMap)
             
-            // 연결 성공 후 저장된 옵저버 상태 복원
-            restoreObserverStatesAfterConnect()
+            // 연결 성공 후 저장된 옵저버 상태 복원 (매번 체크)
+            restoreObserverStatesIfNeeded()
         }.onFailure { error ->
             Log.e(APP_TAG, "연결 실패: ${error.message}")
 
@@ -1697,6 +1697,45 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         // 복원 완료 플래그 설정
         hasRestoredOnce = true
         Log.d(APP_TAG, "옵저버 상태 복원 완료 - 이후 connect() 호출 시 스킵됨")
+    }
+    
+    /**
+     * 필요 시 옵저버 상태 복원 (매 연결마다 체크)
+     */
+    private fun restoreObserverStatesIfNeeded() {
+        if (!::sharedPreferences.isInitialized) {
+            Log.e(APP_TAG, "SharedPreferences가 초기화되지 않음 - 복원 실패")
+            return
+        }
+        
+        Log.d(APP_TAG, "저장된 옵저버 상태 복원 체크 시작")
+        
+        // 현재 실행 중인 옵저버와 저장된 상태 비교
+        for (dataType in ObserverDataType.values()) {
+            val key = "${OBSERVER_STATE_PREFIX}${dataType.typeName}"
+            val savedState = sharedPreferences.getBoolean(key, false)
+            val currentState = observerStates[dataType]?.status == ObserverStatus.RUNNING
+            
+            Log.d(APP_TAG, "[${dataType.typeName}] 저장된 상태: $savedState, 현재 상태: $currentState")
+            
+            if (savedState && !currentState) {
+                // 저장된 상태는 실행중인데 현재는 중지됨 → 복원 필요
+                Log.d(APP_TAG, "[${dataType.typeName}] 복원 필요 - 자동 시작")
+                try {
+                    startObserverInternal(dataType)
+                    Log.d(APP_TAG, "[${dataType.typeName}] 옵저버 자동 복원 성공")
+                } catch (e: Exception) {
+                    Log.e(APP_TAG, "[${dataType.typeName}] 옵저버 자동 복원 실패: ${e.message}")
+                    saveObserverState(dataType, false)
+                }
+            } else if (!savedState && currentState) {
+                // 저장된 상태는 중지인데 현재는 실행중 → 상태 동기화
+                Log.d(APP_TAG, "[${dataType.typeName}] 상태 불일치 - 저장된 상태로 동기화")
+                saveObserverState(dataType, true)
+            }
+        }
+        
+        Log.d(APP_TAG, "옵저버 상태 복원 체크 완료")
     }
     
     /**
