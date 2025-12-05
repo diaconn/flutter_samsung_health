@@ -133,6 +133,10 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     
     // 각 데이터 타입별 마지막 동기화 시간 저장
     private val lastSyncTimes = mutableMapOf<ObserverDataType, Instant>()
+    
+    // 처리된 UID 캐시 (중복 방지용)
+    private val processedUids = mutableMapOf<ObserverDataType, MutableSet<String>>()
+    private val uidCacheCleanupTime = mutableMapOf<ObserverDataType, Long>()
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         context = flutterPluginBinding.applicationContext
@@ -422,6 +426,10 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
             )
         }
         
+        // UID 캐시 정리
+        processedUids.clear()
+        uidCacheCleanupTime.clear()
+        
         Log.d(APP_TAG, "모든 옵저버 정리 완료")
     }
 
@@ -663,22 +671,35 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 try {
                     val changes = readChangesForDataType(store, dataType, lastSync, end)
                     if (changes.isNotEmpty()) {
-                        Log.d(APP_TAG, "[${dataType.typeName}] ${changes.size}개 변경사항 감지")
+                        Log.d(APP_TAG, "[${dataType.typeName}] ${changes.size}개 변경사항 감지 (필터링 전)")
                         
-                        // 변경사항 처리
-                        for (change in changes) {
-                            Log.d(APP_TAG, "[${dataType.typeName}] ${change.changeType} - UID: ${change.upsertDataPoint?.uid ?: change.deleteDataUid}")
+                        // UID 캐시 정리 (1시간마다)
+                        cleanupUidCacheIfNeeded(dataType)
+                        
+                        // 새로운 변경사항만 필터링
+                        val newChanges = filterNewChanges(dataType, changes)
+                        
+                        if (newChanges.isNotEmpty()) {
+                            Log.d(APP_TAG, "[${dataType.typeName}] ${newChanges.size}개 새로운 변경사항 처리")
                             
-                            // 상세 데이터 로그 (getExerciseData 같은 방식으로)
-                            if (change.changeType == ChangeType.UPSERT && change.upsertDataPoint != null) {
-                                val detailedData = getDetailedDataForLog(dataType, change.upsertDataPoint!!)
-                                Log.d(APP_TAG, "[${dataType.typeName}] 상세 데이터: $detailedData")
+                            // 새로운 변경사항만 처리
+                            for (change in newChanges) {
+                                val uid = change.upsertDataPoint?.uid ?: change.deleteDataUid ?: "unknown"
+                                Log.d(APP_TAG, "[${dataType.typeName}] ${change.changeType} - UID: $uid")
+                                
+                                // 상세 데이터 로그 (getExerciseData 같은 방식으로)
+                                if (change.changeType == ChangeType.UPSERT && change.upsertDataPoint != null) {
+                                    val detailedData = getDetailedDataForLog(dataType, change.upsertDataPoint!!)
+                                    Log.d(APP_TAG, "[${dataType.typeName}] 상세 데이터: $detailedData")
+                                }
                             }
+                        } else {
+                            Log.d(APP_TAG, "[${dataType.typeName}] 모든 변경사항이 이미 처리됨 (중복 제거)")
                         }
                         
-                        // 가장 최근 changeTime으로 업데이트
+                        // 가장 최근 changeTime으로 업데이트 (방법2: 1초 후로 설정)
                         changes.maxByOrNull { it.changeTime }?.let { latestChange ->
-                            lastSync = latestChange.changeTime.plusNanos(1)
+                            lastSync = latestChange.changeTime.plusSeconds(1) // 1나노초 → 1초로 변경
                             lastSyncTimes[dataType] = lastSync
                         }
                     }
@@ -1468,6 +1489,51 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
 
     override fun onDetachedFromActivityForConfigChanges() {
         activity = null
+    }
+    
+    // ===== 중복 방지 헬퍼 메서드들 =====
+    
+    /**
+     * UID 캐시 정리 (1시간마다)
+     */
+    private fun cleanupUidCacheIfNeeded(dataType: ObserverDataType) {
+        val now = System.currentTimeMillis()
+        val lastCleanup = uidCacheCleanupTime[dataType] ?: 0
+        
+        // 1시간(3600초)마다 정리
+        if (now - lastCleanup > 3600_000L) {
+            Log.d(APP_TAG, "[${dataType.typeName}] UID 캐시 정리 실행")
+            processedUids[dataType]?.clear()
+            uidCacheCleanupTime[dataType] = now
+        }
+    }
+    
+    /**
+     * 새로운 변경사항만 필터링 (이미 처리된 UID 제외)
+     */
+    private fun filterNewChanges(dataType: ObserverDataType, changes: List<Change<HealthDataPoint>>): List<Change<HealthDataPoint>> {
+        val processedSet = processedUids.getOrPut(dataType) { mutableSetOf() }
+        val newChanges = mutableListOf<Change<HealthDataPoint>>()
+        
+        for (change in changes) {
+            val uid = change.upsertDataPoint?.uid ?: change.deleteDataUid
+            if (uid != null) {
+                if (!processedSet.contains(uid)) {
+                    // 새로운 UID면 처리 목록에 추가
+                    newChanges.add(change)
+                    processedSet.add(uid)
+                    Log.v(APP_TAG, "[${dataType.typeName}] 새로운 UID 등록: $uid")
+                } else {
+                    Log.v(APP_TAG, "[${dataType.typeName}] 중복 UID 스킵: $uid")
+                }
+            } else {
+                // UID가 없는 경우 (예외 상황)
+                newChanges.add(change)
+                Log.w(APP_TAG, "[${dataType.typeName}] UID 없는 변경사항: ${change.changeType}")
+            }
+        }
+        
+        return newChanges
     }
     
     /**
