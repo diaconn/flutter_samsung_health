@@ -141,6 +141,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     
     // SharedPreferences for persistent observer state
     private lateinit var sharedPreferences: SharedPreferences
+    private var hasRestoredOnce = false // 한 번만 복원되도록 플래그
     private companion object {
         const val OBSERVER_PREFS = "samsung_health_observers"
         const val OBSERVER_STATE_PREFIX = "observer_"
@@ -154,8 +155,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         // SharedPreferences 초기화
         sharedPreferences = context.getSharedPreferences(OBSERVER_PREFS, Context.MODE_PRIVATE)
         
-        // 저장된 옵저버 상태 복원
-        restoreObserverStates()
+        // 참고: 옵저버 상태 복원은 connect() 호출 후에 실행됩니다
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
@@ -356,6 +356,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
             resultMap["isConnect"] = true
             resultMap["message"] = "Connected successfully"
             wrapper.success(resultMap)
+            
+            // 연결 성공 후 저장된 옵저버 상태 복원
+            restoreObserverStatesAfterConnect()
         }.onFailure { error ->
             Log.e(APP_TAG, "연결 실패: ${error.message}")
 
@@ -468,11 +471,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     private fun startObserver(dataTypeNames: List<String>?, wrapper: ResultWrapper) {
         Log.d(APP_TAG, "startObserver() 호출: $dataTypeNames")
         
-        val store = healthDataStore
-        if (store == null) {
-            wrapper.error("STORE_NOT_READY", "Samsung Health에 먼저 연결하세요", null)
-            return
-        }
+        // 연결 상태와 무관하게 옵저버 상태 관리 (실제 동작은 연결 시에만)
         
         // 데이터 타입 결정
         val targetTypes = when {
@@ -528,11 +527,19 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                     Log.d(APP_TAG, "[${dataType.typeName}] UID 캐시 초기화 (새 시작)")
                 }
                 
-                // 옵저버 Job 시작
-                val job = observerScope!!.launch {
-                    observeDataType(store, dataType)
+                // Samsung Health 연결 상태에 따라 실제 Job 시작 여부 결정
+                val store = healthDataStore
+                if (store != null) {
+                    // 연결되어 있으면 옵저버 Job 시작
+                    val job = observerScope!!.launch {
+                        observeDataType(store, dataType)
+                    }
+                    observerJobs[dataType] = job
+                    Log.d(APP_TAG, "[${dataType.typeName}] 옵저버 실제 시작 (연결됨)")
+                } else {
+                    // 연결이 안 되어 있으면 상태만 저장 (추후 연결 시 자동 시작됨)
+                    Log.d(APP_TAG, "[${dataType.typeName}] 옵저버 상태만 저장 (미연결 - 연결 시 자동 시작됨)")
                 }
-                observerJobs[dataType] = job
                 
                 results.add(mapOf(
                     "status" to "started",
@@ -1616,10 +1623,16 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     }
     
     /**
-     * 저장된 옵저버 상태들을 복원하고 자동 시작
+     * 연결 후 저장된 옵저버 상태들을 복원하고 자동 시작 (앱 세션 당 한 번만)
      */
-    private fun restoreObserverStates() {
-        Log.d(APP_TAG, "저장된 옵저버 상태 복원 시작")
+    private fun restoreObserverStatesAfterConnect() {
+        // 이미 복원했으면 스킵
+        if (hasRestoredOnce) {
+            Log.d(APP_TAG, "옵저버 상태 이미 복원됨 - 스킵")
+            return
+        }
+        
+        Log.d(APP_TAG, "저장된 옵저버 상태 복원 시작 (첫 번째 연결)")
         
         // 모든 데이터 타입에 대해 저장된 상태 확인
         val savedObservers = mutableListOf<ObserverDataType>()
@@ -1637,10 +1650,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         if (savedObservers.isNotEmpty()) {
             Log.d(APP_TAG, "총 ${savedObservers.size}개 옵저버 자동 복원 시작")
             
-            // 비동기로 옵저버 복원 (HealthDataStore 연결 필요)
+            // 연결 직후 즉시 복원 (HealthDataStore가 이미 연결된 상태)
             CoroutineScope(Dispatchers.Main).launch {
-                delay(1000L) // 초기화 완료 대기
-                
                 for (dataType in savedObservers) {
                     try {
                         // HealthDataStore가 연결되어 있는지 확인
@@ -1661,13 +1672,18 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         } else {
             Log.d(APP_TAG, "복원할 옵저버 없음")
         }
+        
+        // 복원 완료 플래그 설정
+        hasRestoredOnce = true
+        Log.d(APP_TAG, "옵저버 상태 복원 완료 - 이후 connect() 호출 시 스킵됨")
     }
     
     /**
      * 단일 옵저버 내부 시작 로직 (복원용)
      */
     private fun startObserverInternal(dataType: ObserverDataType) {
-        val store = healthDataStore ?: throw IllegalStateException("HealthDataStore not connected")
+        // 연결 상태와 무관하게 상태 관리, 연결되어 있으면 실제 Job도 시작
+        val store = healthDataStore
         
         // 이미 실행 중이면 무시
         if (observerStates[dataType]?.status == ObserverStatus.RUNNING) {
@@ -1700,13 +1716,16 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         // 동기화 시간 설정 (현재 시점)
         lastSyncTimes[dataType] = Instant.now()
         
-        // 옵저버 job 시작
-        val job = observerScope!!.launch {
-            observeDataType(store, dataType)
+        // 연결되어 있으면 실제 Job 시작
+        if (store != null) {
+            val job = observerScope!!.launch {
+                observeDataType(store, dataType)
+            }
+            observerJobs[dataType] = job
+            Log.d(APP_TAG, "[${dataType.typeName}] 옵저버 내부 시작 완료 (연결됨)")
+        } else {
+            Log.d(APP_TAG, "[${dataType.typeName}] 옵저버 상태만 저장 (미연결)")
         }
-        observerJobs[dataType] = job
-        
-        Log.d(APP_TAG, "[${dataType.typeName}] 옵저버 내부 시작 완료")
     }
     
     /**
