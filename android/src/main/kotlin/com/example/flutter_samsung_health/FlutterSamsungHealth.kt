@@ -1556,6 +1556,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     
     /**
      * 새로운 변경사항만 필터링 (이미 처리된 UID 제외)
+     * TEST: UID 체크 비활성화 - 운동 데이터 실시간 업데이트 확인용
      */
     private fun filterNewChanges(dataType: ObserverDataType, changes: List<Change<HealthDataPoint>>): List<Change<HealthDataPoint>> {
         val processedSet = processedUids.getOrPut(dataType) { mutableSetOf() }
@@ -1564,14 +1565,15 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         for (change in changes) {
             val uid = change.upsertDataPoint?.uid ?: change.deleteDataUid
             if (uid != null) {
-                if (!processedSet.contains(uid)) {
+                // TEST: UID 체크 주석 처리 - 모든 변경사항 통과
+                // if (!processedSet.contains(uid)) {
                     // 새로운 UID면 처리 목록에 추가
                     newChanges.add(change)
-                    processedSet.add(uid)
-                    Log.v(APP_TAG, "[${dataType.typeName}] 새로운 UID 등록: $uid")
-                } else {
-                    Log.v(APP_TAG, "[${dataType.typeName}] 중복 UID 스킵: $uid")
-                }
+                    // processedSet.add(uid)
+                    Log.v(APP_TAG, "[${dataType.typeName}] UID 등록 (TEST - 중복체크 비활성화): $uid")
+                // } else {
+                //     Log.v(APP_TAG, "[${dataType.typeName}] 중복 UID 스킵: $uid")
+                // }
             } else {
                 // UID가 없는 경우 (예외 상황)
                 newChanges.add(change)
