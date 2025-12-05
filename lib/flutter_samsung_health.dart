@@ -1,8 +1,5 @@
 import 'flutter_samsung_health_platform_interface.dart';
 
-// Observer 기능 export
-export 'flutter_samsung_health_observer.dart';
-
 class FlutterSamsungHealth {
   /// 설치 여부 체크
   Future<Map<String, dynamic>> isSamsungHealthInstalled() {

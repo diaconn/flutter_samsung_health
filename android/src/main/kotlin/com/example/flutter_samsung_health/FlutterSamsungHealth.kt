@@ -149,7 +149,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
                 ObservedType.BLOOD_GLUCOSE
             )
         } else {
-            se
+            set
         }
     }
 
