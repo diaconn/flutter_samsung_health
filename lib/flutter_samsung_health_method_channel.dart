@@ -237,4 +237,12 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     }
     return result ?? {'status': 'error', 'message': 'Failed to get observer status'};
   }
+
+  /// Samsung Health 권한 설정 화면 열기
+  @override
+  Future<Map<String, dynamic>> openSamsungHealthPermissions() async {
+    final result = await methodChannel.invokeMethod<Map>('openSamsungHealthPermissions', {});
+    return result?.map((key, value) => MapEntry(key.toString(), value)) ?? 
+        {'action': 'failed', 'message': 'Failed to open Samsung Health permissions'};
+  }
 }

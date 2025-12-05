@@ -84,4 +84,7 @@ abstract class FlutterSamsungHealthPlatform extends PlatformInterface {
 
   /// 옵저버 상태 조회
   Future<dynamic> getObserverStatus(List<String>? dataTypes);
+
+  /// Samsung Health 권한 설정 화면 열기
+  Future<Map<String, dynamic>> openSamsungHealthPermissions();
 }
