@@ -160,6 +160,11 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         val allPrefs = sharedPreferences.all
         Log.d(APP_TAG, "기존 저장된 데이터: ${allPrefs}")
         
+        // 수동 테스트 저장/읽기
+        val testSuccess = sharedPreferences.edit().putString("test_key", "test_value").commit()
+        val testRead = sharedPreferences.getString("test_key", "default")
+        Log.d(APP_TAG, "수동 테스트 - 저장 성공: $testSuccess, 읽기 결과: $testRead")
+        
         // 참고: 옵저버 상태 복원은 connect() 호출 후에 실행됩니다
     }
 
@@ -1660,12 +1665,28 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         }
         
         val key = "${OBSERVER_STATE_PREFIX}${dataType.typeName}"
-        val success = sharedPreferences.edit().putBoolean(key, isRunning).commit()
-        Log.d(APP_TAG, "[${dataType.typeName}] 옵저버 상태 저장: $isRunning, 성공: $success")
+        Log.d(APP_TAG, "[${dataType.typeName}] 저장 시도: key='$key', value=$isRunning")
         
-        // 저장된 값 즉시 확인
+        // 여러 방법으로 저장 시도
+        val editor = sharedPreferences.edit()
+        editor.putBoolean(key, isRunning)
+        val commitSuccess = editor.commit()
+        
+        Log.d(APP_TAG, "[${dataType.typeName}] commit() 결과: $commitSuccess")
+        
+        // apply()도 시도
+        val editor2 = sharedPreferences.edit()
+        editor2.putBoolean(key, isRunning)
+        editor2.apply()
+        Log.d(APP_TAG, "[${dataType.typeName}] apply() 호출 완료")
+        
+        // 즉시 확인
         val saved = sharedPreferences.getBoolean(key, false)
-        Log.d(APP_TAG, "[${dataType.typeName}] 저장 확인: $saved")
+        Log.d(APP_TAG, "[${dataType.typeName}] 저장 즉시 확인: $saved")
+        
+        // 전체 데이터도 확인
+        val allData = sharedPreferences.all
+        Log.d(APP_TAG, "[${dataType.typeName}] 전체 SharedPreferences: $allData")
     }
     
     /**
