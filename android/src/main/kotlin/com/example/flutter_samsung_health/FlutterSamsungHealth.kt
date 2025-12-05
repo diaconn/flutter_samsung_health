@@ -669,7 +669,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         // 초기 동기화 시간 설정
         val isFirstStart = !lastSyncTimes.containsKey(dataType)
         var lastSync = if (isFirstStart) {
-            // 처음 시작: 현재 시점부터 (옵저버 켠 이후 데이터만)
+            // 처음 시작: 정확히 현재 시점부터 (옵저버 켠 이후 데이터만)
             val now = Instant.now()
             Log.d(APP_TAG, "[${dataType.typeName}] 옵저버 최초 시작 - 기준 시간: $now")
             now
@@ -682,8 +682,28 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         lastSyncTimes[dataType] = lastSync
         
         try {
+            // 첫 번째 체크 전에 잠깐 대기 (시작 직후 시간 범위 문제 방지)
+            if (isFirstStart) {
+                Log.d(APP_TAG, "[${dataType.typeName}] 첫 체크 전 대기...")
+                delay(2000L) // 2초 대기
+            }
+            
             while (currentCoroutineContext().isActive) {
                 val end = Instant.now()
+                
+                // Samsung Health API는 최소 간격이 필요
+                if (lastSync.isAfter(end) || lastSync.equals(end)) {
+                    Log.v(APP_TAG, "[${dataType.typeName}] 시간 범위 스킵: lastSync=$lastSync, end=$end")
+                    delay(1000L) // 1초 대기
+                    continue
+                }
+                
+                // 최소 1초 간격 보장
+                if (lastSync.plusSeconds(1).isAfter(end)) {
+                    Log.v(APP_TAG, "[${dataType.typeName}] 최소 간격 대기 중...")
+                    delay(1000L)
+                    continue
+                }
                 
                 try {
                     val changes = readChangesForDataType(store, dataType, lastSync, end)
@@ -730,6 +750,15 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                     
                 } catch (e: Exception) {
                     Log.e(APP_TAG, "[${dataType.typeName}] 옵저버 오류: ${e.message}", e)
+                    
+                    // 시간 범위 오류인 경우 특별 처리
+                    if (e.message?.contains("Time Range is invalid") == true) {
+                        Log.w(APP_TAG, "[${dataType.typeName}] 시간 범위 오류 - lastSync를 현재시간으로 재설정")
+                        lastSync = Instant.now().minusSeconds(1)
+                        lastSyncTimes[dataType] = lastSync
+                        delay(2000L) // 2초 대기 후 재시도
+                        continue
+                    }
                     
                     // 상태 업데이트 (오류)
                     observerStates[dataType] = ObserverState(
