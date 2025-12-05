@@ -3,6 +3,7 @@ package com.example.flutter_samsung_health
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.net.Uri
 import android.util.Log
 import com.samsung.android.sdk.health.data.HealthDataService
@@ -137,12 +138,24 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     // 처리된 UID 캐시 (중복 방지용)
     private val processedUids = mutableMapOf<ObserverDataType, MutableSet<String>>()
     private val uidCacheCleanupTime = mutableMapOf<ObserverDataType, Long>()
+    
+    // SharedPreferences for persistent observer state
+    private lateinit var sharedPreferences: SharedPreferences
+    private companion object {
+        const val OBSERVER_PREFS = "samsung_health_observers"
+        const val OBSERVER_STATE_PREFIX = "observer_"
+    }
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         context = flutterPluginBinding.applicationContext
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "flutter_samsung_health")
         channel.setMethodCallHandler(this)
 
+        // SharedPreferences 초기화
+        sharedPreferences = context.getSharedPreferences(OBSERVER_PREFS, Context.MODE_PRIVATE)
+        
+        // 저장된 옵저버 상태 복원
+        restoreObserverStates()
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
@@ -417,20 +430,22 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         observerScope?.cancel()
         observerScope = null
         
-        // 상태 초기화
+        // 상태 초기화 및 SharedPreferences 정리
         for ((dataType, _) in observerStates) {
             observerStates[dataType] = ObserverState(
                 dataType = dataType,
                 status = ObserverStatus.STOPPED,
                 lastSyncTime = System.currentTimeMillis()
             )
+            // SharedPreferences에서도 제거
+            saveObserverState(dataType, false)
         }
         
         // UID 캐시 정리
         processedUids.clear()
         uidCacheCleanupTime.clear()
         
-        Log.d(APP_TAG, "모든 옵저버 정리 완료")
+        Log.d(APP_TAG, "모든 옵저버 정리 완료 (SharedPreferences 포함)")
     }
 
     // ===== 옵저버 메서드들 =====
@@ -503,6 +518,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                     status = ObserverStatus.RUNNING,
                     lastSyncTime = System.currentTimeMillis()
                 )
+                
+                // SharedPreferences에 상태 저장
+                saveObserverState(dataType, true)
                 
                 // 새로 시작하는 옵저버는 UID 캐시도 초기화 (깔끔하게 시작)
                 if (!observerJobs.containsKey(dataType)) {
@@ -578,6 +596,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                     status = ObserverStatus.STOPPED,
                     lastSyncTime = System.currentTimeMillis()
                 )
+                
+                // SharedPreferences에 상태 저장
+                saveObserverState(dataType, false)
                 
                 results.add(mapOf(
                     "status" to "stopped",
@@ -782,6 +803,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 status = ObserverStatus.STOPPED,
                 lastSyncTime = System.currentTimeMillis()
             )
+            
+            // SharedPreferences에 상태 저장
+            saveObserverState(dataType, false)
         }
     }
     
@@ -1580,6 +1604,109 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         }
         
         return newChanges
+    }
+    
+    /**
+     * 옵저버 상태를 SharedPreferences에 저장
+     */
+    private fun saveObserverState(dataType: ObserverDataType, isRunning: Boolean) {
+        val key = "${OBSERVER_STATE_PREFIX}${dataType.typeName}"
+        sharedPreferences.edit().putBoolean(key, isRunning).apply()
+        Log.d(APP_TAG, "[${dataType.typeName}] 옵저버 상태 저장: $isRunning")
+    }
+    
+    /**
+     * 저장된 옵저버 상태들을 복원하고 자동 시작
+     */
+    private fun restoreObserverStates() {
+        Log.d(APP_TAG, "저장된 옵저버 상태 복원 시작")
+        
+        // 모든 데이터 타입에 대해 저장된 상태 확인
+        val savedObservers = mutableListOf<ObserverDataType>()
+        
+        for (dataType in ObserverDataType.values()) {
+            val key = "${OBSERVER_STATE_PREFIX}${dataType.typeName}"
+            val isRunning = sharedPreferences.getBoolean(key, false)
+            
+            if (isRunning) {
+                savedObservers.add(dataType)
+                Log.d(APP_TAG, "[${dataType.typeName}] 복원 대상 옵저버 발견")
+            }
+        }
+        
+        if (savedObservers.isNotEmpty()) {
+            Log.d(APP_TAG, "총 ${savedObservers.size}개 옵저버 자동 복원 시작")
+            
+            // 비동기로 옵저버 복원 (HealthDataStore 연결 필요)
+            CoroutineScope(Dispatchers.Main).launch {
+                delay(1000L) // 초기화 완료 대기
+                
+                for (dataType in savedObservers) {
+                    try {
+                        // HealthDataStore가 연결되어 있는지 확인
+                        if (healthDataStore != null) {
+                            startObserverInternal(dataType)
+                            Log.d(APP_TAG, "[${dataType.typeName}] 옵저버 자동 복원 성공")
+                        } else {
+                            Log.w(APP_TAG, "[${dataType.typeName}] HealthDataStore 연결 필요 - 복원 실패")
+                            saveObserverState(dataType, false)
+                        }
+                    } catch (e: Exception) {
+                        Log.e(APP_TAG, "[${dataType.typeName}] 옵저버 자동 복원 실패: ${e.message}")
+                        // 실패한 옵저버는 저장된 상태에서 제거
+                        saveObserverState(dataType, false)
+                    }
+                }
+            }
+        } else {
+            Log.d(APP_TAG, "복원할 옵저버 없음")
+        }
+    }
+    
+    /**
+     * 단일 옵저버 내부 시작 로직 (복원용)
+     */
+    private fun startObserverInternal(dataType: ObserverDataType) {
+        val store = healthDataStore ?: throw IllegalStateException("HealthDataStore not connected")
+        
+        // 이미 실행 중이면 무시
+        if (observerStates[dataType]?.status == ObserverStatus.RUNNING) {
+            Log.d(APP_TAG, "[${dataType.typeName}] 이미 실행 중 - 무시")
+            return
+        }
+        
+        // 코루틴 스코프 초기화
+        if (observerScope == null) {
+            observerScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        }
+        
+        // 기존 job이 있으면 취소
+        observerJobs[dataType]?.cancel()
+        
+        // 상태 초기화
+        observerStates[dataType] = ObserverState(
+            dataType = dataType,
+            status = ObserverStatus.RUNNING,
+            lastSyncTime = System.currentTimeMillis()
+        )
+        
+        // SharedPreferences에 상태 저장
+        saveObserverState(dataType, true)
+        
+        // UID 캐시 초기화
+        processedUids[dataType]?.clear()
+        Log.d(APP_TAG, "[${dataType.typeName}] UID 캐시 초기화 (복원)")
+        
+        // 동기화 시간 설정 (현재 시점)
+        lastSyncTimes[dataType] = Instant.now()
+        
+        // 옵저버 job 시작
+        val job = observerScope!!.launch {
+            observeDataType(store, dataType)
+        }
+        observerJobs[dataType] = job
+        
+        Log.d(APP_TAG, "[${dataType.typeName}] 옵저버 내부 시작 완료")
     }
     
     /**
