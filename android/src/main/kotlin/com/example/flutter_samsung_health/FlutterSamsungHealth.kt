@@ -504,6 +504,12 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                     lastSyncTime = System.currentTimeMillis()
                 )
                 
+                // 새로 시작하는 옵저버는 UID 캐시도 초기화 (깔끔하게 시작)
+                if (!observerJobs.containsKey(dataType)) {
+                    processedUids[dataType]?.clear()
+                    Log.d(APP_TAG, "[${dataType.typeName}] UID 캐시 초기화 (새 시작)")
+                }
+                
                 // 옵저버 Job 시작
                 val job = observerScope!!.launch {
                     observeDataType(store, dataType)
@@ -660,8 +666,19 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     private suspend fun observeDataType(store: HealthDataStore, dataType: ObserverDataType) {
         Log.d(APP_TAG, "옵저버 시작: ${dataType.typeName}")
         
-        // 초기 동기화 시간 설정 (1분 전)
-        var lastSync = lastSyncTimes[dataType] ?: Instant.now().minusSeconds(60)
+        // 초기 동기화 시간 설정
+        val isFirstStart = !lastSyncTimes.containsKey(dataType)
+        var lastSync = if (isFirstStart) {
+            // 처음 시작: 현재 시점부터 (옵저버 켠 이후 데이터만)
+            val now = Instant.now()
+            Log.d(APP_TAG, "[${dataType.typeName}] 옵저버 최초 시작 - 기준 시간: $now")
+            now
+        } else {
+            // 재시작: 이전 동기화 시점부터 이어서
+            val prev = lastSyncTimes[dataType]!!
+            Log.d(APP_TAG, "[${dataType.typeName}] 옵저버 재시작 - 이전 시간: $prev")
+            prev
+        }
         lastSyncTimes[dataType] = lastSync
         
         try {
