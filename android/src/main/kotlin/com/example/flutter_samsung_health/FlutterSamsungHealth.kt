@@ -525,6 +525,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 hasRunning = true
                 results.add(mapOf(
                     "status" to "already_running",
+                    "isConnected" to true,
                     "dataType" to dataType.typeName,
                     "message" to "${dataType.typeName} 옵저버가 이미 실행중입니다"
                 ))
@@ -558,6 +559,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 
                 results.add(mapOf(
                     "status" to "started",
+                    "isConnected" to true,
                     "dataType" to dataType.typeName,
                     "message" to "${dataType.typeName} 옵저버를 시작했습니다"
                 ))
@@ -624,12 +626,14 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 
                 results.add(mapOf(
                     "status" to "stopped",
+                    "isConnected" to false,
                     "dataType" to dataType.typeName,
                     "message" to "${dataType.typeName} 옵저버를 중단했습니다"
                 ))
             } else {
                 results.add(mapOf(
                     "status" to "not_running",
+                    "isConnected" to false,
                     "dataType" to dataType.typeName,
                     "message" to "${dataType.typeName} 옵저버가 실행중이 아닙니다"
                 ))
@@ -675,26 +679,25 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 status = ObserverStatus.STOPPED
             )
             
+            val isRunning = state.status == ObserverStatus.RUNNING
             mapOf(
                 "dataType" to state.dataType.typeName,
                 "status" to state.status.name.lowercase(),
+                "isConnected" to isRunning,
                 "lastSyncTime" to state.lastSyncTime,
                 "errorMessage" to state.errorMessage
             )
         }
         
         val response = if (targetTypes.size == 1) {
-            // 단일 타입인 경우 바로 반환 (하위호환성)
             results.first()
         } else {
-            // 여러 타입인 경우 배열로 반환
             mapOf(
                 "message" to "${targetTypes.size}개 타입의 옵저버 상태 조회 완료",
                 "targetTypes" to targetTypes.map { it.typeName },
                 "results" to results
             )
         }
-        
         wrapper.success(response)
     }
     
