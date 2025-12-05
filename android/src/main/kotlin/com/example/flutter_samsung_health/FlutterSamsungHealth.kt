@@ -154,6 +154,11 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
 
         // SharedPreferences 초기화
         sharedPreferences = context.getSharedPreferences(OBSERVER_PREFS, Context.MODE_PRIVATE)
+        Log.d(APP_TAG, "SharedPreferences 초기화 완료: ${OBSERVER_PREFS}")
+        
+        // 기존 저장된 데이터 확인 (디버깅용)
+        val allPrefs = sharedPreferences.all
+        Log.d(APP_TAG, "기존 저장된 데이터: ${allPrefs}")
         
         // 참고: 옵저버 상태 복원은 connect() 호출 후에 실행됩니다
     }
@@ -1617,9 +1622,18 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
      * 옵저버 상태를 SharedPreferences에 저장
      */
     private fun saveObserverState(dataType: ObserverDataType, isRunning: Boolean) {
+        if (!::sharedPreferences.isInitialized) {
+            Log.e(APP_TAG, "SharedPreferences가 초기화되지 않음 - 상태 저장 실패")
+            return
+        }
+        
         val key = "${OBSERVER_STATE_PREFIX}${dataType.typeName}"
-        sharedPreferences.edit().putBoolean(key, isRunning).apply()
-        Log.d(APP_TAG, "[${dataType.typeName}] 옵저버 상태 저장: $isRunning")
+        val success = sharedPreferences.edit().putBoolean(key, isRunning).commit()
+        Log.d(APP_TAG, "[${dataType.typeName}] 옵저버 상태 저장: $isRunning, 성공: $success")
+        
+        // 저장된 값 즉시 확인
+        val saved = sharedPreferences.getBoolean(key, false)
+        Log.d(APP_TAG, "[${dataType.typeName}] 저장 확인: $saved")
     }
     
     /**
@@ -1632,6 +1646,11 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
             return
         }
         
+        if (!::sharedPreferences.isInitialized) {
+            Log.e(APP_TAG, "SharedPreferences가 초기화되지 않음 - 복원 실패")
+            return
+        }
+        
         Log.d(APP_TAG, "저장된 옵저버 상태 복원 시작 (첫 번째 연결)")
         
         // 모든 데이터 타입에 대해 저장된 상태 확인
@@ -1640,6 +1659,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         for (dataType in ObserverDataType.values()) {
             val key = "${OBSERVER_STATE_PREFIX}${dataType.typeName}"
             val isRunning = sharedPreferences.getBoolean(key, false)
+            
+            Log.d(APP_TAG, "[${dataType.typeName}] 저장된 상태 확인: key=$key, value=$isRunning")
             
             if (isRunning) {
                 savedObservers.add(dataType)
