@@ -75,4 +75,13 @@ abstract class FlutterSamsungHealthPlatform extends PlatformInterface {
 
   /// 혈당 조회
   Future<List<Map<String, dynamic>>> getBloodGlucoseData(int start, int end);
+
+  /// 옵저버 시작
+  Future<Map<String, dynamic>> startObserver(List<String>? dataTypes);
+
+  /// 옵저버 중단
+  Future<Map<String, dynamic>> stopObserver(List<String>? dataTypes);
+
+  /// 옵저버 상태 조회
+  Future<dynamic> getObserverStatus(List<String>? dataTypes);
 }

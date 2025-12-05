@@ -203,4 +203,38 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
         .map((item) => Map<String, dynamic>.from((item as Map).map((key, value) => MapEntry(key.toString(), value))))
         .toList();
   }
+
+  /// 옵저버 시작
+  @override
+  Future<Map<String, dynamic>> startObserver(List<String>? dataTypes) async {
+    final result = await methodChannel.invokeMethod<Map>('startObserver', {
+      'dataTypes': dataTypes,
+    });
+    return result?.map((key, value) => MapEntry(key.toString(), value)) ?? 
+        {'status': 'error', 'message': 'Failed to start observer'};
+  }
+
+  /// 옵저버 중단
+  @override
+  Future<Map<String, dynamic>> stopObserver(List<String>? dataTypes) async {
+    final result = await methodChannel.invokeMethod<Map>('stopObserver', {
+      'dataTypes': dataTypes,
+    });
+    return result?.map((key, value) => MapEntry(key.toString(), value)) ?? 
+        {'status': 'error', 'message': 'Failed to stop observer'};
+  }
+
+  /// 옵저버 상태 조회
+  @override
+  Future<dynamic> getObserverStatus(List<String>? dataTypes) async {
+    final result = await methodChannel.invokeMethod('getObserverStatus', {
+      'dataTypes': dataTypes,
+    });
+    
+    // 단일 타입인 경우와 여러 타입인 경우를 구분
+    if (result is Map) {
+      return result.map((key, value) => MapEntry(key.toString(), value));
+    }
+    return result ?? {'status': 'error', 'message': 'Failed to get observer status'};
+  }
 }

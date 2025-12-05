@@ -4,8 +4,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import com.samsung.android.sdk.health.data.HealthDataService
 import com.samsung.android.sdk.health.data.HealthDataStore
@@ -24,7 +22,6 @@ import com.samsung.android.sdk.health.data.error.HealthDataException
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
-import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
@@ -44,15 +41,12 @@ import java.time.LocalDateTime
 import java.time.ZoneOffset
 
 /** FlutterSamsungHealth - Samsung Health Data SDK 1.0.0 */
-class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, EventChannel.StreamHandler {
+class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
 
     private lateinit var channel: MethodChannel
     private lateinit var context: Context
     private var healthDataStore: HealthDataStore? = null
     private var activity: Activity? = null
-    
-    // EventChannel에 연결된 리스너들 (여러 개 리스너 지원)
-    private val eventSinks = mutableListOf<EventChannel.EventSink>()
 
     private val APP_TAG: String = "FlutterSamsungHealth"
 
@@ -101,361 +95,50 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
         }
     }
 
-    private enum class ObservedType {
-        EXERCISE,
-        NUTRITION,
-        BLOOD_GLUCOSE
-    }
-
-    private var exerciseChangeLastSync: Instant = Instant.EPOCH
-    private var nutritionChangeLastSync: Instant = Instant.EPOCH
-    private var bloodGlucoseChangeLastSync: Instant = Instant.EPOCH
-
-    private var changeScope: CoroutineScope? = null
-    private val changeJobs = mutableMapOf<ObservedType, Job>()
-
-    private val mainHandler = Handler(Looper.getMainLooper())
-
+    // ===== 옵저버 관련 선언 =====
     /**
-     * Flutter에서 전송된 구독 타입 목록을 ObservedType Set으로 변환
-     * @param arguments Flutter receiveBroadcastStream()의 인자 (예: ['exercise', 'nutrition'])
-     * @return 감시할 데이터 타입 Set (기본값: 전체 타입)
+     * 옵저버가 감시할 수 있는 데이터 타입
      */
-    private fun parseObservedTypes(arguments: Any?): Set<ObservedType> {
-        // 인자가 없으면 "전체 타입 구독"이 기본값
-        if (arguments !is List<*>) {
-            return setOf(
-                ObservedType.EXERCISE,
-                ObservedType.NUTRITION,
-                ObservedType.BLOOD_GLUCOSE
-            )
-        }
-
-        val names = arguments.mapNotNull { it as? String }
-        val set = names.mapNotNull { name ->
-            when (name.lowercase()) {
-                "exercise" -> ObservedType.EXERCISE
-                "nutrition" -> ObservedType.NUTRITION
-                "blood_glucose" -> ObservedType.BLOOD_GLUCOSE
-                else -> null
-            }
-        }.toSet()
-
-        // 아무 것도 매칭되지 않으면 역시 전체 타입을 기본으로
-        return if (set.isEmpty()) {
-            setOf(
-                ObservedType.EXERCISE,
-                ObservedType.NUTRITION,
-                ObservedType.BLOOD_GLUCOSE
-            )
-        } else {
-            set
-        }
+    enum class ObserverDataType(val typeName: String) {
+        EXERCISE("exercise"),
+        NUTRITION("nutrition"), 
+        BLOOD_GLUCOSE("blood_glucose")
     }
-
+    
     /**
-     * 운동 데이터 변경 이벤트를 Flutter 전송용 Map으로 변환
-     * - UPSERT: 새로 추가/수정된 운동 데이터의 상세 정보 포함
-     * - DELETE: 삭제된 데이터의 UID만 포함
-     * @param change Samsung Health Change<HealthDataPoint> 객체
-     * @return Flutter EventChannel로 전송할 Map 데이터
+     * 옵저버 상태
      */
-    private fun mapExerciseChange(change: Change<HealthDataPoint>): Map<String, Any?> {
-        // 삭제 이벤트일 때는 uid만 넘긴다
-        if (change.changeType == ChangeType.DELETE) {
-            return mapOf(
-                "data_type" to "exercise",
-                "change_type" to "DELETE",
-                "uid" to change.deleteDataUid
-            )
-        }
-
-        val dp = change.upsertDataPoint
-        val exerciseType = dp.getValue(DataType.ExerciseType.EXERCISE_TYPE)
-        val sessions = dp.getValue(DataType.ExerciseType.SESSIONS)
-
-        // 첫 번째 세션의 정보만 포함 (필요시 전체 세션 배열로 확장 가능)
-        val session = sessions?.firstOrNull()
-
-        return mapOf(
-            "data_type" to "exercise",
-            "change_type" to "UPSERT",
-            "uid" to (dp.uid ?: ""),
-            "start_time" to (dp.startTime?.toEpochMilli() ?: 0L),
-            "end_time" to (dp.endTime?.toEpochMilli() ?: 0L),
-            "exercise_type" to (exerciseType?.ordinal ?: 0),
-            "exercise_type_name" to (exerciseType?.name ?: "Unknown"),
-            "duration" to (session?.duration?.toMillis() ?: 0L),
-            "calories" to (session?.calories ?: 0f),
-            "distance" to (session?.distance ?: 0f),
-            "max_heart_rate" to (session?.maxHeartRate ?: 0f),
-            "mean_heart_rate" to (session?.meanHeartRate ?: 0f),
-            "min_heart_rate" to (session?.minHeartRate ?: 0f),
-        )
+    enum class ObserverStatus {
+        STOPPED,    // 중단됨
+        RUNNING,    // 실행중
+        ERROR       // 오류 상태
     }
-
+    
     /**
-     * 영양 데이터 변경 이벤트를 Flutter 전송용 Map으로 변환
-     * @param change Samsung Health Change<HealthDataPoint> 객체
-     * @return Flutter EventChannel로 전송할 Map 데이터
+     * 옵저버 상태 관리 클래스
      */
-    private fun mapNutritionChange(change: Change<HealthDataPoint>): Map<String, Any?> {
-        if (change.changeType == ChangeType.DELETE) {
-            return mapOf(
-                "data_type" to "nutrition",
-                "change_type" to "DELETE",
-                "uid" to change.deleteDataUid
-            )
-        }
-
-        val dp = change.upsertDataPoint
-        val mealType = dp.getValue(DataType.NutritionType.MEAL_TYPE)
-
-        return mapOf(
-            "data_type" to "nutrition",
-            "change_type" to "UPSERT",
-            "uid" to (dp.uid ?: ""),
-            "start_time" to (dp.startTime?.toEpochMilli() ?: 0L),
-            "end_time" to (dp.endTime?.toEpochMilli() ?: 0L),
-            "title" to (dp.getValue(DataType.NutritionType.TITLE) ?: ""),
-            "meal_type" to (mealType?.ordinal ?: 0),
-            "meal_type_name" to (mealType?.name ?: "Unknown"),
-            "calories" to (dp.getValue(DataType.NutritionType.CALORIES) ?: 0f),
-            "total_fat" to (dp.getValue(DataType.NutritionType.TOTAL_FAT) ?: 0f),
-            "protein" to (dp.getValue(DataType.NutritionType.PROTEIN) ?: 0f),
-            "carbohydrate" to (dp.getValue(DataType.NutritionType.CARBOHYDRATE) ?: 0f),
-        )
-    }
-
-    /**
-     * 혈당 데이터 변경 이벤트를 Flutter 전송용 Map으로 변환
-     * @param change Samsung Health Change<HealthDataPoint> 객체
-     * @return Flutter EventChannel로 전송할 Map 데이터
-     */
-    private fun mapBloodGlucoseChange(change: Change<HealthDataPoint>): Map<String, Any?> {
-        if (change.changeType == ChangeType.DELETE) {
-            return mapOf(
-                "data_type" to "blood_glucose",
-                "change_type" to "DELETE",
-                "uid" to change.deleteDataUid
-            )
-        }
-
-        val dp = change.upsertDataPoint
-        val glucoseMmol = dp.getValue(DataType.BloodGlucoseType.GLUCOSE_LEVEL) ?: 0f
-        val glucoseMgdl = glucoseMmol * 18.018f  // mmol/L to mg/dL 변환
-        val measurementType = dp.getValue(DataType.BloodGlucoseType.MEASUREMENT_TYPE)
-        val mealStatus = dp.getValue(DataType.BloodGlucoseType.MEAL_STATUS)
-
-        return mapOf(
-            "data_type" to "blood_glucose",
-            "change_type" to "UPSERT",
-            "uid" to (dp.uid ?: ""),
-            "start_time" to (dp.startTime?.toEpochMilli() ?: 0L),
-            "end_time" to (dp.endTime?.toEpochMilli() ?: 0L),
-            "glucose_mmol" to glucoseMmol,
-            "glucose_mgdl" to glucoseMgdl,
-            "measurement_type" to (measurementType?.ordinal ?: 0),
-            "measurement_type_name" to (measurementType?.name ?: "Unknown"),
-            "meal_status" to (mealStatus?.ordinal ?: 0),
-            "meal_status_name" to (mealStatus?.name ?: "Unknown"),
-        )
-    }
-
-    /**
-     * EventChannel에 연결된 모든 sink로 이벤트를 전송
-     * - Handler를 사용해 메인 스레드에서 안전하게 전송
-     * - 전송 실패한 리스너는 자동으로 제거
-     * @param event Flutter로 전송할 변경 이벤트 Map
-     */
-    private fun sendEventToSinks(event: Map<String, Any?>) {
-        if (eventSinks.isEmpty()) return
-
-        mainHandler.post {
-            val iterator = eventSinks.iterator()
-            while (iterator.hasNext()) {
-                try {
-                    iterator.next().success(event)
-                } catch (e: Exception) {
-                    Log.e(APP_TAG, "EventSink 전송 중 오류: ${e.message}", e)
-                    iterator.remove() // 실패한 sink는 제거
-                }
-            }
-        }
-    }
-
-    /**
-     * 실시간 변경 감시 시작
-     * - 첫 EventChannel 리스너 연결 시 호출
-     * - 타입별로 독립적인 코루틴으로 변경 감시 시작
-     * @param observedTypes 감시할 데이터 타입 Set
-     */
-    private fun startChangeObservers(observedTypes: Set<ObservedType>) {
-        val store = healthDataStore
-        if (store == null) {
-            Log.w(APP_TAG, "startChangeObservers() 호출 시 store가 null입니다. connect() 후 다시 시도해야 합니다.")
-            return
-        }
-
-        if (changeScope != null) {
-            Log.d(APP_TAG, "Change observers already running, 무시")
-            return
-        }
-
-        Log.d(APP_TAG, "Change observers 시작 - observedTypes=$observedTypes")
-
-        // 최근 1분 전부터 변경 내역을 조회하도록 초기값 설정
-        val now = Instant.now()
-        exerciseChangeLastSync = now.minusSeconds(60)
-        nutritionChangeLastSync = now.minusSeconds(60)
-        bloodGlucoseChangeLastSync = now.minusSeconds(60)
-
-        changeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-        // 요청된 타입별로 감시 코루틴 시작
-        if (ObservedType.EXERCISE in observedTypes) {
-            changeJobs[ObservedType.EXERCISE] = changeScope!!.launch {
-                observeExerciseChanges(store)
-            }
-        }
-        if (ObservedType.NUTRITION in observedTypes) {
-            changeJobs[ObservedType.NUTRITION] = changeScope!!.launch {
-                observeNutritionChanges(store)
-            }
-        }
-        if (ObservedType.BLOOD_GLUCOSE in observedTypes) {
-            changeJobs[ObservedType.BLOOD_GLUCOSE] = changeScope!!.launch {
-                observeBloodGlucoseChanges(store)
-            }
-        }
-    }
-
-    /**
-     * 실시간 변경 감시 중단중
-     * - EventChannel이 모두 끊기거나 disconnect()/onDetachedFromEngine()에서 호출
-     */
-    private fun stopChangeObservers() {
-        Log.d(APP_TAG, "Change observers 중단")
-        
-        // 모든 감시 Job 취소
-        changeJobs.values.forEach { it.cancel() }
-        changeJobs.clear()
-        
-        // 코루틴 스코프 취소
-        changeScope?.cancel()
-        changeScope = null
-    }
-
-    /**
-     * 운동 데이터 변경 감시 루프 (폴링 방식)
-     * - while(isActive)로 무한 반복하며 변경사항 체크
-     * - readChanges() API로 마지막 sync 이후 변경분만 조회
-     * - 변경 발견 시 즉시 EventChannel로 이벤트 전송
-     * @param store HealthDataStore 인스턴스
-     * @param pollIntervalMillis 폴링 간격 (기본 10초)
-     */
-    private suspend fun observeExerciseChanges(store: HealthDataStore, pollIntervalMillis: Long = 10_000L) {
-        while (currentCoroutineContext().isActive) {
-            try {
-                val end = Instant.now()
-                val request = DataTypes.EXERCISE.changedDataRequestBuilder
-                    .setChangeTimeFilter(InstantTimeFilter.of(exerciseChangeLastSync, end))
-                    .build()
-
-                val response = store.readChanges(request)
-                val changes = response.dataList
-
-                // 변경 내용이 있으면 EventChannel로 전송
-                for (change in changes) {
-                    val event = mapExerciseChange(change)
-                    sendEventToSinks(event)
-                    Log.d(APP_TAG, "운동 데이터 변경 감지: ${change.changeType} - ${event["uid"]}")
-                }
-
-                // 가장 최근 changeTime 기준으로 lastSync 갱신
-                changes.maxByOrNull { it.changeTime }?.let {
-                    exerciseChangeLastSync = it.changeTime.plusNanos(1)
-                }
-                
-            } catch (e: Exception) {
-                Log.e(APP_TAG, "observeExerciseChanges 오류: ${e.message}", e)
-            }
-
-            delay(pollIntervalMillis)
-        }
-    }
-
-    /**
-     * 영양 데이터 변경 감시 루프
-     */
-    private suspend fun observeNutritionChanges(store: HealthDataStore, pollIntervalMillis: Long = 10_000L) {
-        while (currentCoroutineContext().isActive) {
-            try {
-                val end = Instant.now()
-                val request = DataTypes.NUTRITION.changedDataRequestBuilder
-                    .setChangeTimeFilter(InstantTimeFilter.of(nutritionChangeLastSync, end))
-                    .build()
-
-                val response = store.readChanges(request)
-                val changes = response.dataList
-
-                for (change in changes) {
-                    val event = mapNutritionChange(change)
-                    sendEventToSinks(event)
-                    Log.d(APP_TAG, "영양 데이터 변경 감지: ${change.changeType} - ${event["uid"]}")
-                }
-
-                changes.maxByOrNull { it.changeTime }?.let {
-                    nutritionChangeLastSync = it.changeTime.plusNanos(1)
-                }
-                
-            } catch (e: Exception) {
-                Log.e(APP_TAG, "observeNutritionChanges 오류: ${e.message}", e)
-            }
-
-            delay(pollIntervalMillis)
-        }
-    }
-
-    /**
-     * 혈당 데이터 변경 감시 루프
-     */
-    private suspend fun observeBloodGlucoseChanges(store: HealthDataStore, pollIntervalMillis: Long = 10_000L) {
-        while (currentCoroutineContext().isActive) {
-            try {
-                val end = Instant.now()
-                val request = DataTypes.BLOOD_GLUCOSE.changedDataRequestBuilder
-                    .setChangeTimeFilter(InstantTimeFilter.of(bloodGlucoseChangeLastSync, end))
-                    .build()
-
-                val response = store.readChanges(request)
-                val changes = response.dataList
-
-                for (change in changes) {
-                    val event = mapBloodGlucoseChange(change)
-                    sendEventToSinks(event)
-                    Log.d(APP_TAG, "혈당 데이터 변경 감지: ${change.changeType} - ${event["uid"]}")
-                }
-
-                changes.maxByOrNull { it.changeTime }?.let {
-                    bloodGlucoseChangeLastSync = it.changeTime.plusNanos(1)
-                }
-                
-            } catch (e: Exception) {
-                Log.e(APP_TAG, "observeBloodGlucoseChanges 오류: ${e.message}", e)
-            }
-
-            delay(pollIntervalMillis)
-        }
-    }
+    data class ObserverState(
+        val dataType: ObserverDataType,
+        val status: ObserverStatus,
+        val lastSyncTime: Long = 0L,
+        val errorMessage: String? = null
+    )
+    
+    // 통합 옵저버 상태 맵
+    private val observerStates = mutableMapOf<ObserverDataType, ObserverState>()
+    private val observerJobs = mutableMapOf<ObserverDataType, kotlinx.coroutines.Job>()
+    
+    // 코루틴 스코프 (옵저버용)
+    private var observerScope: CoroutineScope? = null
+    
+    // 각 데이터 타입별 마지막 동기화 시간 저장
+    private val lastSyncTimes = mutableMapOf<ObserverDataType, Instant>()
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         context = flutterPluginBinding.applicationContext
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "flutter_samsung_health")
         channel.setMethodCallHandler(this)
 
-        val eventChannel = EventChannel(flutterPluginBinding.binaryMessenger, "flutter_samsung_health_event")
-        eventChannel.setStreamHandler(this)
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
@@ -539,6 +222,18 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             }
 
             "openSamsungHealthPermissions" -> openSamsungHealthPermissions(wrapper)
+            "startObserver" -> {
+                val dataTypes = call.argument<List<String>?>("dataTypes")
+                startObserver(dataTypes, wrapper)
+            }
+            "stopObserver" -> {
+                val dataTypes = call.argument<List<String>?>("dataTypes")
+                stopObserver(dataTypes, wrapper)
+            }
+            "getObserverStatus" -> {
+                val dataTypes = call.argument<List<String>?>("dataTypes")
+                getObserverStatus(dataTypes, wrapper)
+            }
             else -> wrapper.notImplemented()
         }
     }
@@ -691,6 +386,10 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
 
     private fun disconnect(wrapper: ResultWrapper) {
         Log.d(APP_TAG, "disconnect() 호출")
+        
+        // 모든 옵저버 정리
+        cleanupObservers()
+        
         healthDataStore = null
         val resultMap = mutableMapOf<String, Any>(
             "isConnect" to false,
@@ -698,6 +397,343 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
             "message" to "연결이 해제되었습니다"
         )
         wrapper.success(resultMap)
+    }
+    
+    /**
+     * 모든 옵저버 정리
+     */
+    private fun cleanupObservers() {
+        Log.d(APP_TAG, "모든 옵저버 정리 시작")
+        
+        // 모든 옵저버 Jobs 취소
+        observerJobs.values.forEach { it.cancel() }
+        observerJobs.clear()
+        
+        // 옵저버 스코프 정리
+        observerScope?.cancel()
+        observerScope = null
+        
+        // 상태 초기화
+        for ((dataType, _) in observerStates) {
+            observerStates[dataType] = ObserverState(
+                dataType = dataType,
+                status = ObserverStatus.STOPPED,
+                lastSyncTime = System.currentTimeMillis()
+            )
+        }
+        
+        Log.d(APP_TAG, "모든 옵저버 정리 완료")
+    }
+
+    // ===== 옵저버 메서드들 =====
+    
+    /**
+     * 문자열 타입명을 ObserverDataType enum으로 변환
+     */
+    private fun parseObserverDataType(typeName: String): ObserverDataType? {
+        return when (typeName.lowercase()) {
+            "exercise" -> ObserverDataType.EXERCISE
+            "nutrition" -> ObserverDataType.NUTRITION
+            "blood_glucose" -> ObserverDataType.BLOOD_GLUCOSE
+            else -> null
+        }
+    }
+    
+    /**
+     * 통합 옵저버 시작
+     */
+    private fun startObserver(dataTypeNames: List<String>?, wrapper: ResultWrapper) {
+        Log.d(APP_TAG, "startObserver() 호출: $dataTypeNames")
+        
+        val store = healthDataStore
+        if (store == null) {
+            wrapper.error("STORE_NOT_READY", "Samsung Health에 먼저 연결하세요", null)
+            return
+        }
+        
+        // 데이터 타입 결정
+        val targetTypes = when {
+            dataTypeNames == null || dataTypeNames.isEmpty() -> {
+                // null이거나 비어있으면 모든 타입
+                ObserverDataType.values().toList()
+            }
+            else -> {
+                // 지정된 타입들만 처리
+                dataTypeNames.mapNotNull { parseObserverDataType(it) }
+            }
+        }
+        
+        if (targetTypes.isEmpty()) {
+            wrapper.error("INVALID_DATA_TYPES", "유효한 데이터 타입이 없습니다", null)
+            return
+        }
+        
+        // 옵저버 스코프 초기화
+        if (observerScope == null) {
+            observerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        }
+        
+        val results = mutableListOf<Map<String, Any>>()
+        var hasRunning = false
+        var hasStarted = false
+        
+        for (dataType in targetTypes) {
+            val currentState = observerStates[dataType]
+            if (currentState?.status == ObserverStatus.RUNNING) {
+                hasRunning = true
+                results.add(mapOf(
+                    "status" to "already_running",
+                    "dataType" to dataType.typeName,
+                    "message" to "${dataType.typeName} 옵저버가 이미 실행중입니다"
+                ))
+            } else {
+                hasStarted = true
+                
+                // 상태 초기화
+                observerStates[dataType] = ObserverState(
+                    dataType = dataType,
+                    status = ObserverStatus.RUNNING,
+                    lastSyncTime = System.currentTimeMillis()
+                )
+                
+                // 옵저버 Job 시작
+                val job = observerScope!!.launch {
+                    observeDataType(store, dataType)
+                }
+                observerJobs[dataType] = job
+                
+                results.add(mapOf(
+                    "status" to "started",
+                    "dataType" to dataType.typeName,
+                    "message" to "${dataType.typeName} 옵저버를 시작했습니다"
+                ))
+            }
+        }
+        
+        val overallStatus = when {
+            hasRunning && hasStarted -> "partially_started"
+            hasRunning -> "already_running"
+            hasStarted -> "started"
+            else -> "no_action"
+        }
+        
+        wrapper.success(mapOf(
+            "status" to overallStatus,
+            "message" to "${targetTypes.size}개 타입의 옵저버 시작 처리 완료",
+            "targetTypes" to targetTypes.map { it.typeName },
+            "results" to results
+        ))
+    }
+    
+    /**
+     * 통합 옵저버 중단
+     */
+    private fun stopObserver(dataTypeNames: List<String>?, wrapper: ResultWrapper) {
+        Log.d(APP_TAG, "stopObserver() 호출: $dataTypeNames")
+        
+        // 데이터 타입 결정
+        val targetTypes = when {
+            dataTypeNames == null || dataTypeNames.isEmpty() -> {
+                // null이거나 비어있으면 모든 타입
+                ObserverDataType.values().toList()
+            }
+            else -> {
+                // 지정된 타입들만 처리
+                dataTypeNames.mapNotNull { parseObserverDataType(it) }
+            }
+        }
+        
+        if (targetTypes.isEmpty()) {
+            wrapper.error("INVALID_DATA_TYPES", "유효한 데이터 타입이 없습니다", null)
+            return
+        }
+        
+        val results = mutableListOf<Map<String, Any>>()
+        var hasStopped = false
+        
+        for (dataType in targetTypes) {
+            val job = observerJobs[dataType]
+            if (job != null) {
+                job.cancel()
+                observerJobs.remove(dataType)
+                hasStopped = true
+                
+                // 상태 업데이트
+                observerStates[dataType] = ObserverState(
+                    dataType = dataType,
+                    status = ObserverStatus.STOPPED,
+                    lastSyncTime = System.currentTimeMillis()
+                )
+                
+                results.add(mapOf(
+                    "status" to "stopped",
+                    "dataType" to dataType.typeName,
+                    "message" to "${dataType.typeName} 옵저버를 중단했습니다"
+                ))
+            } else {
+                results.add(mapOf(
+                    "status" to "not_running",
+                    "dataType" to dataType.typeName,
+                    "message" to "${dataType.typeName} 옵저버가 실행중이 아닙니다"
+                ))
+            }
+        }
+        
+        val overallStatus = if (hasStopped) "stopped" else "not_running"
+        
+        wrapper.success(mapOf(
+            "status" to overallStatus,
+            "message" to "${targetTypes.size}개 타입의 옵저버 중단 처리 완료",
+            "targetTypes" to targetTypes.map { it.typeName },
+            "results" to results
+        ))
+    }
+    
+    /**
+     * 통합 옵저버 상태 조회
+     */
+    private fun getObserverStatus(dataTypeNames: List<String>?, wrapper: ResultWrapper) {
+        Log.d(APP_TAG, "getObserverStatus() 호출: $dataTypeNames")
+        
+        // 데이터 타입 결정
+        val targetTypes = when {
+            dataTypeNames == null || dataTypeNames.isEmpty() -> {
+                // null이거나 비어있으면 모든 타입
+                ObserverDataType.values().toList()
+            }
+            else -> {
+                // 지정된 타입들만 처리
+                dataTypeNames.mapNotNull { parseObserverDataType(it) }
+            }
+        }
+        
+        if (targetTypes.isEmpty()) {
+            wrapper.error("INVALID_DATA_TYPES", "유효한 데이터 타입이 없습니다", null)
+            return
+        }
+        
+        val results = targetTypes.map { dataType ->
+            val state = observerStates[dataType] ?: ObserverState(
+                dataType = dataType,
+                status = ObserverStatus.STOPPED
+            )
+            
+            mapOf(
+                "dataType" to state.dataType.typeName,
+                "status" to state.status.name.lowercase(),
+                "lastSyncTime" to state.lastSyncTime,
+                "errorMessage" to state.errorMessage
+            )
+        }
+        
+        val response = if (targetTypes.size == 1) {
+            // 단일 타입인 경우 바로 반환 (하위호환성)
+            results.first()
+        } else {
+            // 여러 타입인 경우 배열로 반환
+            mapOf(
+                "message" to "${targetTypes.size}개 타입의 옵저버 상태 조회 완료",
+                "targetTypes" to targetTypes.map { it.typeName },
+                "results" to results
+            )
+        }
+        
+        wrapper.success(response)
+    }
+    
+    
+    
+    
+    // ===== 옵저버 실행 로직 =====
+    
+    /**
+     * 데이터 타입 감시 (폴링 방식)
+     */
+    private suspend fun observeDataType(store: HealthDataStore, dataType: ObserverDataType) {
+        Log.d(APP_TAG, "옵저버 시작: ${dataType.typeName}")
+        
+        // 초기 동기화 시간 설정 (1분 전)
+        var lastSync = lastSyncTimes[dataType] ?: Instant.now().minusSeconds(60)
+        lastSyncTimes[dataType] = lastSync
+        
+        try {
+            while (currentCoroutineContext().isActive) {
+                val end = Instant.now()
+                
+                try {
+                    val changes = readChangesForDataType(store, dataType, lastSync, end)
+                    if (changes.isNotEmpty()) {
+                        Log.d(APP_TAG, "[${dataType.typeName}] ${changes.size}개 변경사항 감지")
+                        
+                        // 변경사항 처리 (지금은 로그만, 나중에 콜백 추가 가능)
+                        for (change in changes) {
+                            Log.d(APP_TAG, "[${dataType.typeName}] ${change.changeType} - UID: ${change.upsertDataPoint?.uid ?: change.deleteDataUid}")
+                        }
+                        
+                        // 가장 최근 changeTime으로 업데이트
+                        changes.maxByOrNull { it.changeTime }?.let { latestChange ->
+                            lastSync = latestChange.changeTime.plusNanos(1)
+                            lastSyncTimes[dataType] = lastSync
+                        }
+                    }
+                    
+                    // 상태 업데이트 (성공)
+                    observerStates[dataType] = ObserverState(
+                        dataType = dataType,
+                        status = ObserverStatus.RUNNING,
+                        lastSyncTime = System.currentTimeMillis()
+                    )
+                    
+                } catch (e: Exception) {
+                    Log.e(APP_TAG, "[${dataType.typeName}] 옵저버 오류: ${e.message}", e)
+                    
+                    // 상태 업데이트 (오류)
+                    observerStates[dataType] = ObserverState(
+                        dataType = dataType,
+                        status = ObserverStatus.ERROR,
+                        lastSyncTime = System.currentTimeMillis(),
+                        errorMessage = e.message
+                    )
+                }
+                
+                delay(10_000L) // 10초 간격 폴링
+            }
+        } catch (e: Exception) {
+            Log.e(APP_TAG, "[${dataType.typeName}] 옵저버 예외: ${e.message}", e)
+        } finally {
+            Log.d(APP_TAG, "[${dataType.typeName}] 옵저버 종료")
+            
+            // 최종 상태 업데이트
+            observerStates[dataType] = ObserverState(
+                dataType = dataType,
+                status = ObserverStatus.STOPPED,
+                lastSyncTime = System.currentTimeMillis()
+            )
+        }
+    }
+    
+    
+    /**
+     * 특정 데이터 타입의 변경사항 조회
+     */
+    private suspend fun readChangesForDataType(
+        store: HealthDataStore,
+        dataType: ObserverDataType,
+        startTime: Instant,
+        endTime: Instant
+    ): List<Change<HealthDataPoint>> {
+        val dataTypes = when (dataType) {
+            ObserverDataType.EXERCISE -> DataTypes.EXERCISE
+            ObserverDataType.NUTRITION -> DataTypes.NUTRITION
+            ObserverDataType.BLOOD_GLUCOSE -> DataTypes.BLOOD_GLUCOSE
+        }
+        
+        val request = dataTypes.changedDataRequestBuilder
+            .setChangeTimeFilter(InstantTimeFilter.of(startTime, endTime))
+            .build()
+            
+        val response = store.readChanges(request)
+        return response.dataList
     }
 
     private fun requestPermissions(types: List<String>, wrapper: ResultWrapper) {
@@ -1404,35 +1440,11 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, Ev
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
-        // 엔진에서 분리될 때도 변경 감시 정리
-        stopChangeObservers()
+        
+        // 엔진에서 분리될 때 모든 옵저버 정리
+        cleanupObservers()
     }
 
-    // ===== EventChannel.StreamHandler 구현 =====
-    
-    /**
-     * EventChannel 생명주기 관리
-     * - onListen: 리스너 등록 및 첫 연결시 Observer 시작
-     * - onCancel: 모든 리스너 해제시 Observer 중단
-     */
-    override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-        Log.d(APP_TAG, "EventChannel onListen() 호출 - arguments=$arguments")
-        events?.let { eventSinks.add(it) }
-
-        // "첫 번째 리스너"가 붙을 때 변경 감시 시작
-        if (eventSinks.size == 1) {
-            val observedTypes = parseObservedTypes(arguments)
-            Log.d(APP_TAG, "첫 번째 리스너 연결, 감시 시작: $observedTypes")
-            startChangeObservers(observedTypes)
-        }
-    }
-
-    override fun onCancel(arguments: Any?) {
-        Log.d(APP_TAG, "EventChannel onCancel() 호출")
-        eventSinks.clear()
-        // 더 이상 리스너가 없으면 변경 감시도 중단
-        stopChangeObservers()
-    }
 
     // ===== ActivityAware 구현 =====
 

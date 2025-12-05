@@ -118,4 +118,33 @@ class FlutterSamsungHealth {
   }) {
     return FlutterSamsungHealthPlatform.instance.getBloodGlucoseData(start, end);
   }
+
+  /// 옵저버 시작
+  /// 반환값:
+  /// - status: 'started', 'already_running', 'partially_started', 'error'
+  /// - targetTypes: 처리된 데이터 타입 목록
+  /// - results: 각 타입별 상세 결과
+  /// - message: 상태 메시지
+  Future<Map<String, dynamic>> startObserver([List<String>? dataTypes]) {
+    return FlutterSamsungHealthPlatform.instance.startObserver(dataTypes);
+  }
+
+  /// 옵저버 중단
+  /// 사용 예:
+  /// 반환값:
+  /// - status: 'stopped', 'not_running', 'error'
+  /// - targetTypes: 처리된 데이터 타입 목록
+  /// - results: 각 타입별 상세 결과
+  /// - message: 상태 메시지
+  Future<Map<String, dynamic>> stopObserver([List<String>? dataTypes]) {
+    return FlutterSamsungHealthPlatform.instance.stopObserver(dataTypes);
+  }
+
+  /// 옵저버 상태 조회
+  /// 반환값:
+  /// - 단일 타입: { dataType, status, lastSyncTime, errorMessage }
+  /// - 여러 타입: { message, targetTypes, results[] }
+  Future<dynamic> getObserverStatus([List<String>? dataTypes]) {
+    return FlutterSamsungHealthPlatform.instance.getObserverStatus(dataTypes);
+  }
 }
