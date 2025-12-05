@@ -665,9 +665,15 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                     if (changes.isNotEmpty()) {
                         Log.d(APP_TAG, "[${dataType.typeName}] ${changes.size}개 변경사항 감지")
                         
-                        // 변경사항 처리 (지금은 로그만, 나중에 콜백 추가 가능)
+                        // 변경사항 처리
                         for (change in changes) {
                             Log.d(APP_TAG, "[${dataType.typeName}] ${change.changeType} - UID: ${change.upsertDataPoint?.uid ?: change.deleteDataUid}")
+                            
+                            // 상세 데이터 로그 (getExerciseData 같은 방식으로)
+                            if (change.changeType == ChangeType.UPSERT && change.upsertDataPoint != null) {
+                                val detailedData = getDetailedDataForLog(dataType, change.upsertDataPoint!!)
+                                Log.d(APP_TAG, "[${dataType.typeName}] 상세 데이터: $detailedData")
+                            }
                         }
                         
                         // 가장 최근 changeTime으로 업데이트
@@ -1462,6 +1468,66 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
 
     override fun onDetachedFromActivityForConfigChanges() {
         activity = null
+    }
+    
+    /**
+     * 옵저버용 상세 데이터 로그 생성 (getExerciseData 같은 방식으로)
+     */
+    private fun getDetailedDataForLog(dataType: ObserverDataType, dataPoint: HealthDataPoint): Map<String, Any> {
+        return when (dataType) {
+            ObserverDataType.EXERCISE -> {
+                val exerciseType = dataPoint.getValue(DataType.ExerciseType.EXERCISE_TYPE)
+                val sessions = dataPoint.getValue(DataType.ExerciseType.SESSIONS)
+                
+                val firstSession = sessions?.firstOrNull()
+                mapOf(
+                    "uid" to (dataPoint.uid ?: ""),
+                    "startTime" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
+                    "endTime" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
+                    "exerciseType" to (exerciseType?.ordinal ?: 0),
+                    "exerciseTypeName" to (exerciseType?.name ?: "Unknown"),
+                    "duration" to (firstSession?.duration?.toMillis() ?: 0L),
+                    "calories" to (firstSession?.calories ?: 0f),
+                    "distance" to (firstSession?.distance ?: 0f),
+                    "maxHeartRate" to (firstSession?.maxHeartRate ?: 0f),
+                    "meanHeartRate" to (firstSession?.meanHeartRate ?: 0f),
+                    "sessionCount" to (sessions?.size ?: 0)
+                )
+            }
+            
+            ObserverDataType.NUTRITION -> {
+                val mealType = dataPoint.getValue(DataType.NutritionType.MEAL_TYPE)
+                mapOf(
+                    "uid" to (dataPoint.uid ?: ""),
+                    "startTime" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
+                    "endTime" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
+                    "title" to (dataPoint.getValue(DataType.NutritionType.TITLE) ?: ""),
+                    "mealType" to (mealType?.ordinal ?: 0),
+                    "mealTypeName" to (mealType?.name ?: "Unknown"),
+                    "calories" to (dataPoint.getValue(DataType.NutritionType.CALORIES) ?: 0f),
+                    "protein" to (dataPoint.getValue(DataType.NutritionType.PROTEIN) ?: 0f),
+                    "carbohydrate" to (dataPoint.getValue(DataType.NutritionType.CARBOHYDRATE) ?: 0f),
+                    "totalFat" to (dataPoint.getValue(DataType.NutritionType.TOTAL_FAT) ?: 0f)
+                )
+            }
+            
+            ObserverDataType.BLOOD_GLUCOSE -> {
+                val glucoseMmol = dataPoint.getValue(DataType.BloodGlucoseType.GLUCOSE_LEVEL) ?: 0f
+                val measurementType = dataPoint.getValue(DataType.BloodGlucoseType.MEASUREMENT_TYPE)
+                val mealStatus = dataPoint.getValue(DataType.BloodGlucoseType.MEAL_STATUS)
+                mapOf(
+                    "uid" to (dataPoint.uid ?: ""),
+                    "startTime" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
+                    "endTime" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
+                    "glucoseMmol" to glucoseMmol,
+                    "glucoseMgdl" to (glucoseMmol * 18.018f),
+                    "measurementType" to (measurementType?.ordinal ?: 0),
+                    "measurementTypeName" to (measurementType?.name ?: "Unknown"),
+                    "mealStatus" to (mealStatus?.ordinal ?: 0),
+                    "mealStatusName" to (mealStatus?.name ?: "Unknown")
+                )
+            }
+        }
     }
 }
 
