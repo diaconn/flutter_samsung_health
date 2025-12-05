@@ -412,8 +412,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     private fun disconnect(wrapper: ResultWrapper) {
         Log.d(APP_TAG, "disconnect() 호출")
         
-        // 모든 옵저버 정리
-        cleanupObservers()
+        // 연결 해제 시에는 Jobs만 정리하고 상태는 유지 (재연결 시 복원용)
+        cleanupObserverJobsOnly()
         
         healthDataStore = null
         val resultMap = mutableMapOf<String, Any>(
@@ -425,7 +425,38 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     }
     
     /**
-     * 모든 옵저버 정리
+     * 옵저버 Jobs만 정리 (상태는 유지)
+     */
+    private fun cleanupObserverJobsOnly() {
+        Log.d(APP_TAG, "옵저버 Jobs만 정리 (상태 유지)")
+        
+        // 모든 옵저버 Jobs 취소
+        observerJobs.values.forEach { it.cancel() }
+        observerJobs.clear()
+        
+        // 옵저버 스코프 정리
+        observerScope?.cancel()
+        observerScope = null
+        
+        // 메모리 상태는 STOPPED으로 변경하되 SharedPreferences는 유지
+        for ((dataType, _) in observerStates) {
+            observerStates[dataType] = ObserverState(
+                dataType = dataType,
+                status = ObserverStatus.STOPPED,
+                lastSyncTime = System.currentTimeMillis()
+            )
+            // SharedPreferences는 건드리지 않음 (재연결 시 복원용)
+        }
+        
+        // UID 캐시 정리
+        processedUids.clear()
+        uidCacheCleanupTime.clear()
+        
+        Log.d(APP_TAG, "옵저버 Jobs 정리 완료 (SharedPreferences 상태 유지)")
+    }
+    
+    /**
+     * 모든 옵저버 완전 정리 (상태도 삭제)
      */
     private fun cleanupObservers() {
         Log.d(APP_TAG, "모든 옵저버 정리 시작")
@@ -1550,8 +1581,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
         
-        // 엔진에서 분리될 때 모든 옵저버 정리
-        cleanupObservers()
+        // 앱 종료 시에는 옵저버 상태를 유지 (재시작 시 복원을 위해)
+        // cleanupObservers() 호출하지 않음
+        Log.d(APP_TAG, "Flutter 엔진에서 분리됨 - 옵저버 상태 유지")
     }
 
 
