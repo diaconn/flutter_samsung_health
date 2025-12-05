@@ -154,18 +154,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
 
         // SharedPreferences 초기화
         sharedPreferences = context.getSharedPreferences(OBSERVER_PREFS, Context.MODE_PRIVATE)
-        Log.d(APP_TAG, "SharedPreferences 초기화 완료: ${OBSERVER_PREFS}")
-        
-        // 기존 저장된 데이터 확인 (디버깅용)
-        val allPrefs = sharedPreferences.all
-        Log.d(APP_TAG, "기존 저장된 데이터: ${allPrefs}")
-        
-        // 수동 테스트 저장/읽기
-        val testSuccess = sharedPreferences.edit().putString("test_key", "test_value").commit()
-        val testRead = sharedPreferences.getString("test_key", "default")
-        Log.d(APP_TAG, "수동 테스트 - 저장 성공: $testSuccess, 읽기 결과: $testRead")
-        
-        // 참고: 옵저버 상태 복원은 connect() 호출 후에 실행됩니다
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
@@ -433,8 +421,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
      * 옵저버 Jobs만 정리 (상태는 유지)
      */
     private fun cleanupObserverJobsOnly() {
-        Log.d(APP_TAG, "옵저버 Jobs만 정리 (상태 유지)")
-        
         // 모든 옵저버 Jobs 취소
         observerJobs.values.forEach { it.cancel() }
         observerJobs.clear()
@@ -450,22 +436,17 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 status = ObserverStatus.STOPPED,
                 lastSyncTime = System.currentTimeMillis()
             )
-            // SharedPreferences는 건드리지 않음 (재연결 시 복원용)
         }
         
         // UID 캐시 정리
         processedUids.clear()
         uidCacheCleanupTime.clear()
-        
-        Log.d(APP_TAG, "옵저버 Jobs 정리 완료 (SharedPreferences 상태 유지)")
     }
     
     /**
      * 모든 옵저버 완전 정리 (상태도 삭제)
      */
     private fun cleanupObservers() {
-        Log.d(APP_TAG, "모든 옵저버 정리 시작")
-        
         // 모든 옵저버 Jobs 취소
         observerJobs.values.forEach { it.cancel() }
         observerJobs.clear()
@@ -488,8 +469,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         // UID 캐시 정리
         processedUids.clear()
         uidCacheCleanupTime.clear()
-        
-        Log.d(APP_TAG, "모든 옵저버 정리 완료 (SharedPreferences 포함)")
     }
 
     // ===== 옵저버 메서드들 =====
@@ -562,10 +541,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 // SharedPreferences에 상태 저장
                 saveObserverState(dataType, true)
                 
-                // 새로 시작하는 옵저버는 UID 캐시도 초기화 (깔끔하게 시작)
+                // UID 캐시 초기화
                 if (!observerJobs.containsKey(dataType)) {
                     processedUids[dataType]?.clear()
-                    Log.d(APP_TAG, "[${dataType.typeName}] UID 캐시 초기화 (새 시작)")
                 }
                 
                 // Samsung Health 연결 상태에 따라 실제 Job 시작 여부 결정
@@ -576,10 +554,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                         observeDataType(store, dataType)
                     }
                     observerJobs[dataType] = job
-                    Log.d(APP_TAG, "[${dataType.typeName}] 옵저버 실제 시작 (연결됨)")
-                } else {
-                    // 연결이 안 되어 있으면 상태만 저장 (추후 연결 시 자동 시작됨)
-                    Log.d(APP_TAG, "[${dataType.typeName}] 옵저버 상태만 저장 (미연결 - 연결 시 자동 시작됨)")
                 }
                 
                 results.add(mapOf(
@@ -733,27 +707,21 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
      * 데이터 타입 감시 (폴링 방식)
      */
     private suspend fun observeDataType(store: HealthDataStore, dataType: ObserverDataType) {
-        Log.d(APP_TAG, "옵저버 시작: ${dataType.typeName}")
-        
         // 초기 동기화 시간 설정
         val isFirstStart = !lastSyncTimes.containsKey(dataType)
         var lastSync = if (isFirstStart) {
             // 처음 시작: 정확히 현재 시점부터 (옵저버 켠 이후 데이터만)
             val now = Instant.now()
-            Log.d(APP_TAG, "[${dataType.typeName}] 옵저버 최초 시작 - 기준 시간: $now")
             now
         } else {
             // 재시작: 이전 동기화 시점부터 이어서
-            val prev = lastSyncTimes[dataType]!!
-            Log.d(APP_TAG, "[${dataType.typeName}] 옵저버 재시작 - 이전 시간: $prev")
-            prev
+            lastSyncTimes[dataType]!!
         }
         lastSyncTimes[dataType] = lastSync
         
         try {
             // 첫 번째 체크 전에 잠깐 대기 (시작 직후 시간 범위 문제 방지)
             if (isFirstStart) {
-                Log.d(APP_TAG, "[${dataType.typeName}] 첫 체크 전 대기...")
                 delay(2000L) // 2초 대기
             }
             
@@ -843,8 +811,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         } catch (e: Exception) {
             Log.e(APP_TAG, "[${dataType.typeName}] 옵저버 예외: ${e.message}", e)
         } finally {
-            Log.d(APP_TAG, "[${dataType.typeName}] 옵저버 종료")
-            
             // 최종 상태 업데이트
             observerStates[dataType] = ObserverState(
                 dataType = dataType,
@@ -1587,8 +1553,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         channel.setMethodCallHandler(null)
         
         // 앱 종료 시에는 옵저버 상태를 유지 (재시작 시 복원을 위해)
-        // cleanupObservers() 호출하지 않음
-        Log.d(APP_TAG, "Flutter 엔진에서 분리됨 - 옵저버 상태 유지")
     }
 
 
@@ -1641,9 +1605,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                     // 새로운 UID면 처리 목록에 추가
                     newChanges.add(change)
                     processedSet.add(uid)
-                    Log.v(APP_TAG, "[${dataType.typeName}] 새로운 UID 등록: $uid")
+                    // 새로운 UID 등록
                 } else {
-                    Log.v(APP_TAG, "[${dataType.typeName}] 중복 UID 스킵: $uid")
+                    // 중복 UID 스킵
                 }
             } else {
                 // UID가 없는 경우 (예외 상황)
@@ -1660,33 +1624,12 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
      */
     private fun saveObserverState(dataType: ObserverDataType, isRunning: Boolean) {
         if (!::sharedPreferences.isInitialized) {
-            Log.e(APP_TAG, "SharedPreferences가 초기화되지 않음 - 상태 저장 실패")
+            Log.e(APP_TAG, "SharedPreferences not initialized")
             return
         }
         
         val key = "${OBSERVER_STATE_PREFIX}${dataType.typeName}"
-        Log.d(APP_TAG, "[${dataType.typeName}] 저장 시도: key='$key', value=$isRunning")
-        
-        // 여러 방법으로 저장 시도
-        val editor = sharedPreferences.edit()
-        editor.putBoolean(key, isRunning)
-        val commitSuccess = editor.commit()
-        
-        Log.d(APP_TAG, "[${dataType.typeName}] commit() 결과: $commitSuccess")
-        
-        // apply()도 시도
-        val editor2 = sharedPreferences.edit()
-        editor2.putBoolean(key, isRunning)
-        editor2.apply()
-        Log.d(APP_TAG, "[${dataType.typeName}] apply() 호출 완료")
-        
-        // 즉시 확인
-        val saved = sharedPreferences.getBoolean(key, false)
-        Log.d(APP_TAG, "[${dataType.typeName}] 저장 즉시 확인: $saved")
-        
-        // 전체 데이터도 확인
-        val allData = sharedPreferences.all
-        Log.d(APP_TAG, "[${dataType.typeName}] 전체 SharedPreferences: $allData")
+        sharedPreferences.edit().putBoolean(key, isRunning).apply()
     }
     
     /**
@@ -1756,12 +1699,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
      * 필요 시 옵저버 상태 복원 (매 연결마다 체크)
      */
     private fun restoreObserverStatesIfNeeded() {
-        if (!::sharedPreferences.isInitialized) {
-            Log.e(APP_TAG, "SharedPreferences가 초기화되지 않음 - 복원 실패")
-            return
-        }
+        if (!::sharedPreferences.isInitialized) return
         
-        Log.d(APP_TAG, "저장된 옵저버 상태 복원 체크 시작")
+        var restoredCount = 0
         
         // 현재 실행 중인 옵저버와 저장된 상태 비교
         for (dataType in ObserverDataType.values()) {
@@ -1769,26 +1709,24 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
             val savedState = sharedPreferences.getBoolean(key, false)
             val currentState = observerStates[dataType]?.status == ObserverStatus.RUNNING
             
-            Log.d(APP_TAG, "[${dataType.typeName}] 저장된 상태: $savedState, 현재 상태: $currentState")
-            
             if (savedState && !currentState) {
                 // 저장된 상태는 실행중인데 현재는 중지됨 → 복원 필요
-                Log.d(APP_TAG, "[${dataType.typeName}] 복원 필요 - 자동 시작")
                 try {
                     startObserverInternal(dataType)
-                    Log.d(APP_TAG, "[${dataType.typeName}] 옵저버 자동 복원 성공")
+                    restoredCount++
                 } catch (e: Exception) {
-                    Log.e(APP_TAG, "[${dataType.typeName}] 옵저버 자동 복원 실패: ${e.message}")
+                    Log.e(APP_TAG, "[${dataType.typeName}] Observer restore failed: ${e.message}")
                     saveObserverState(dataType, false)
                 }
             } else if (!savedState && currentState) {
                 // 저장된 상태는 중지인데 현재는 실행중 → 상태 동기화
-                Log.d(APP_TAG, "[${dataType.typeName}] 상태 불일치 - 저장된 상태로 동기화")
                 saveObserverState(dataType, true)
             }
         }
         
-        Log.d(APP_TAG, "옵저버 상태 복원 체크 완료")
+        if (restoredCount > 0) {
+            Log.i(APP_TAG, "Restored $restoredCount observers from saved state")
+        }
     }
     
     /**
@@ -1824,7 +1762,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         
         // UID 캐시 초기화
         processedUids[dataType]?.clear()
-        Log.d(APP_TAG, "[${dataType.typeName}] UID 캐시 초기화 (복원)")
         
         // 동기화 시간 설정 (현재 시점)
         lastSyncTimes[dataType] = Instant.now()
@@ -1835,9 +1772,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                 observeDataType(store, dataType)
             }
             observerJobs[dataType] = job
-            Log.d(APP_TAG, "[${dataType.typeName}] 옵저버 내부 시작 완료 (연결됨)")
-        } else {
-            Log.d(APP_TAG, "[${dataType.typeName}] 옵저버 상태만 저장 (미연결)")
         }
     }
     
