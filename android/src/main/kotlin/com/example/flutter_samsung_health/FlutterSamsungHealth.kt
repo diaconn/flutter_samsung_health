@@ -1870,20 +1870,22 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
             "meal_type" to (mealType?.ordinal ?: 0),
             "meal_type_name" to (mealType?.name ?: "Unknown"),
             "calories" to (dataPoint.getValue(DataType.NutritionType.CALORIES) ?: 0f),
-            "protein" to (dataPoint.getValue(DataType.NutritionType.PROTEIN) ?: 0f),
-            "carbohydrate" to (dataPoint.getValue(DataType.NutritionType.CARBOHYDRATE) ?: 0f),
             "total_fat" to (dataPoint.getValue(DataType.NutritionType.TOTAL_FAT) ?: 0f),
             "saturated_fat" to (dataPoint.getValue(DataType.NutritionType.SATURATED_FAT) ?: 0f),
             "trans_fat" to (dataPoint.getValue(DataType.NutritionType.TRANS_FAT) ?: 0f),
+            "polysaturated_fat" to (dataPoint.getValue(DataType.NutritionType.POLYSATURATED_FAT) ?: 0f),
+            "monosaturated_fat" to (dataPoint.getValue(DataType.NutritionType.MONOSATURATED_FAT) ?: 0f),
             "cholesterol" to (dataPoint.getValue(DataType.NutritionType.CHOLESTEROL) ?: 0f),
+            "protein" to (dataPoint.getValue(DataType.NutritionType.PROTEIN) ?: 0f),
+            "carbohydrate" to (dataPoint.getValue(DataType.NutritionType.CARBOHYDRATE) ?: 0f),
+            "sugar" to (dataPoint.getValue(DataType.NutritionType.SUGAR) ?: 0f),
+            "dietary_fiber" to (dataPoint.getValue(DataType.NutritionType.DIETARY_FIBER) ?: 0f),
             "sodium" to (dataPoint.getValue(DataType.NutritionType.SODIUM) ?: 0f),
             "potassium" to (dataPoint.getValue(DataType.NutritionType.POTASSIUM) ?: 0f),
-            "dietary_fiber" to (dataPoint.getValue(DataType.NutritionType.DIETARY_FIBER) ?: 0f),
-            "sugar" to (dataPoint.getValue(DataType.NutritionType.SUGAR) ?: 0f),
+            "calcium" to (dataPoint.getValue(DataType.NutritionType.CALCIUM) ?: 0f),
+            "iron" to (dataPoint.getValue(DataType.NutritionType.IRON) ?: 0f),
             "vitamin_a" to (dataPoint.getValue(DataType.NutritionType.VITAMIN_A) ?: 0f),
             "vitamin_c" to (dataPoint.getValue(DataType.NutritionType.VITAMIN_C) ?: 0f),
-            "calcium" to (dataPoint.getValue(DataType.NutritionType.CALCIUM) ?: 0f),
-            "iron" to (dataPoint.getValue(DataType.NutritionType.IRON) ?: 0f)
         )
     }
     
