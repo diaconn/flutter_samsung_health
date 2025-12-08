@@ -1826,14 +1826,14 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
         // 세션 데이터 파싱
         val sessionList = sessions?.map { session ->
             mapOf(
-                "startTime" to (session.startTime?.toEpochMilli() ?: 0L),
-                "endTime" to (session.endTime?.toEpochMilli() ?: 0L),
+                "start_time" to (session.startTime?.toEpochMilli() ?: 0L),
+                "end_time" to (session.endTime?.toEpochMilli() ?: 0L),
                 "duration" to (session.duration?.toMillis() ?: 0L),
                 "calories" to (session.calories ?: 0f),
                 "distance" to (session.distance ?: 0f),
-                "maxHeartRate" to (session.maxHeartRate ?: 0f),
-                "meanHeartRate" to (session.meanHeartRate ?: 0f),
-                "minHeartRate" to (session.minHeartRate ?: 0f)
+                "max_heart_rate" to (session.maxHeartRate ?: 0f),
+                "mean_heart_rate" to (session.meanHeartRate ?: 0f),
+                "min_heart_rate" to (session.minHeartRate ?: 0f)
             )
         } ?: emptyList()
         
@@ -1841,17 +1841,17 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
         
         return mapOf(
             "uid" to (dataPoint.uid ?: ""),
-            "startTime" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
-            "endTime" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
-            "exerciseType" to (exerciseType?.ordinal ?: 0),
-            "exerciseTypeName" to (exerciseType?.name ?: "Unknown"),
+            "start_time" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
+            "end_time" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
+            "exercise_type" to (exerciseType?.ordinal ?: 0),
+            "exercise_type_name" to (exerciseType?.name ?: "Unknown"),
             "duration" to (firstSession?.duration?.toMillis() ?: 0L),
             "calories" to (firstSession?.calories ?: 0f),
             "distance" to (firstSession?.distance ?: 0f),
-            "maxHeartRate" to (firstSession?.maxHeartRate ?: 0f),
-            "meanHeartRate" to (firstSession?.meanHeartRate ?: 0f),
-            "minHeartRate" to (firstSession?.minHeartRate ?: 0f),
-            "sessionCount" to (sessions?.size ?: 0),
+            "max_heart_rate" to (firstSession?.maxHeartRate ?: 0f),
+            "mean_heart_rate" to (firstSession?.meanHeartRate ?: 0f),
+            "min_heart_rate" to (firstSession?.minHeartRate ?: 0f),
+            "session_count" to (sessions?.size ?: 0),
             "sessions" to sessionList
         )
     }
@@ -1864,24 +1864,24 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
         
         return mapOf(
             "uid" to (dataPoint.uid ?: ""),
-            "startTime" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
-            "endTime" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
+            "start_time" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
+            "end_time" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
             "title" to (dataPoint.getValue(DataType.NutritionType.TITLE) ?: ""),
-            "mealType" to (mealType?.ordinal ?: 0),
-            "mealTypeName" to (mealType?.name ?: "Unknown"),
+            "meal_type" to (mealType?.ordinal ?: 0),
+            "meal_type_name" to (mealType?.name ?: "Unknown"),
             "calories" to (dataPoint.getValue(DataType.NutritionType.CALORIES) ?: 0f),
             "protein" to (dataPoint.getValue(DataType.NutritionType.PROTEIN) ?: 0f),
             "carbohydrate" to (dataPoint.getValue(DataType.NutritionType.CARBOHYDRATE) ?: 0f),
-            "totalFat" to (dataPoint.getValue(DataType.NutritionType.TOTAL_FAT) ?: 0f),
-            "saturatedFat" to (dataPoint.getValue(DataType.NutritionType.SATURATED_FAT) ?: 0f),
-            "transFat" to (dataPoint.getValue(DataType.NutritionType.TRANS_FAT) ?: 0f),
+            "total_fat" to (dataPoint.getValue(DataType.NutritionType.TOTAL_FAT) ?: 0f),
+            "saturated_fat" to (dataPoint.getValue(DataType.NutritionType.SATURATED_FAT) ?: 0f),
+            "trans_fat" to (dataPoint.getValue(DataType.NutritionType.TRANS_FAT) ?: 0f),
             "cholesterol" to (dataPoint.getValue(DataType.NutritionType.CHOLESTEROL) ?: 0f),
             "sodium" to (dataPoint.getValue(DataType.NutritionType.SODIUM) ?: 0f),
             "potassium" to (dataPoint.getValue(DataType.NutritionType.POTASSIUM) ?: 0f),
-            "dietaryFiber" to (dataPoint.getValue(DataType.NutritionType.DIETARY_FIBER) ?: 0f),
+            "dietary_fiber" to (dataPoint.getValue(DataType.NutritionType.DIETARY_FIBER) ?: 0f),
             "sugar" to (dataPoint.getValue(DataType.NutritionType.SUGAR) ?: 0f),
-            "vitaminA" to (dataPoint.getValue(DataType.NutritionType.VITAMIN_A) ?: 0f),
-            "vitaminC" to (dataPoint.getValue(DataType.NutritionType.VITAMIN_C) ?: 0f),
+            "vitamin_a" to (dataPoint.getValue(DataType.NutritionType.VITAMIN_A) ?: 0f),
+            "vitamin_c" to (dataPoint.getValue(DataType.NutritionType.VITAMIN_C) ?: 0f),
             "calcium" to (dataPoint.getValue(DataType.NutritionType.CALCIUM) ?: 0f),
             "iron" to (dataPoint.getValue(DataType.NutritionType.IRON) ?: 0f)
         )
@@ -1897,14 +1897,14 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
         
         return mapOf(
             "uid" to (dataPoint.uid ?: ""),
-            "startTime" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
-            "endTime" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
-            "glucoseMmol" to glucoseMmol,
-            "glucoseMgdl" to (glucoseMmol * 18.018f),
-            "measurementType" to (measurementType?.ordinal ?: 0),
-            "measurementTypeName" to (measurementType?.name ?: "Unknown"),
-            "mealStatus" to (mealStatus?.ordinal ?: 0),
-            "mealStatusName" to (mealStatus?.name ?: "Unknown")
+            "start_time" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
+            "end_time" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
+            "glucose_mmol" to glucoseMmol,
+            "glucose_mgdl" to (glucoseMmol * 18.018f),
+            "measurement_type" to (measurementType?.ordinal ?: 0),
+            "measurement_type_name" to (measurementType?.name ?: "Unknown"),
+            "meal_status" to (mealStatus?.ordinal ?: 0),
+            "meal_status_name" to (mealStatus?.name ?: "Unknown")
         )
     }
     
