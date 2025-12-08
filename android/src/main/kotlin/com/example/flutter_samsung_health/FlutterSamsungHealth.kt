@@ -27,6 +27,9 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import io.flutter.plugin.common.EventChannel
+import io.flutter.plugin.common.EventChannel.EventSink
+import io.flutter.plugin.common.EventChannel.StreamHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -42,12 +45,14 @@ import java.time.LocalDateTime
 import java.time.ZoneOffset
 
 /** FlutterSamsungHealth - Samsung Health Data SDK 1.0.0 */
-class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
+class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, StreamHandler {
 
     private lateinit var channel: MethodChannel
+    private lateinit var eventChannel: EventChannel
     private lateinit var context: Context
     private var healthDataStore: HealthDataStore? = null
     private var activity: Activity? = null
+    private var eventSink: EventSink? = null
 
     private val APP_TAG: String = "FlutterSamsungHealth"
 
@@ -151,6 +156,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
         context = flutterPluginBinding.applicationContext
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "flutter_samsung_health")
         channel.setMethodCallHandler(this)
+        
+        eventChannel = EventChannel(flutterPluginBinding.binaryMessenger, "flutter_samsung_health/stream")
+        eventChannel.setStreamHandler(this)
 
         // SharedPreferences 초기화
         sharedPreferences = context.getSharedPreferences(OBSERVER_PREFS, Context.MODE_PRIVATE)
@@ -759,16 +767,25 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
                         if (newChanges.isNotEmpty()) {
                             Log.d(APP_TAG, "[${dataType.typeName}] ${newChanges.size}개 새로운 변경사항 처리")
                             
+                            // Flutter로 전송할 데이터 준비
+                            val dataToSend = mutableListOf<Map<String, Any>>()
+                            
                             // 새로운 변경사항만 처리
                             for (change in newChanges) {
                                 val uid = change.upsertDataPoint?.uid ?: change.deleteDataUid ?: "unknown"
                                 Log.d(APP_TAG, "[${dataType.typeName}] ${change.changeType} - UID: $uid")
                                 
-                                // 상세 데이터 로그 (getExerciseData 같은 방식으로)
+                                // 상세 데이터 수집 (getExerciseData 같은 방식으로)
                                 if (change.changeType == ChangeType.UPSERT && change.upsertDataPoint != null) {
                                     val detailedData = getDetailedDataForLog(dataType, change.upsertDataPoint!!)
+                                    dataToSend.add(detailedData)
                                     Log.d(APP_TAG, "[${dataType.typeName}] 상세 데이터: $detailedData")
                                 }
+                            }
+                            
+                            // Flutter로 실시간 데이터 전송
+                            if (dataToSend.isNotEmpty()) {
+                                sendDataToFlutter(dataType, dataToSend)
                             }
                         } else {
                             Log.d(APP_TAG, "[${dataType.typeName}] 모든 변경사항이 이미 처리됨 (중복 제거)")
@@ -1554,6 +1571,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
+        eventChannel.setStreamHandler(null)
+        eventSink = null
         
         // 앱 종료 시에는 옵저버 상태를 유지 (재시작 시 복원을 위해)
     }
@@ -1779,62 +1798,148 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware {
     }
     
     /**
-     * 옵저버용 상세 데이터 로그 생성 (getExerciseData 같은 방식으로)
+     * 옵저버용 완전한 데이터 생성 (실제 API와 동일한 구조)
      */
     private fun getDetailedDataForLog(dataType: ObserverDataType, dataPoint: HealthDataPoint): Map<String, Any> {
         return when (dataType) {
             ObserverDataType.EXERCISE -> {
-                val exerciseType = dataPoint.getValue(DataType.ExerciseType.EXERCISE_TYPE)
-                val sessions = dataPoint.getValue(DataType.ExerciseType.SESSIONS)
-                
-                val firstSession = sessions?.firstOrNull()
-                mapOf(
-                    "uid" to (dataPoint.uid ?: ""),
-                    "startTime" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
-                    "endTime" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
-                    "exerciseType" to (exerciseType?.ordinal ?: 0),
-                    "exerciseTypeName" to (exerciseType?.name ?: "Unknown"),
-                    "duration" to (firstSession?.duration?.toMillis() ?: 0L),
-                    "calories" to (firstSession?.calories ?: 0f),
-                    "distance" to (firstSession?.distance ?: 0f),
-                    "maxHeartRate" to (firstSession?.maxHeartRate ?: 0f),
-                    "meanHeartRate" to (firstSession?.meanHeartRate ?: 0f),
-                    "sessionCount" to (sessions?.size ?: 0)
-                )
+                parseExerciseDataPoint(dataPoint)
             }
             
             ObserverDataType.NUTRITION -> {
-                val mealType = dataPoint.getValue(DataType.NutritionType.MEAL_TYPE)
-                mapOf(
-                    "uid" to (dataPoint.uid ?: ""),
-                    "startTime" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
-                    "endTime" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
-                    "title" to (dataPoint.getValue(DataType.NutritionType.TITLE) ?: ""),
-                    "mealType" to (mealType?.ordinal ?: 0),
-                    "mealTypeName" to (mealType?.name ?: "Unknown"),
-                    "calories" to (dataPoint.getValue(DataType.NutritionType.CALORIES) ?: 0f),
-                    "protein" to (dataPoint.getValue(DataType.NutritionType.PROTEIN) ?: 0f),
-                    "carbohydrate" to (dataPoint.getValue(DataType.NutritionType.CARBOHYDRATE) ?: 0f),
-                    "totalFat" to (dataPoint.getValue(DataType.NutritionType.TOTAL_FAT) ?: 0f)
-                )
+                parseNutritionDataPoint(dataPoint)
             }
             
             ObserverDataType.BLOOD_GLUCOSE -> {
-                val glucoseMmol = dataPoint.getValue(DataType.BloodGlucoseType.GLUCOSE_LEVEL) ?: 0f
-                val measurementType = dataPoint.getValue(DataType.BloodGlucoseType.MEASUREMENT_TYPE)
-                val mealStatus = dataPoint.getValue(DataType.BloodGlucoseType.MEAL_STATUS)
-                mapOf(
-                    "uid" to (dataPoint.uid ?: ""),
-                    "startTime" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
-                    "endTime" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
-                    "glucoseMmol" to glucoseMmol,
-                    "glucoseMgdl" to (glucoseMmol * 18.018f),
-                    "measurementType" to (measurementType?.ordinal ?: 0),
-                    "measurementTypeName" to (measurementType?.name ?: "Unknown"),
-                    "mealStatus" to (mealStatus?.ordinal ?: 0),
-                    "mealStatusName" to (mealStatus?.name ?: "Unknown")
-                )
+                parseBloodGlucoseDataPoint(dataPoint)
             }
+        }
+    }
+    
+    /**
+     * 운동 데이터 파싱 (getExerciseData와 동일한 구조)
+     */
+    private fun parseExerciseDataPoint(dataPoint: HealthDataPoint): Map<String, Any> {
+        val exerciseType = dataPoint.getValue(DataType.ExerciseType.EXERCISE_TYPE)
+        val sessions = dataPoint.getValue(DataType.ExerciseType.SESSIONS)
+        
+        // 세션 데이터 파싱
+        val sessionList = sessions?.map { session ->
+            mapOf(
+                "startTime" to (session.startTime?.toEpochMilli() ?: 0L),
+                "endTime" to (session.endTime?.toEpochMilli() ?: 0L),
+                "duration" to (session.duration?.toMillis() ?: 0L),
+                "calories" to (session.calories ?: 0f),
+                "distance" to (session.distance ?: 0f),
+                "maxHeartRate" to (session.maxHeartRate ?: 0f),
+                "meanHeartRate" to (session.meanHeartRate ?: 0f),
+                "minHeartRate" to (session.minHeartRate ?: 0f)
+            )
+        } ?: emptyList()
+        
+        val firstSession = sessions?.firstOrNull()
+        
+        return mapOf(
+            "uid" to (dataPoint.uid ?: ""),
+            "startTime" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
+            "endTime" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
+            "exerciseType" to (exerciseType?.ordinal ?: 0),
+            "exerciseTypeName" to (exerciseType?.name ?: "Unknown"),
+            "duration" to (firstSession?.duration?.toMillis() ?: 0L),
+            "calories" to (firstSession?.calories ?: 0f),
+            "distance" to (firstSession?.distance ?: 0f),
+            "maxHeartRate" to (firstSession?.maxHeartRate ?: 0f),
+            "meanHeartRate" to (firstSession?.meanHeartRate ?: 0f),
+            "minHeartRate" to (firstSession?.minHeartRate ?: 0f),
+            "sessionCount" to (sessions?.size ?: 0),
+            "sessions" to sessionList
+        )
+    }
+    
+    /**
+     * 영양소 데이터 파싱 (getNutritionData와 동일한 구조)
+     */
+    private fun parseNutritionDataPoint(dataPoint: HealthDataPoint): Map<String, Any> {
+        val mealType = dataPoint.getValue(DataType.NutritionType.MEAL_TYPE)
+        
+        return mapOf(
+            "uid" to (dataPoint.uid ?: ""),
+            "startTime" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
+            "endTime" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
+            "title" to (dataPoint.getValue(DataType.NutritionType.TITLE) ?: ""),
+            "mealType" to (mealType?.ordinal ?: 0),
+            "mealTypeName" to (mealType?.name ?: "Unknown"),
+            "calories" to (dataPoint.getValue(DataType.NutritionType.CALORIES) ?: 0f),
+            "protein" to (dataPoint.getValue(DataType.NutritionType.PROTEIN) ?: 0f),
+            "carbohydrate" to (dataPoint.getValue(DataType.NutritionType.CARBOHYDRATE) ?: 0f),
+            "totalFat" to (dataPoint.getValue(DataType.NutritionType.TOTAL_FAT) ?: 0f),
+            "saturatedFat" to (dataPoint.getValue(DataType.NutritionType.SATURATED_FAT) ?: 0f),
+            "transFat" to (dataPoint.getValue(DataType.NutritionType.TRANS_FAT) ?: 0f),
+            "cholesterol" to (dataPoint.getValue(DataType.NutritionType.CHOLESTEROL) ?: 0f),
+            "sodium" to (dataPoint.getValue(DataType.NutritionType.SODIUM) ?: 0f),
+            "potassium" to (dataPoint.getValue(DataType.NutritionType.POTASSIUM) ?: 0f),
+            "dietaryFiber" to (dataPoint.getValue(DataType.NutritionType.DIETARY_FIBER) ?: 0f),
+            "sugar" to (dataPoint.getValue(DataType.NutritionType.SUGAR) ?: 0f),
+            "vitaminA" to (dataPoint.getValue(DataType.NutritionType.VITAMIN_A) ?: 0f),
+            "vitaminC" to (dataPoint.getValue(DataType.NutritionType.VITAMIN_C) ?: 0f),
+            "calcium" to (dataPoint.getValue(DataType.NutritionType.CALCIUM) ?: 0f),
+            "iron" to (dataPoint.getValue(DataType.NutritionType.IRON) ?: 0f)
+        )
+    }
+    
+    /**
+     * 혈당 데이터 파싱 (getBloodGlucoseData와 동일한 구조)
+     */
+    private fun parseBloodGlucoseDataPoint(dataPoint: HealthDataPoint): Map<String, Any> {
+        val glucoseMmol = dataPoint.getValue(DataType.BloodGlucoseType.GLUCOSE_LEVEL) ?: 0f
+        val measurementType = dataPoint.getValue(DataType.BloodGlucoseType.MEASUREMENT_TYPE)
+        val mealStatus = dataPoint.getValue(DataType.BloodGlucoseType.MEAL_STATUS)
+        
+        return mapOf(
+            "uid" to (dataPoint.uid ?: ""),
+            "startTime" to (dataPoint.startTime?.toEpochMilli() ?: 0L),
+            "endTime" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
+            "glucoseMmol" to glucoseMmol,
+            "glucoseMgdl" to (glucoseMmol * 18.018f),
+            "measurementType" to (measurementType?.ordinal ?: 0),
+            "measurementTypeName" to (measurementType?.name ?: "Unknown"),
+            "mealStatus" to (mealStatus?.ordinal ?: 0),
+            "mealStatusName" to (mealStatus?.name ?: "Unknown")
+        )
+    }
+    
+    
+    // ===== EventChannel StreamHandler 구현 =====
+    
+    override fun onListen(arguments: Any?, events: EventSink?) {
+        Log.d(APP_TAG, "Event Channel 연결됨")
+        eventSink = events
+    }
+
+    override fun onCancel(arguments: Any?) {
+        Log.d(APP_TAG, "Event Channel 연결 해제됨")
+        eventSink = null
+    }
+    
+    /**
+     * Flutter로 실시간 데이터 전송
+     */
+    private fun sendDataToFlutter(dataType: ObserverDataType, data: List<Map<String, Any>>) {
+        eventSink?.let { sink ->
+            val eventData = mapOf(
+                "dataType" to dataType.typeName,
+                "data" to data,
+                "timestamp" to System.currentTimeMillis(),
+                "count" to data.size
+            )
+            
+            // UI 스레드에서 전송
+            CoroutineScope(Dispatchers.Main).launch {
+                sink.success(eventData)
+                Log.d(APP_TAG, "[${dataType.typeName}] Flutter로 ${data.size}개 데이터 전송 완료")
+            }
+        } ?: run {
+            Log.w(APP_TAG, "[${dataType.typeName}] EventSink가 null - Flutter 전송 실패")
         }
     }
 }

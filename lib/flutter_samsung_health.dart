@@ -1,6 +1,32 @@
+import 'dart:async';
+
+import 'package:flutter/services.dart';
 import 'flutter_samsung_health_platform_interface.dart';
 
 class FlutterSamsungHealth {
+  static const EventChannel _eventChannel = EventChannel('flutter_samsung_health/stream');
+  StreamSubscription? _subscription;
+  
+  /// 실시간 헬스 데이터 스트림
+  Stream<Map<String, dynamic>> get healthDataStream => 
+      _eventChannel.receiveBroadcastStream().cast<Map<String, dynamic>>();
+  
+  /// 헬스 데이터 스트림 시작 (편의 메서드)
+  StreamSubscription startListening(Function(Map<String, dynamic>) onData, {Function(Object)? onError}) {
+    _subscription?.cancel(); // 기존 구독 취소
+    _subscription = healthDataStream.listen(
+      onData,
+      onError: onError,
+    );
+    return _subscription!;
+  }
+  
+  /// 헬스 데이터 스트림 중지
+  void stopListening() {
+    _subscription?.cancel();
+    _subscription = null;
+  }
+
   /// 설치 여부 체크
   Future<Map<String, dynamic>> isSamsungHealthInstalled() {
     return FlutterSamsungHealthPlatform.instance.isSamsungHealthInstalled();
