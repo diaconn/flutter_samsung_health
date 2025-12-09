@@ -1263,7 +1263,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
             .build()
 
         val result = store.readData(readRequest)
-        val allSleepData = mutableListOf<Map<String, Any>>()
+        val resultList = mutableListOf<Map<String, Any>>()
 
         for (dataPoint in result.dataList) {
             val sleepSessions = dataPoint.getValue(DataType.SleepType.SESSIONS)
@@ -1303,26 +1303,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                 sleepMap["sessions"] = sessionsData
                 Log.v(APP_TAG, "수면 세션 데이터 추가: ${sessionsData.size}개")
             }
-            allSleepData.add(sleepMap)
+            resultList.add(sleepMap)
         }
-
-        // startTime 기준으로 정확한 날짜의 수면 데이터만 필터링
-        val targetDate = startTime.toLocalDate()  // Flutter에서 요청한 날짜
-        val expectedSleepStartDate = targetDate.minusDays(1)  // 해당 날짜 수면은 전날에 시작됨
-        
-        val filteredSleepData = allSleepData.filter { sleepData ->
-            val sleepStartTime = sleepData["start_time"] as Long
-            val sleepStartDate = Instant.ofEpochMilli(sleepStartTime)
-                .atZone(ZoneOffset.UTC)
-                .toLocalDate()
-            
-            sleepStartDate == expectedSleepStartDate
-        }
-        
-        Log.d(APP_TAG, "전체 수면 데이터: ${allSleepData.size}개, 필터링 후: ${filteredSleepData.size}개")
-        Log.d(APP_TAG, "타겟 날짜: $targetDate, 예상 수면 시작 날짜: $expectedSleepStartDate")
-        
-        return filteredSleepData
+        return resultList
     }
 
     private suspend fun readStepsData(
