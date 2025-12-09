@@ -1737,13 +1737,11 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                 try {
                     startObserverInternal(dataType)
                     restoredCount++
+                    Log.d(APP_TAG, "[${dataType.typeName}] Observer restored from saved state")
                 } catch (e: Exception) {
                     Log.e(APP_TAG, "[${dataType.typeName}] Observer restore failed: ${e.message}")
                     saveObserverState(dataType, false)
                 }
-            } else if (!savedState && currentState) {
-                // 저장된 상태는 중지인데 현재는 실행중 → 상태 동기화
-                saveObserverState(dataType, true)
             }
         }
         
@@ -1779,9 +1777,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
             status = ObserverStatus.RUNNING,
             lastSyncTime = System.currentTimeMillis()
         )
-        
-        // SharedPreferences에 상태 저장
-        saveObserverState(dataType, true)
         
         // UID 캐시 초기화
         processedUids[dataType]?.clear()
