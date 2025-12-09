@@ -1291,7 +1291,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     } ?: emptyList<Map<String, Any>>()
 
                     mapOf(
-                        "session_number" to (index + 1),
+                        "session_no" to (index + 1),
                         "session_start_time" to (session.startTime?.toEpochMilli() ?: 0L),
                         "session_end_time" to (session.endTime?.toEpochMilli() ?: 0L),
                         "session_duration" to (session.duration?.toMillis() ?: 0L),
