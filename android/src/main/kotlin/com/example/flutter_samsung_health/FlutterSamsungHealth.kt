@@ -1280,7 +1280,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
 
             // 세션 및 수면 단계 데이터 포함
             sleepSessions?.let { sessions ->
-                val sessionsData = sessions.map { session ->
+                val sessionsData = sessions.mapIndexed { index, session ->
                     val stagesData = session.stages?.map { stage ->
                         mapOf(
                             "stage_type" to (stage.stage?.ordinal ?: 0),
@@ -1291,6 +1291,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     } ?: emptyList<Map<String, Any>>()
 
                     mapOf(
+                        "session_number" to (index + 1),
                         "session_start_time" to (session.startTime?.toEpochMilli() ?: 0L),
                         "session_end_time" to (session.endTime?.toEpochMilli() ?: 0L),
                         "session_duration" to (session.duration?.toMillis() ?: 0L),
