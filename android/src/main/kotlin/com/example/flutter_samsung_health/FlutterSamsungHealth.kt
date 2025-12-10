@@ -557,9 +557,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                 if (!hasPermissionForObserverType(dataType)) {
                     Log.w(APP_TAG, "[${dataType.typeName}] 권한 없음 - 옵저버 시작 스킵")
                     results.add(mapOf(
-                        "status" to "permission_denied",
-                        "isConnected" to false,
                         "dataType" to dataType.typeName,
+                        "isConnected" to false,
+                        "status" to "permission_denied",
                         "message" to "${dataType.typeName} 권한이 없어 스킵되었습니다"
                     ))
                     continue
@@ -569,9 +569,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                 if (currentState?.status == ObserverStatus.RUNNING) {
                     hasRunning = true
                     results.add(mapOf(
-                        "status" to "already_running",
-                        "isConnected" to true,
                         "dataType" to dataType.typeName,
+                        "isConnected" to true,
+                        "status" to "already_running",
                         "message" to "${dataType.typeName} 옵저버가 이미 실행중입니다"
                     ))
                 } else {
@@ -603,9 +603,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     }
                     
                     results.add(mapOf(
-                        "status" to "started",
-                        "isConnected" to true,
                         "dataType" to dataType.typeName,
+                        "isConnected" to true,
+                        "status" to "started",
                         "message" to "${dataType.typeName} 옵저버를 시작했습니다"
                     ))
                 }
@@ -671,16 +671,16 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                 saveObserverState(dataType, false)
                 
                 results.add(mapOf(
-                    "status" to "stopped",
-                    "isConnected" to false,
                     "dataType" to dataType.typeName,
+                    "isConnected" to false,
+                    "status" to "stopped",
                     "message" to "${dataType.typeName} 옵저버를 중단했습니다"
                 ))
             } else {
                 results.add(mapOf(
-                    "status" to "not_running",
-                    "isConnected" to false,
                     "dataType" to dataType.typeName,
+                    "isConnected" to false,
+                    "status" to "not_running",
                     "message" to "${dataType.typeName} 옵저버가 실행중이 아닙니다"
                 ))
             }
@@ -689,9 +689,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
         val overallStatus = if (hasStopped) "stopped" else "not_running"
         
         wrapper.success(mapOf(
+            "targetTypes" to targetTypes.map { it.typeName },
             "status" to overallStatus,
             "message" to "${targetTypes.size}개 타입의 옵저버 중단 처리 완료",
-            "targetTypes" to targetTypes.map { it.typeName },
             "results" to results
         ))
     }
@@ -728,8 +728,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
             val isRunning = state.status == ObserverStatus.RUNNING
             mapOf(
                 "dataType" to state.dataType.typeName,
-                "status" to state.status.name.lowercase(),
                 "isConnected" to isRunning,
+                "status" to state.status.name.lowercase(),
                 "lastSyncTime" to state.lastSyncTime,
                 "errorMessage" to state.errorMessage
             )
