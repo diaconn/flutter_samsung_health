@@ -494,6 +494,29 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
     }
     
     /**
+     * 특정 옵저버 데이터 타입에 대한 권한 확인
+     */
+    private suspend fun hasPermissionForObserverType(dataType: ObserverDataType): Boolean {
+        val store = healthDataStore ?: return false
+        
+        val permission = when (dataType) {
+            ObserverDataType.EXERCISE -> Permission.of(DataTypes.EXERCISE, AccessType.READ)
+            ObserverDataType.NUTRITION -> Permission.of(DataTypes.NUTRITION, AccessType.READ)
+            ObserverDataType.BLOOD_GLUCOSE -> Permission.of(DataTypes.BLOOD_GLUCOSE, AccessType.READ)
+        }
+        
+        return try {
+            val grantedPermissions = store.getGrantedPermissions(setOf(permission))
+            val hasPermission = grantedPermissions.contains(permission)
+            Log.d(APP_TAG, "[${dataType.typeName}] 권한 확인: $hasPermission")
+            hasPermission
+        } catch (e: Exception) {
+            Log.e(APP_TAG, "[${dataType.typeName}] 권한 확인 실패: ${e.message}")
+            false
+        }
+    }
+    
+    /**
      * 통합 옵저버 시작
      */
     private fun startObserver(dataTypeNames: List<String>?, wrapper: ResultWrapper) {
@@ -523,70 +546,85 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
             observerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         }
         
-        val results = mutableListOf<Map<String, Any>>()
-        var hasRunning = false
-        var hasStarted = false
-        
-        for (dataType in targetTypes) {
-            val currentState = observerStates[dataType]
-            if (currentState?.status == ObserverStatus.RUNNING) {
-                hasRunning = true
-                results.add(mapOf(
-                    "status" to "already_running",
-                    "isConnected" to true,
-                    "dataType" to dataType.typeName,
-                    "message" to "${dataType.typeName} 옵저버가 이미 실행중입니다"
-                ))
-            } else {
-                hasStarted = true
-                
-                // 상태 초기화
-                observerStates[dataType] = ObserverState(
-                    dataType = dataType,
-                    status = ObserverStatus.RUNNING,
-                    lastSyncTime = System.currentTimeMillis()
-                )
-                
-                // SharedPreferences에 상태 저장
-                saveObserverState(dataType, true)
-                
-                // UID 캐시 초기화
-                if (!observerJobs.containsKey(dataType)) {
-                    processedUids[dataType]?.clear()
+        // 코루틴 스코프에서 전체 로직 실행
+        observerScope?.launch {
+            val results = mutableListOf<Map<String, Any>>()
+            var hasRunning = false
+            var hasStarted = false
+            
+            for (dataType in targetTypes) {
+                // 권한 체크 먼저 (suspend 함수이므로 코루틴 내에서 실행)
+                if (!hasPermissionForObserverType(dataType)) {
+                    Log.w(APP_TAG, "[${dataType.typeName}] 권한 없음 - 옵저버 시작 스킵")
+                    results.add(mapOf(
+                        "status" to "permission_denied",
+                        "isConnected" to false,
+                        "dataType" to dataType.typeName,
+                        "message" to "${dataType.typeName} 권한이 없어 스킵되었습니다"
+                    ))
+                    continue
                 }
                 
-                // Samsung Health 연결 상태에 따라 실제 Job 시작 여부 결정
-                val store = healthDataStore
-                if (store != null) {
-                    // 연결되어 있으면 옵저버 Job 시작
-                    val job = observerScope!!.launch {
-                        observeDataType(store, dataType)
+                val currentState = observerStates[dataType]
+                if (currentState?.status == ObserverStatus.RUNNING) {
+                    hasRunning = true
+                    results.add(mapOf(
+                        "status" to "already_running",
+                        "isConnected" to true,
+                        "dataType" to dataType.typeName,
+                        "message" to "${dataType.typeName} 옵저버가 이미 실행중입니다"
+                    ))
+                } else {
+                    hasStarted = true
+                    
+                    // 상태 초기화
+                    observerStates[dataType] = ObserverState(
+                        dataType = dataType,
+                        status = ObserverStatus.RUNNING,
+                        lastSyncTime = System.currentTimeMillis()
+                    )
+                    
+                    // SharedPreferences에 상태 저장
+                    saveObserverState(dataType, true)
+                    
+                    // UID 캐시 초기화
+                    if (!observerJobs.containsKey(dataType)) {
+                        processedUids[dataType]?.clear()
                     }
-                    observerJobs[dataType] = job
+                    
+                    // Samsung Health 연결 상태에 따라 실제 Job 시작 여부 결정
+                    val store = healthDataStore
+                    if (store != null) {
+                        // 연결되어 있으면 옵저버 Job 시작
+                        val job = observerScope!!.launch {
+                            observeDataType(store, dataType)
+                        }
+                        observerJobs[dataType] = job
+                    }
+                    
+                    results.add(mapOf(
+                        "status" to "started",
+                        "isConnected" to true,
+                        "dataType" to dataType.typeName,
+                        "message" to "${dataType.typeName} 옵저버를 시작했습니다"
+                    ))
                 }
-                
-                results.add(mapOf(
-                    "status" to "started",
-                    "isConnected" to true,
-                    "dataType" to dataType.typeName,
-                    "message" to "${dataType.typeName} 옵저버를 시작했습니다"
-                ))
             }
+            
+            val overallStatus = when {
+                hasRunning && hasStarted -> "partially_started"
+                hasRunning -> "already_running"
+                hasStarted -> "started"
+                else -> "no_action"
+            }
+            
+            wrapper.success(mapOf(
+                "status" to overallStatus,
+                "message" to "${targetTypes.size}개 타입의 옵저버 시작 처리 완료",
+                "targetTypes" to targetTypes.map { it.typeName },
+                "results" to results
+            ))
         }
-        
-        val overallStatus = when {
-            hasRunning && hasStarted -> "partially_started"
-            hasRunning -> "already_running"
-            hasStarted -> "started"
-            else -> "no_action"
-        }
-        
-        wrapper.success(mapOf(
-            "status" to overallStatus,
-            "message" to "${targetTypes.size}개 타입의 옵저버 시작 처리 완료",
-            "targetTypes" to targetTypes.map { it.typeName },
-            "results" to results
-        ))
     }
     
     /**
