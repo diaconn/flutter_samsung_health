@@ -57,32 +57,32 @@ abstract class FlutterSamsungHealthPlatform extends PlatformInterface {
   Future<Map<String, List<Map<String, dynamic>>>> getTotalData(int start, int end);
 
   /// 운동 데이터 조회
-  Future<List<Map<String, dynamic>>> getExerciseData(int start, int end);
+  Future<Map<String, dynamic>> getExerciseData(int start, int end);
 
   /// 심박수 데이터 조회
-  Future<List<Map<String, dynamic>>> getHeartRateData(int start, int end);
+  Future<Map<String, dynamic>> getHeartRateData(int start, int end);
 
   /// 걸음수 데이터 조회
-  Future<List<Map<String, dynamic>>> getStepsData(int start, int end);
+  Future<Map<String, dynamic>> getStepsData(int start, int end);
 
   /// 5분 간격 걸음수 데이터 조회
-  Future<List<Map<String, dynamic>>> getFiveMinuteStepsData(int start, int end);
+  Future<Map<String, dynamic>> getFiveMinuteStepsData(int start, int end);
 
   /// 수면 데이터 조회
-  Future<List<Map<String, dynamic>>> getSleepData(int start, int end);
+  Future<Map<String, dynamic>> getSleepData(int start, int end);
 
   /// 영양소 데이터 조회
-  Future<List<Map<String, dynamic>>> getNutritionData(int start, int end);
+  Future<Map<String, dynamic>> getNutritionData(int start, int end);
 
   /// 혈당 데이터 조회
-  Future<List<Map<String, dynamic>>> getBloodGlucoseData(int start, int end);
+  Future<Map<String, dynamic>> getBloodGlucoseData(int start, int end);
 
   /// 신체 구성 데이터 조회
-  Future<List<Map<String, dynamic>>> getBodyCompositionData(int start, int end);
+  Future<Map<String, dynamic>> getBodyCompositionData(int start, int end);
 
   /// 산소 포화도 데이터 조회
-  Future<List<Map<String, dynamic>>> getOxygenSaturationData(int start, int end);
+  Future<Map<String, dynamic>> getOxygenSaturationData(int start, int end);
 
   /// 체온 데이터 조회
-  Future<List<Map<String, dynamic>>> getBodyTemperatureData(int start, int end);
+  Future<Map<String, dynamic>> getBodyTemperatureData(int start, int end);
 }

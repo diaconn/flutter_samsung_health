@@ -86,7 +86,7 @@ class FlutterSamsungHealth {
   }
 
   /// 운동 데이터 조회
-  Future<List<Map<String, dynamic>>> getExerciseData({
+  Future<Map<String, dynamic>> getExerciseData({
     required int start,
     required int end,
   }) {
@@ -94,7 +94,7 @@ class FlutterSamsungHealth {
   }
 
   /// 심박수 데이터 조회
-  Future<List<Map<String, dynamic>>> getHeartRateData({
+  Future<Map<String, dynamic>> getHeartRateData({
     required int start,
     required int end,
   }) {
@@ -102,7 +102,7 @@ class FlutterSamsungHealth {
   }
 
   /// 걸음수 데이터 조회
-  Future<List<Map<String, dynamic>>> getStepsData({
+  Future<Map<String, dynamic>> getStepsData({
     required int start,
     required int end,
   }) {
@@ -110,7 +110,7 @@ class FlutterSamsungHealth {
   }
 
   /// 5분 간격 걸음수 데이터 조회
-  Future<List<Map<String, dynamic>>> getFiveMinuteStepsData({
+  Future<Map<String, dynamic>> getFiveMinuteStepsData({
     required int start,
     required int end,
   }) {
@@ -118,7 +118,7 @@ class FlutterSamsungHealth {
   }
 
   /// 수면 데이터 조회
-  Future<List<Map<String, dynamic>>> getSleepData({
+  Future<Map<String, dynamic>> getSleepData({
     required int start,
     required int end,
   }) {
@@ -126,7 +126,7 @@ class FlutterSamsungHealth {
   }
 
   /// 영양소 데이터 조회
-  Future<List<Map<String, dynamic>>> getNutritionData({
+  Future<Map<String, dynamic>> getNutritionData({
     required int start,
     required int end,
   }) {
@@ -134,7 +134,7 @@ class FlutterSamsungHealth {
   }
 
   /// 혈당 데이터 조회
-  Future<List<Map<String, dynamic>>> getBloodGlucoseData({
+  Future<Map<String, dynamic>> getBloodGlucoseData({
     required int start,
     required int end,
   }) {
@@ -142,7 +142,7 @@ class FlutterSamsungHealth {
   }
 
   /// 신체 구성 데이터 조회
-  Future<List<Map<String, dynamic>>> getBodyCompositionData({
+  Future<Map<String, dynamic>> getBodyCompositionData({
     required int start,
     required int end,
   }) {
@@ -150,7 +150,7 @@ class FlutterSamsungHealth {
   }
 
   /// 산소 포화도 데이터 조회
-  Future<List<Map<String, dynamic>>> getOxygenSaturationData({
+  Future<Map<String, dynamic>> getOxygenSaturationData({
     required int start,
     required int end,
   }) {
@@ -158,7 +158,7 @@ class FlutterSamsungHealth {
   }
 
   /// 체온 데이터 조회
-  Future<List<Map<String, dynamic>>> getBodyTemperatureData({
+  Future<Map<String, dynamic>> getBodyTemperatureData({
     required int start,
     required int end,
   }) {

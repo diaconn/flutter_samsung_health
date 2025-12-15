@@ -9,25 +9,6 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
   @visibleForTesting
   final methodChannel = const MethodChannel('flutter_samsung_health');
 
-  /// Helper method to extract data list from standardized response
-  List<Map<String, dynamic>> _extractDataList(Map<String, dynamic>? result) {
-    if (result == null) return [];
-    
-    // Check if response follows standardized structure
-    if (result.containsKey('success') && result.containsKey('result')) {
-      final success = result['success'] as bool? ?? false;
-      if (success) {
-        final resultData = result['result'] as List?;
-        if (resultData != null) {
-          return resultData
-              .map((item) => Map<String, dynamic>.from((item as Map).map((key, value) => MapEntry(key.toString(), value))))
-              .toList();
-        }
-      }
-    }
-    return [];
-  }
-
   /// 앱 설치 여부 확인
   @override
   Future<Map<String, dynamic>> isSamsungHealthInstalled() async {
@@ -197,101 +178,151 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
 
   /// 운동 데이터 조회
   @override
-  Future<List<Map<String, dynamic>>> getExerciseData(int start, int end) async {
+  Future<Map<String, dynamic>> getExerciseData(int start, int end) async {
     final result = await methodChannel.invokeMethod<Map>('getExerciseData', {
       'start': start,
       'end': end,
     });
-    return _extractDataList(result?.map((key, value) => MapEntry(key.toString(), value)));
+    return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
+      'success': false,
+      'result': [],
+      'message': 'Failed to get exercise data',
+      'error': 'METHOD_CHANNEL_ERROR'
+    };
   }
 
   /// 심박수 데이터 조회
   @override
-  Future<List<Map<String, dynamic>>> getHeartRateData(int start, int end) async {
+  Future<Map<String, dynamic>> getHeartRateData(int start, int end) async {
     final result = await methodChannel.invokeMethod<Map>('getHeartRateData', {
       'start': start,
       'end': end,
     });
-    return _extractDataList(result?.map((key, value) => MapEntry(key.toString(), value)));
+    return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
+      'success': false,
+      'result': [],
+      'message': 'Failed to get heart rate data',
+      'error': 'METHOD_CHANNEL_ERROR'
+    };
   }
 
   /// 걸음수 데이터 조회
   @override
-  Future<List<Map<String, dynamic>>> getStepsData(int start, int end) async {
+  Future<Map<String, dynamic>> getStepsData(int start, int end) async {
     final result = await methodChannel.invokeMethod<Map>('getStepsData', {
       'start': start,
       'end': end,
     });
-    return _extractDataList(result?.map((key, value) => MapEntry(key.toString(), value)));
+    return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
+      'success': false,
+      'result': [],
+      'message': 'Failed to get steps data',
+      'error': 'METHOD_CHANNEL_ERROR'
+    };
   }
 
   /// 5분 간격 걸음수 데이터 조회
   @override
-  Future<List<Map<String, dynamic>>> getFiveMinuteStepsData(int start, int end) async {
+  Future<Map<String, dynamic>> getFiveMinuteStepsData(int start, int end) async {
     final result = await methodChannel.invokeMethod<Map>('getFiveMinuteStepsData', {
       'start': start,
       'end': end,
     });
-    return _extractDataList(result?.map((key, value) => MapEntry(key.toString(), value)));
+    return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
+      'success': false,
+      'result': [],
+      'message': 'Failed to get five minute steps data',
+      'error': 'METHOD_CHANNEL_ERROR'
+    };
   }
 
   /// 수면 데이터 조회
   @override
-  Future<List<Map<String, dynamic>>> getSleepData(int start, int end) async {
+  Future<Map<String, dynamic>> getSleepData(int start, int end) async {
     final result = await methodChannel.invokeMethod<Map>('getSleepData', {
       'start': start,
       'end': end,
     });
-    return _extractDataList(result?.map((key, value) => MapEntry(key.toString(), value)));
+    return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
+      'success': false,
+      'result': [],
+      'message': 'Failed to get sleep data',
+      'error': 'METHOD_CHANNEL_ERROR'
+    };
   }
 
   /// 영양소 데이터 조회
   @override
-  Future<List<Map<String, dynamic>>> getNutritionData(int start, int end) async {
+  Future<Map<String, dynamic>> getNutritionData(int start, int end) async {
     final result = await methodChannel.invokeMethod<Map>('getNutritionData', {
       'start': start,
       'end': end,
     });
-    return _extractDataList(result?.map((key, value) => MapEntry(key.toString(), value)));
+    return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
+      'success': false,
+      'result': [],
+      'message': 'Failed to get nutrition data',
+      'error': 'METHOD_CHANNEL_ERROR'
+    };
   }
 
   /// 혈당 데이터 조회
   @override
-  Future<List<Map<String, dynamic>>> getBloodGlucoseData(int start, int end) async {
+  Future<Map<String, dynamic>> getBloodGlucoseData(int start, int end) async {
     final result = await methodChannel.invokeMethod<Map>('getBloodGlucoseData', {
       'start': start,
       'end': end,
     });
-    return _extractDataList(result?.map((key, value) => MapEntry(key.toString(), value)));
+    return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
+      'success': false,
+      'result': [],
+      'message': 'Failed to get blood glucose data',
+      'error': 'METHOD_CHANNEL_ERROR'
+    };
   }
 
   /// 신체 구성 데이터 조회
   @override
-  Future<List<Map<String, dynamic>>> getBodyCompositionData(int start, int end) async {
+  Future<Map<String, dynamic>> getBodyCompositionData(int start, int end) async {
     final result = await methodChannel.invokeMethod<Map>('getBodyCompositionData', {
       'start': start,
       'end': end,
     });
-    return _extractDataList(result?.map((key, value) => MapEntry(key.toString(), value)));
+    return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
+      'success': false,
+      'result': [],
+      'message': 'Failed to get body composition data',
+      'error': 'METHOD_CHANNEL_ERROR'
+    };
   }
 
   /// 산소 포화도 데이터 조회
   @override
-  Future<List<Map<String, dynamic>>> getOxygenSaturationData(int start, int end) async {
+  Future<Map<String, dynamic>> getOxygenSaturationData(int start, int end) async {
     final result = await methodChannel.invokeMethod<Map>('getOxygenSaturationData', {
       'start': start,
       'end': end,
     });
-    return _extractDataList(result?.map((key, value) => MapEntry(key.toString(), value)));
+    return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
+      'success': false,
+      'result': [],
+      'message': 'Failed to get oxygen saturation data',
+      'error': 'METHOD_CHANNEL_ERROR'
+    };
   }
 
   /// 체온 데이터 조회
   @override
-  Future<List<Map<String, dynamic>>> getBodyTemperatureData(int start, int end) async {
+  Future<Map<String, dynamic>> getBodyTemperatureData(int start, int end) async {
     final result = await methodChannel.invokeMethod<Map>('getBodyTemperatureData', {
       'start': start,
       'end': end,
     });
-    return _extractDataList(result?.map((key, value) => MapEntry(key.toString(), value)));
+    return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
+      'success': false,
+      'result': [],
+      'message': 'Failed to get body temperature data',
+      'error': 'METHOD_CHANNEL_ERROR'
+    };
   }
 }
