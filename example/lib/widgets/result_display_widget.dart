@@ -43,7 +43,7 @@ class ResultDisplayWidget extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('마지막 결과', style: Theme.of(context).textTheme.headlineSmall),
+            Text('결과', style: Theme.of(context).textTheme.headlineSmall),
             if (_formatResult(lastResult!).split('\n').length > 15)
               TextButton(
                 onPressed: onToggleExpanded,

@@ -15,23 +15,27 @@ class StatusCardWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('상태', style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 8),
-              Text('설치 상태: $installStatus'),
-              Text('연결 상태: $connectionStatus'),
-              Text('허용된 권한: ${grantedPermissions.join(', ')}'),
-            ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('상태', style: Theme.of(context).textTheme.headlineSmall),
+        SizedBox(
+          width: double.infinity,
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('설치 상태: $installStatus'),
+                  Text('연결 상태: $connectionStatus'),
+                  Text('허용된 권한: ${grantedPermissions.join(', ')}'),
+                ],
+              ),
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 }
