@@ -434,8 +434,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
         }
         
         try {
-            // 연결 해제 시에는 Jobs만 정리하고 상태는 유지 (재연결 시 복원용)
-            cleanupObserverJobsOnly()
+            // 연결 해제 시 모든 옵저버 완전 정리
+            cleanupObservers()
             
             wrapper.success(mapOf(
                 "success" to true,
@@ -464,95 +464,218 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
             }
         }
     }
-    
-    /**
-     * 옵저버 Jobs만 정리 (상태는 유지)
-     */
-    private fun cleanupObserverJobsOnly() {
-        // 모든 옵저버 Jobs 취소
-        observerJobs.values.forEach { it.cancel() }
-        observerJobs.clear()
-        
-        // 옵저버 스코프 정리
-        observerScope?.cancel()
-        observerScope = null
-        
-        // 메모리 상태는 STOPPED으로 변경하되 SharedPreferences는 유지
-        for ((dataType, _) in observerStates) {
-            observerStates[dataType] = ObserverState(
-                dataType = dataType,
-                status = ObserverStatus.STOPPED,
-                lastSyncTime = System.currentTimeMillis()
-            )
+
+    /// 데이터 권한 요청
+    private fun requestPermissions(types: List<String>, wrapper: ResultWrapper) {
+        Log.d(APP_TAG, "requestPermissions() 호출: $types")
+
+        val store = healthDataStore
+        if (store == null) {
+            wrapper.success(mapOf(
+                "success" to false,
+                "result" to mapOf(
+                    "granted" to emptyList<String>(),
+                    "denied" to types,
+                    "status" to "error"
+                ),
+                "message" to "권한 요청 실패 - Samsung Health에 먼저 연결하세요",
+                "error" to "STORE_NOT_READY"
+            ))
+            return
         }
-        
-        // UID 캐시 정리
-        processedUids.clear()
-        uidCacheCleanupTime.clear()
-    }
-    
-    /**
-     * 모든 옵저버 완전 정리 (상태도 삭제)
-     */
-    private fun cleanupObservers() {
-        // 모든 옵저버 Jobs 취소
-        observerJobs.values.forEach { it.cancel() }
-        observerJobs.clear()
-        
-        // 옵저버 스코프 정리
-        observerScope?.cancel()
-        observerScope = null
-        
-        // 상태 초기화 및 SharedPreferences 정리
-        for ((dataType, _) in observerStates) {
-            observerStates[dataType] = ObserverState(
-                dataType = dataType,
-                status = ObserverStatus.STOPPED,
-                lastSyncTime = System.currentTimeMillis()
-            )
-            // SharedPreferences에서도 제거
-            saveObserverState(dataType, false)
+
+        val act = activity
+        if (act == null) {
+            wrapper.success(mapOf(
+                "success" to false,
+                "result" to mapOf(
+                    "granted" to emptyList<String>(),
+                    "denied" to types,
+                    "status" to "error"
+                ),
+                "message" to "권한 요청 실패 - Activity가 없습니다",
+                "error" to "ACTIVITY_NOT_READY"
+            ))
+            return
         }
-        
-        // UID 캐시 정리
-        processedUids.clear()
-        uidCacheCleanupTime.clear()
+
+        if (act.isDestroyed || act.isFinishing) {
+            wrapper.success(mapOf(
+                "success" to false,
+                "result" to mapOf(
+                    "granted" to emptyList<String>(),
+                    "denied" to types,
+                    "status" to "error"
+                ),
+                "message" to "권한 요청 실패 - Activity가 유효하지 않습니다",
+                "error" to "ACTIVITY_INVALID"
+            ))
+            return
+        }
+
+        val permissionsToRequest = if (types.isEmpty()) {
+            allPermissions
+        } else {
+            types.mapNotNull { type ->
+                _getPermissionForType(type)
+            }.toSet()
+        }
+
+        if (permissionsToRequest.isEmpty()) {
+            wrapper.success(mapOf(
+                "success" to true,
+                "result" to mapOf(
+                    "granted" to emptyList<String>(),
+                    "denied" to emptyList<String>(),
+                    "status" to "no_permissions"
+                ),
+                "message" to "권한 요청 완료 - 요청할 권한이 없습니다"
+            ))
+            return
+        }
+
+        CoroutineScope(Dispatchers.Main).launch {
+            runCatching {
+                // 항상 권한 다이얼로그 표시
+                store.requestPermissions(permissionsToRequest, act)
+                kotlinx.coroutines.delay(1500) // 권한 다이얼로그 처리 대기
+
+                val finalGrantedPermissions = store.getGrantedPermissions(permissionsToRequest)
+
+                val grantedList = permissionsToRequest
+                    .filter { finalGrantedPermissions.contains(it) }
+                    .map { _getDataTypeNameForPermission(it) }
+
+                val deniedList = permissionsToRequest
+                    .filter { !finalGrantedPermissions.contains(it) }
+                    .map { _getDataTypeNameForPermission(it) }
+
+                val allGranted = deniedList.isEmpty()
+                wrapper.success(mapOf(
+                    "success" to true,
+                    "result" to mapOf(
+                        "granted" to grantedList,
+                        "denied" to deniedList,
+                        "status" to if (allGranted) "all_granted" else "partial_granted"
+                    ),
+                    "message" to if (allGranted)
+                        "권한 요청 완료 - 모든 권한이 허용되었습니다"
+                    else
+                        "권한 요청 완료 - 일부 권한이 거부되었습니다 (거부된 권한: ${deniedList.joinToString(", ")})"
+                ))
+            }.onFailure { error ->
+                Log.e(APP_TAG, "권한 요청 실패: ${error.message}")
+
+                when (error) {
+                    is ResolvablePlatformException -> {
+                        if (error.hasResolution) {
+                            runCatching { error.resolve(act) }
+                        }
+                        wrapper.success(mapOf(
+                            "success" to true,
+                            "result" to mapOf(
+                                "granted" to emptyList<String>(),
+                                "denied" to types,
+                                "status" to "user_action_required"
+                            ),
+                            "message" to "권한 요청 완료 - 사용자 액션이 필요합니다: ${error.message}"
+                        ))
+                    }
+
+                    is HealthDataException -> {
+                        wrapper.success(mapOf(
+                            "success" to false,
+                            "result" to mapOf(
+                                "granted" to emptyList<String>(),
+                                "denied" to types,
+                                "status" to "error"
+                            ),
+                            "message" to "권한 요청 실패 - Samsung Health 오류: ${error.message}",
+                            "error" to "HEALTH_DATA_ERROR"
+                        ))
+                    }
+
+                    else -> {
+                        wrapper.success(mapOf(
+                            "success" to false,
+                            "result" to mapOf(
+                                "granted" to emptyList<String>(),
+                                "denied" to types,
+                                "status" to "error"
+                            ),
+                            "message" to "권한 요청 실패 - 오류: ${error.message ?: "알 수 없는 오류"}",
+                            "error" to "PERMISSION_ERROR"
+                        ))
+                    }
+                }
+            }
+        }
     }
 
-    // ===== 옵저버 메서드들 =====
-    
-    /**
-     * 문자열 타입명을 ObserverDataType enum으로 변환
-     */
-    private fun parseObserverDataType(typeName: String): ObserverDataType? {
-        return when (typeName.lowercase()) {
-            "exercise" -> ObserverDataType.EXERCISE
-            "nutrition" -> ObserverDataType.NUTRITION
-            "blood_glucose" -> ObserverDataType.BLOOD_GLUCOSE
-            else -> null
+    /// 승인된 권한 조회
+    private fun getGrantedPermissions(wrapper: ResultWrapper) {
+        Log.d(APP_TAG, "getGrantedPermissions() 호출")
+
+        val store = healthDataStore
+        if (store == null) {
+            wrapper.success(mapOf(
+                "success" to false,
+                "result" to mapOf(
+                    "granted" to emptyList<String>(),
+                    "status" to "error"
+                ),
+                "message" to "권한 조회 실패 - Samsung Health에 먼저 연결하세요",
+                "error" to "STORE_NOT_READY"
+            ))
+            return
         }
-    }
-    
-    /**
-     * 특정 옵저버 데이터 타입에 대한 권한 확인
-     */
-    private suspend fun hasPermissionForObserverType(dataType: ObserverDataType): Boolean {
-        val store = healthDataStore ?: return false
-        
-        val permission = when (dataType) {
-            ObserverDataType.EXERCISE -> Permission.of(DataTypes.EXERCISE, AccessType.READ)
-            ObserverDataType.NUTRITION -> Permission.of(DataTypes.NUTRITION, AccessType.READ)
-            ObserverDataType.BLOOD_GLUCOSE -> Permission.of(DataTypes.BLOOD_GLUCOSE, AccessType.READ)
-        }
-        
-        return try {
-            val grantedPermissions = store.getGrantedPermissions(setOf(permission))
-            val hasPermission = grantedPermissions.contains(permission)
-            Log.d(APP_TAG, "[${dataType.typeName}] 권한 확인: $hasPermission")
-            hasPermission
-        } catch (e: Exception) {
-            Log.e(APP_TAG, "[${dataType.typeName}] 권한 확인 실패: ${e.message}")
-            false
+
+        CoroutineScope(Dispatchers.Main).launch {
+            runCatching {
+                val grantedPermissions = store.getGrantedPermissions(allPermissions)
+                val grantedList = grantedPermissions.map { _getDataTypeNameForPermission(it) }
+                Log.i(APP_TAG, "권한 조회 성공: ${grantedList.size}개 권한 허용됨")
+
+                wrapper.success(mapOf(
+                    "success" to true,
+                    "result" to mapOf(
+                        "granted" to grantedList,
+                        "status" to if (grantedList.isEmpty()) "no_permissions" else "has_permissions"
+                    ),
+                    "message" to if (grantedList.isEmpty())
+                        "권한 조회 완료 - 허용된 권한이 없습니다"
+                    else
+                        "권한 조회 완료 - ${grantedList.size}개 권한이 허용되었습니다"
+                ))
+            }.onFailure { error ->
+                Log.e(APP_TAG, "권한 조회 실패: ${error.message}", error)
+
+                when (error) {
+                    is HealthDataException -> {
+                        wrapper.success(mapOf(
+                            "success" to false,
+                            "result" to mapOf(
+                                "granted" to emptyList<String>(),
+                                "status" to "error"
+                            ),
+                            "message" to "권한 조회 실패 - Samsung Health 오류: ${error.message}",
+                            "error" to "HEALTH_DATA_ERROR"
+                        ))
+                    }
+
+                    else -> {
+                        wrapper.success(mapOf(
+                            "success" to false,
+                            "result" to mapOf(
+                                "granted" to emptyList<String>(),
+                                "status" to "error"
+                            ),
+                            "message" to "권한 조회 실패 - 오류: ${error.message ?: "알 수 없는 오류"}",
+                            "error" to "PERMISSION_QUERY_ERROR"
+                        ))
+                    }
+                }
+            }
         }
     }
 
@@ -870,378 +993,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
             "message" to "${targetTypes.size}개 타입의 옵저버 상태 조회 완료"
         ))
     }
-    
-    
-    
-    
-    // ===== 옵저버 실행 로직 =====
-    
-    /**
-     * 데이터 타입 감시 (폴링 방식)
-     */
-    private suspend fun observeDataType(store: HealthDataStore, dataType: ObserverDataType) {
-        // 초기 동기화 시간 설정
-        val isFirstStart = !lastSyncTimes.containsKey(dataType)
-        var lastSync = if (isFirstStart) {
-            // 처음 시작: 정확히 현재 시점부터 (옵저버 켠 이후 데이터만)
-            val now = Instant.now()
-            now
-        } else {
-            // 재시작: 이전 동기화 시점부터 이어서
-            lastSyncTimes[dataType]!!
-        }
-        lastSyncTimes[dataType] = lastSync
-        
-        try {
-            // 첫 번째 체크 전에 잠깐 대기 (시작 직후 시간 범위 문제 방지)
-            if (isFirstStart) {
-                delay(2000L) // 2초 대기
-            }
-            
-            while (currentCoroutineContext().isActive) {
-                val end = Instant.now()
-                
-                // Samsung Health API는 최소 간격이 필요
-                if (lastSync.isAfter(end) || lastSync.equals(end)) {
-                    Log.v(APP_TAG, "[${dataType.typeName}] 시간 범위 스킵: lastSync=$lastSync, end=$end")
-                    delay(1000L) // 1초 대기
-                    continue
-                }
-                
-                // 최소 1초 간격 보장
-                if (lastSync.plusSeconds(1).isAfter(end)) {
-                    Log.v(APP_TAG, "[${dataType.typeName}] 최소 간격 대기 중...")
-                    delay(1000L)
-                    continue
-                }
-                
-                try {
-                    val changes = readChangesForDataType(store, dataType, lastSync, end)
-                    if (changes.isNotEmpty()) {
-                        Log.d(APP_TAG, "[${dataType.typeName}] ${changes.size}개 변경사항 감지 (필터링 전)")
-                        
-                        // UID 캐시 정리 (1시간마다)
-                        cleanupUidCacheIfNeeded(dataType)
-                        
-                        // 새로운 변경사항만 필터링
-                        val newChanges = filterNewChanges(dataType, changes)
-                        
-                        if (newChanges.isNotEmpty()) {
-                            Log.d(APP_TAG, "[${dataType.typeName}] ${newChanges.size}개 새로운 변경사항 처리")
-                            
-                            // Flutter로 전송할 데이터 준비
-                            val dataToSend = mutableListOf<Map<String, Any>>()
-                            
-                            // 새로운 변경사항만 처리
-                            for (change in newChanges) {
-                                val uid = change.upsertDataPoint?.uid ?: change.deleteDataUid ?: "unknown"
-                                Log.d(APP_TAG, "[${dataType.typeName}] ${change.changeType} - UID: $uid")
-                                
-                                // 상세 데이터 수집 (getExerciseData 같은 방식으로)
-                                if (change.changeType == ChangeType.UPSERT && change.upsertDataPoint != null) {
-                                    val detailedData = getDetailedDataForLog(dataType, change.upsertDataPoint!!)
-                                    dataToSend.add(detailedData)
-                                    Log.d(APP_TAG, "[${dataType.typeName}] 상세 데이터: $detailedData")
-                                }
-                            }
-                            
-                            // Flutter로 실시간 데이터 전송
-                            if (dataToSend.isNotEmpty()) {
-                                sendDataToFlutter(dataType, dataToSend)
-                            }
-                        } else {
-                            Log.d(APP_TAG, "[${dataType.typeName}] 모든 변경사항이 이미 처리됨 (중복 제거)")
-                        }
-                        
-                        // 가장 최근 changeTime으로 업데이트 (방법2: 1초 후로 설정)
-                        changes.maxByOrNull { it.changeTime }?.let { latestChange ->
-                            lastSync = latestChange.changeTime.plusSeconds(1) // 1나노초 → 1초로 변경
-                            lastSyncTimes[dataType] = lastSync
-                        }
-                    }
-                    
-                    // 상태 업데이트 (성공)
-                    observerStates[dataType] = ObserverState(
-                        dataType = dataType,
-                        status = ObserverStatus.RUNNING,
-                        lastSyncTime = System.currentTimeMillis()
-                    )
-                    
-                } catch (e: Exception) {
-                    Log.e(APP_TAG, "[${dataType.typeName}] 옵저버 오류: ${e.message}", e)
-                    
-                    // 시간 범위 오류인 경우 특별 처리
-                    if (e.message?.contains("Time Range is invalid") == true) {
-                        Log.w(APP_TAG, "[${dataType.typeName}] 시간 범위 오류 - lastSync를 현재시간으로 재설정")
-                        lastSync = Instant.now().minusSeconds(1)
-                        lastSyncTimes[dataType] = lastSync
-                        delay(2000L) // 2초 대기 후 재시도
-                        continue
-                    }
-                    
-                    // 상태 업데이트 (오류)
-                    observerStates[dataType] = ObserverState(
-                        dataType = dataType,
-                        status = ObserverStatus.ERROR,
-                        lastSyncTime = System.currentTimeMillis(),
-                        errorMessage = e.message
-                    )
-                }
-                
-                delay(30_000L) // 30초 간격 폴링
-            }
-        } catch (e: Exception) {
-            Log.e(APP_TAG, "[${dataType.typeName}] 옵저버 예외: ${e.message}", e)
-        } finally {
-            // 최종 상태 업데이트
-            observerStates[dataType] = ObserverState(
-                dataType = dataType,
-                status = ObserverStatus.STOPPED,
-                lastSyncTime = System.currentTimeMillis()
-            )
-            
-            // SharedPreferences에 상태 저장
-            saveObserverState(dataType, false)
-        }
-    }
-    
-    
-    /**
-     * 특정 데이터 타입의 변경사항 조회
-     */
-    private suspend fun readChangesForDataType(
-        store: HealthDataStore,
-        dataType: ObserverDataType,
-        startTime: Instant,
-        endTime: Instant
-    ): List<Change<HealthDataPoint>> {
-        val dataTypes = when (dataType) {
-            ObserverDataType.EXERCISE -> DataTypes.EXERCISE
-            ObserverDataType.NUTRITION -> DataTypes.NUTRITION
-            ObserverDataType.BLOOD_GLUCOSE -> DataTypes.BLOOD_GLUCOSE
-        }
-        
-        val request = dataTypes.changedDataRequestBuilder
-            .setChangeTimeFilter(InstantTimeFilter.of(startTime, endTime))
-            .build()
-            
-        val response = store.readChanges(request)
-        return response.dataList
-    }
-
-    /// 데이터 권한 요청
-    private fun requestPermissions(types: List<String>, wrapper: ResultWrapper) {
-        Log.d(APP_TAG, "requestPermissions() 호출: $types")
-
-        val store = healthDataStore
-        if (store == null) {
-            wrapper.success(mapOf(
-                "success" to false,
-                "result" to mapOf(
-                    "granted" to emptyList<String>(),
-                    "denied" to types,
-                    "status" to "error"
-                ),
-                "message" to "권한 요청 실패 - Samsung Health에 먼저 연결하세요",
-                "error" to "STORE_NOT_READY"
-            ))
-            return
-        }
-
-        val act = activity
-        if (act == null) {
-            wrapper.success(mapOf(
-                "success" to false,
-                "result" to mapOf(
-                    "granted" to emptyList<String>(),
-                    "denied" to types,
-                    "status" to "error"
-                ),
-                "message" to "권한 요청 실패 - Activity가 없습니다",
-                "error" to "ACTIVITY_NOT_READY"
-            ))
-            return
-        }
-
-        if (act.isDestroyed || act.isFinishing) {
-            wrapper.success(mapOf(
-                "success" to false,
-                "result" to mapOf(
-                    "granted" to emptyList<String>(),
-                    "denied" to types,
-                    "status" to "error"
-                ),
-                "message" to "권한 요청 실패 - Activity가 유효하지 않습니다",
-                "error" to "ACTIVITY_INVALID"
-            ))
-            return
-        }
-
-        val permissionsToRequest = if (types.isEmpty()) {
-            allPermissions
-        } else {
-            types.mapNotNull { type ->
-                _getPermissionForType(type)
-            }.toSet()
-        }
-
-        if (permissionsToRequest.isEmpty()) {
-            wrapper.success(mapOf(
-                "success" to true,
-                "result" to mapOf(
-                    "granted" to emptyList<String>(),
-                    "denied" to emptyList<String>(),
-                    "status" to "no_permissions"
-                ),
-                "message" to "권한 요청 완료 - 요청할 권한이 없습니다"
-            ))
-            return
-        }
-
-        CoroutineScope(Dispatchers.Main).launch {
-            runCatching {
-                // 항상 권한 다이얼로그 표시
-                store.requestPermissions(permissionsToRequest, act)
-                kotlinx.coroutines.delay(1500) // 권한 다이얼로그 처리 대기
-
-                val finalGrantedPermissions = store.getGrantedPermissions(permissionsToRequest)
-                
-                val grantedList = permissionsToRequest
-                    .filter { finalGrantedPermissions.contains(it) }
-                    .map { _getDataTypeNameForPermission(it) }
-                    
-                val deniedList = permissionsToRequest
-                    .filter { !finalGrantedPermissions.contains(it) }
-                    .map { _getDataTypeNameForPermission(it) }
-
-                val allGranted = deniedList.isEmpty()
-                wrapper.success(mapOf(
-                    "success" to true,
-                    "result" to mapOf(
-                        "granted" to grantedList,
-                        "denied" to deniedList,
-                        "status" to if (allGranted) "all_granted" else "partial_granted"
-                    ),
-                    "message" to if (allGranted) 
-                        "권한 요청 완료 - 모든 권한이 허용되었습니다" 
-                    else 
-                        "권한 요청 완료 - 일부 권한이 거부되었습니다 (거부된 권한: ${deniedList.joinToString(", ")})"
-                ))
-            }.onFailure { error ->
-                Log.e(APP_TAG, "권한 요청 실패: ${error.message}")
-
-                when (error) {
-                    is ResolvablePlatformException -> {
-                        if (error.hasResolution) {
-                            runCatching { error.resolve(act) }
-                        }
-                        wrapper.success(mapOf(
-                            "success" to true,
-                            "result" to mapOf(
-                                "granted" to emptyList<String>(),
-                                "denied" to types,
-                                "status" to "user_action_required"
-                            ),
-                            "message" to "권한 요청 완료 - 사용자 액션이 필요합니다: ${error.message}"
-                        ))
-                    }
-
-                    is HealthDataException -> {
-                        wrapper.success(mapOf(
-                            "success" to false,
-                            "result" to mapOf(
-                                "granted" to emptyList<String>(),
-                                "denied" to types,
-                                "status" to "error"
-                            ),
-                            "message" to "권한 요청 실패 - Samsung Health 오류: ${error.message}",
-                            "error" to "HEALTH_DATA_ERROR"
-                        ))
-                    }
-
-                    else -> {
-                        wrapper.success(mapOf(
-                            "success" to false,
-                            "result" to mapOf(
-                                "granted" to emptyList<String>(),
-                                "denied" to types,
-                                "status" to "error"
-                            ),
-                            "message" to "권한 요청 실패 - 오류: ${error.message ?: "알 수 없는 오류"}",
-                            "error" to "PERMISSION_ERROR"
-                        ))
-                    }
-                }
-            }
-        }
-    }
-
-    /// 승인된 권한 조회
-    private fun getGrantedPermissions(wrapper: ResultWrapper) {
-        Log.d(APP_TAG, "getGrantedPermissions() 호출")
-
-        val store = healthDataStore
-        if (store == null) {
-            wrapper.success(mapOf(
-                "success" to false,
-                "result" to mapOf(
-                    "granted" to emptyList<String>(),
-                    "status" to "error"
-                ),
-                "message" to "권한 조회 실패 - Samsung Health에 먼저 연결하세요",
-                "error" to "STORE_NOT_READY"
-            ))
-            return
-        }
-
-        CoroutineScope(Dispatchers.Main).launch {
-            runCatching {
-                val grantedPermissions = store.getGrantedPermissions(allPermissions)
-                val grantedList = grantedPermissions.map { _getDataTypeNameForPermission(it) }
-                Log.i(APP_TAG, "권한 조회 성공: ${grantedList.size}개 권한 허용됨")
-                
-                wrapper.success(mapOf(
-                    "success" to true,
-                    "result" to mapOf(
-                        "granted" to grantedList,
-                        "status" to if (grantedList.isEmpty()) "no_permissions" else "has_permissions"
-                    ),
-                    "message" to if (grantedList.isEmpty()) 
-                        "권한 조회 완료 - 허용된 권한이 없습니다" 
-                    else 
-                        "권한 조회 완료 - ${grantedList.size}개 권한이 허용되었습니다"
-                ))
-            }.onFailure { error ->
-                Log.e(APP_TAG, "권한 조회 실패: ${error.message}", error)
-
-                when (error) {
-                    is HealthDataException -> {
-                        wrapper.success(mapOf(
-                            "success" to false,
-                            "result" to mapOf(
-                                "granted" to emptyList<String>(),
-                                "status" to "error"
-                            ),
-                            "message" to "권한 조회 실패 - Samsung Health 오류: ${error.message}",
-                            "error" to "HEALTH_DATA_ERROR"
-                        ))
-                    }
-
-                    else -> {
-                        wrapper.success(mapOf(
-                            "success" to false,
-                            "result" to mapOf(
-                                "granted" to emptyList<String>(),
-                                "status" to "error"
-                            ),
-                            "message" to "권한 조회 실패 - 오류: ${error.message ?: "알 수 없는 오류"}",
-                            "error" to "PERMISSION_QUERY_ERROR"
-                        ))
-                    }
-                }
-            }
-        }
-    }
 
     /// 전체 데이터 조회
     private fun getTotalData(start: Long, end: Long, wrapper: ResultWrapper) {
@@ -1448,7 +1199,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     wrapper.success(mapOf(
                         "success" to true,
                         "result" to data,
-                        "message" to "${dataTypeName} 데이터 조회 완료 - ${data.size}건"
+                        "message" to "${dataTypeName} 데이터 없음"
                     ))
                 }
             }.onFailure { error ->
@@ -1494,7 +1245,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
         startTime: LocalDateTime,
         endTime: LocalDateTime
     ): List<Map<String, Any>> {
-        Log.d(APP_TAG, "운동 데이터 조회 시작 - 시작시간: $startTime, 끝시간: $endTime")
         val readRequest = DataTypes.EXERCISE.readDataRequestBuilder
             .setLocalTimeFilter(LocalTimeFilter.of(startTime, endTime))
             .setOrdering(Ordering.DESC)
@@ -1532,7 +1282,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
         startTime: LocalDateTime,
         endTime: LocalDateTime
     ): List<Map<String, Any>> {
-        Log.d(APP_TAG, "심박 데이터 조회 시작 - 시작시간: $startTime, 끝시간: $endTime")
         val readRequest = DataTypes.HEART_RATE.readDataRequestBuilder
             .setLocalTimeFilter(LocalTimeFilter.of(startTime, endTime))
             .setOrdering(Ordering.DESC)
@@ -1575,7 +1324,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
         endTime: LocalDateTime
     ): List<Map<String, Any>> {
         val adjustedStartTime = startTime.minusDays(1)
-        Log.d(APP_TAG, "수면 데이터 조회 시작 - 조정된 시작시간: $adjustedStartTime, 끝시간: $endTime")
 
         val readRequest = DataTypes.SLEEP.readDataRequestBuilder
             .setLocalTimeFilter(LocalTimeFilter.of(adjustedStartTime, endTime))
@@ -1633,7 +1381,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
         startTime: LocalDateTime,
         endTime: LocalDateTime
     ): List<Map<String, Any>> {
-        Log.d(APP_TAG, "걸음 데이터 조회 시작 - 시작시간: $startTime, 끝시간: $endTime")
 
         // 새 SDK는 집계 데이터 조회 - DataType.StepsType.TOTAL.requestBuilder 사용
         val readRequest = DataType.StepsType.TOTAL.requestBuilder
@@ -1718,7 +1465,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
         startTime: LocalDateTime,
         endTime: LocalDateTime
     ): List<Map<String, Any>> {
-        Log.d(APP_TAG, "영양 데이터 조회 시작 - 시작시간: $startTime, 끝시간: $endTime")
         val readRequest = DataTypes.NUTRITION.readDataRequestBuilder
             .setLocalTimeFilter(LocalTimeFilter.of(startTime, endTime))
             .setOrdering(Ordering.DESC)
@@ -1765,7 +1511,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
         startTime: LocalDateTime,
         endTime: LocalDateTime
     ): List<Map<String, Any>> {
-        Log.d(APP_TAG, "신체 데이터 조회 시작 - 시작시간: $startTime, 끝시간: $endTime")
         val readRequest = DataTypes.BODY_COMPOSITION.readDataRequestBuilder
             .setLocalTimeFilter(LocalTimeFilter.of(startTime, endTime))
             .setOrdering(Ordering.DESC)
@@ -1801,7 +1546,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
         startTime: LocalDateTime,
         endTime: LocalDateTime
     ): List<Map<String, Any>> {
-        Log.d(APP_TAG, "산소포화도 데이터 조회 시작 - 시작시간: $startTime, 끝시간: $endTime")
         val readRequest = DataTypes.BLOOD_OXYGEN.readDataRequestBuilder
             .setLocalTimeFilter(LocalTimeFilter.of(startTime, endTime))
             .setOrdering(Ordering.DESC)
@@ -1827,7 +1571,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
         startTime: LocalDateTime,
         endTime: LocalDateTime
     ): List<Map<String, Any>> {
-        Log.d(APP_TAG, "체온 데이터 조회 시작 - 시작시간: $startTime, 끝시간: $endTime")
         val readRequest = DataTypes.BODY_TEMPERATURE.readDataRequestBuilder
             .setLocalTimeFilter(LocalTimeFilter.of(startTime, endTime))
             .setOrdering(Ordering.DESC)
@@ -1856,7 +1599,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
         startTime: LocalDateTime,
         endTime: LocalDateTime
     ): List<Map<String, Any>> {
-        Log.d(APP_TAG, "혈당 데이터 조회 시작 - 시작시간: $startTime, 끝시간: $endTime")
         val readRequest = DataTypes.BLOOD_GLUCOSE.readDataRequestBuilder
             .setLocalTimeFilter(LocalTimeFilter.of(startTime, endTime))
             .setOrdering(Ordering.DESC)
@@ -1887,38 +1629,249 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
         return resultList
     }
 
+    // ===== 내부 메서드들 =====
+    /**
+     * 데이터 타입 감시 (폴링 방식)
+     */
+    private suspend fun observeDataType(store: HealthDataStore, dataType: ObserverDataType) {
+        // 초기 동기화 시간 설정
+        val isFirstStart = !lastSyncTimes.containsKey(dataType)
+        var lastSync = if (isFirstStart) {
+            // 처음 시작: 정확히 현재 시점부터 (옵저버 켠 이후 데이터만)
+            val now = Instant.now()
+            now
+        } else {
+            // 재시작: 이전 동기화 시점부터 이어서
+            lastSyncTimes[dataType]!!
+        }
+        lastSyncTimes[dataType] = lastSync
 
-    // ===== FlutterPlugin 생명주기 =====
+        try {
+            // 첫 번째 체크 전에 잠깐 대기 (시작 직후 시간 범위 문제 방지)
+            if (isFirstStart) {
+                delay(2000L) // 2초 대기
+            }
 
-    override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-        channel.setMethodCallHandler(null)
-        eventChannel.setStreamHandler(null)
-        eventSink = null
-        
-        // 앱 종료 시에는 옵저버 상태를 유지 (재시작 시 복원을 위해)
+            while (currentCoroutineContext().isActive) {
+                val end = Instant.now()
+
+                // Samsung Health API는 최소 간격이 필요
+                if (lastSync.isAfter(end) || lastSync.equals(end)) {
+                    Log.v(APP_TAG, "[${dataType.typeName}] 시간 범위 스킵: lastSync=$lastSync, end=$end")
+                    delay(1000L) // 1초 대기
+                    continue
+                }
+
+                // 최소 1초 간격 보장
+                if (lastSync.plusSeconds(1).isAfter(end)) {
+                    Log.v(APP_TAG, "[${dataType.typeName}] 최소 간격 대기 중...")
+                    delay(1000L)
+                    continue
+                }
+
+                try {
+                    val changes = readChangesForDataType(store, dataType, lastSync, end)
+                    if (changes.isNotEmpty()) {
+                        Log.d(APP_TAG, "[${dataType.typeName}] ${changes.size}개 변경사항 감지 (필터링 전)")
+
+                        // UID 캐시 정리 (1시간마다)
+                        cleanupUidCacheIfNeeded(dataType)
+
+                        // 새로운 변경사항만 필터링
+                        val newChanges = filterNewChanges(dataType, changes)
+
+                        if (newChanges.isNotEmpty()) {
+                            Log.d(APP_TAG, "[${dataType.typeName}] ${newChanges.size}개 새로운 변경사항 처리")
+
+                            // Flutter로 전송할 데이터 준비
+                            val dataToSend = mutableListOf<Map<String, Any>>()
+
+                            // 새로운 변경사항만 처리
+                            for (change in newChanges) {
+                                val uid = change.upsertDataPoint?.uid ?: change.deleteDataUid ?: "unknown"
+                                Log.d(APP_TAG, "[${dataType.typeName}] ${change.changeType} - UID: $uid")
+
+                                // 상세 데이터 수집 (getExerciseData 같은 방식으로)
+                                if (change.changeType == ChangeType.UPSERT && change.upsertDataPoint != null) {
+                                    val detailedData = getDetailedDataForLog(dataType, change.upsertDataPoint!!)
+                                    dataToSend.add(detailedData)
+                                    Log.d(APP_TAG, "[${dataType.typeName}] 상세 데이터: $detailedData")
+                                }
+                            }
+
+                            // Flutter로 실시간 데이터 전송
+                            if (dataToSend.isNotEmpty()) {
+                                sendDataToFlutter(dataType, dataToSend)
+                            }
+                        } else {
+                            Log.d(APP_TAG, "[${dataType.typeName}] 모든 변경사항이 이미 처리됨 (중복 제거)")
+                        }
+
+                        // 가장 최근 changeTime으로 업데이트 (방법2: 1초 후로 설정)
+                        changes.maxByOrNull { it.changeTime }?.let { latestChange ->
+                            lastSync = latestChange.changeTime.plusSeconds(1) // 1나노초 → 1초로 변경
+                            lastSyncTimes[dataType] = lastSync
+                        }
+                    }
+
+                    // 상태 업데이트 (성공)
+                    observerStates[dataType] = ObserverState(
+                        dataType = dataType,
+                        status = ObserverStatus.RUNNING,
+                        lastSyncTime = System.currentTimeMillis()
+                    )
+
+                } catch (e: Exception) {
+                    Log.e(APP_TAG, "[${dataType.typeName}] 옵저버 오류: ${e.message}", e)
+
+                    // 시간 범위 오류인 경우 특별 처리
+                    if (e.message?.contains("Time Range is invalid") == true) {
+                        Log.w(APP_TAG, "[${dataType.typeName}] 시간 범위 오류 - lastSync를 현재시간으로 재설정")
+                        lastSync = Instant.now().minusSeconds(1)
+                        lastSyncTimes[dataType] = lastSync
+                        delay(2000L) // 2초 대기 후 재시도
+                        continue
+                    }
+
+                    // 상태 업데이트 (오류)
+                    observerStates[dataType] = ObserverState(
+                        dataType = dataType,
+                        status = ObserverStatus.ERROR,
+                        lastSyncTime = System.currentTimeMillis(),
+                        errorMessage = e.message
+                    )
+                }
+
+                delay(30_000L) // 30초 간격 폴링
+            }
+        } catch (e: Exception) {
+            Log.e(APP_TAG, "[${dataType.typeName}] 옵저버 예외: ${e.message}", e)
+        } finally {
+            // 최종 상태 업데이트
+            observerStates[dataType] = ObserverState(
+                dataType = dataType,
+                status = ObserverStatus.STOPPED,
+                lastSyncTime = System.currentTimeMillis()
+            )
+
+            // SharedPreferences에 상태 저장
+            saveObserverState(dataType, false)
+        }
     }
 
 
-    // ===== ActivityAware 구현 =====
+    /**
+     * 특정 데이터 타입의 변경사항 조회
+     */
+    private suspend fun readChangesForDataType(
+        store: HealthDataStore,
+        dataType: ObserverDataType,
+        startTime: Instant,
+        endTime: Instant
+    ): List<Change<HealthDataPoint>> {
+        val dataTypes = when (dataType) {
+            ObserverDataType.EXERCISE -> DataTypes.EXERCISE
+            ObserverDataType.NUTRITION -> DataTypes.NUTRITION
+            ObserverDataType.BLOOD_GLUCOSE -> DataTypes.BLOOD_GLUCOSE
+        }
 
-    override fun onAttachedToActivity(binding: ActivityPluginBinding) {
-        activity = binding.activity
+        val request = dataTypes.changedDataRequestBuilder
+            .setChangeTimeFilter(InstantTimeFilter.of(startTime, endTime))
+            .build()
+
+        val response = store.readChanges(request)
+        return response.dataList
     }
 
-    override fun onDetachedFromActivity() {
-        activity = null
+    /**
+     * 옵저버 Jobs만 정리 (상태는 유지)
+     */
+    private fun cleanupObserverJobsOnly() {
+        // 모든 옵저버 Jobs 취소
+        observerJobs.values.forEach { it.cancel() }
+        observerJobs.clear()
+
+        // 옵저버 스코프 정리
+        observerScope?.cancel()
+        observerScope = null
+
+        // 메모리 상태는 STOPPED으로 변경하되 SharedPreferences는 유지
+        for ((dataType, _) in observerStates) {
+            observerStates[dataType] = ObserverState(
+                dataType = dataType,
+                status = ObserverStatus.STOPPED,
+                lastSyncTime = System.currentTimeMillis()
+            )
+        }
+
+        // UID 캐시 정리
+        processedUids.clear()
+        uidCacheCleanupTime.clear()
     }
 
-    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
-        activity = binding.activity
+    /**
+     * 모든 옵저버 완전 정리 (상태도 삭제)
+     */
+    private fun cleanupObservers() {
+        // 모든 옵저버 Jobs 취소
+        observerJobs.values.forEach { it.cancel() }
+        observerJobs.clear()
+
+        // 옵저버 스코프 정리
+        observerScope?.cancel()
+        observerScope = null
+
+        // 상태 초기화 및 SharedPreferences 정리
+        for ((dataType, _) in observerStates) {
+            observerStates[dataType] = ObserverState(
+                dataType = dataType,
+                status = ObserverStatus.STOPPED,
+                lastSyncTime = System.currentTimeMillis()
+            )
+            // SharedPreferences에서도 제거
+            saveObserverState(dataType, false)
+        }
+
+        // UID 캐시 정리
+        processedUids.clear()
+        uidCacheCleanupTime.clear()
     }
 
-    override fun onDetachedFromActivityForConfigChanges() {
-        activity = null
+    /**
+     * 문자열 타입명을 ObserverDataType enum으로 변환
+     */
+    private fun parseObserverDataType(typeName: String): ObserverDataType? {
+        return when (typeName.lowercase()) {
+            "exercise" -> ObserverDataType.EXERCISE
+            "nutrition" -> ObserverDataType.NUTRITION
+            "blood_glucose" -> ObserverDataType.BLOOD_GLUCOSE
+            else -> null
+        }
     }
-    
-    // ===== 중복 방지 헬퍼 메서드들 =====
-    
+
+    /**
+     * 특정 옵저버 데이터 타입에 대한 권한 확인
+     */
+    private suspend fun hasPermissionForObserverType(dataType: ObserverDataType): Boolean {
+        val store = healthDataStore ?: return false
+
+        val permission = when (dataType) {
+            ObserverDataType.EXERCISE -> Permission.of(DataTypes.EXERCISE, AccessType.READ)
+            ObserverDataType.NUTRITION -> Permission.of(DataTypes.NUTRITION, AccessType.READ)
+            ObserverDataType.BLOOD_GLUCOSE -> Permission.of(DataTypes.BLOOD_GLUCOSE, AccessType.READ)
+        }
+
+        return try {
+            val grantedPermissions = store.getGrantedPermissions(setOf(permission))
+            val hasPermission = grantedPermissions.contains(permission)
+            Log.d(APP_TAG, "[${dataType.typeName}] 권한 확인: $hasPermission")
+            hasPermission
+        } catch (e: Exception) {
+            Log.e(APP_TAG, "[${dataType.typeName}] 권한 확인 실패: ${e.message}")
+            false
+        }
+    }
+
     /**
      * UID 캐시 정리 (1시간마다)
      */
@@ -2112,6 +2065,28 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
             observerJobs[dataType] = job
         }
     }
+
+    /**
+     * Flutter로 실시간 데이터 전송
+     */
+    private fun sendDataToFlutter(dataType: ObserverDataType, data: List<Map<String, Any>>) {
+        eventSink?.let { sink ->
+            val eventData = mapOf(
+                "dataType" to dataType.typeName,
+                "data" to data,
+                "timestamp" to System.currentTimeMillis(),
+                "count" to data.size
+            )
+
+            // UI 스레드에서 전송
+            CoroutineScope(Dispatchers.Main).launch {
+                sink.success(eventData)
+                Log.d(APP_TAG, "[${dataType.typeName}] Flutter로 ${data.size}개 데이터 전송 완료")
+            }
+        } ?: run {
+            Log.w(APP_TAG, "[${dataType.typeName}] EventSink가 null - Flutter 전송 실패")
+        }
+    }
     
     /**
      * 옵저버용 완전한 데이터 생성 (실제 API와 동일한 구조)
@@ -2225,8 +2200,35 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
             "meal_status_name" to (mealStatus?.name ?: "Unknown")
         )
     }
-    
-    
+
+    // ===== FlutterPlugin 생명주기 =====
+
+    override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        channel.setMethodCallHandler(null)
+        eventChannel.setStreamHandler(null)
+        eventSink = null
+
+        // 앱 종료 시에는 옵저버 상태를 유지 (재시작 시 복원을 위해)
+    }
+
+    // ===== ActivityAware 구현 =====
+
+    override fun onAttachedToActivity(binding: ActivityPluginBinding) {
+        activity = binding.activity
+    }
+
+    override fun onDetachedFromActivity() {
+        activity = null
+    }
+
+    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
+        activity = binding.activity
+    }
+
+    override fun onDetachedFromActivityForConfigChanges() {
+        activity = null
+    }
+
     // ===== EventChannel StreamHandler 구현 =====
     
     override fun onListen(arguments: Any?, events: EventSink?) {
@@ -2237,28 +2239,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
     override fun onCancel(arguments: Any?) {
         Log.d(APP_TAG, "Event Channel 연결 해제됨")
         eventSink = null
-    }
-    
-    /**
-     * Flutter로 실시간 데이터 전송
-     */
-    private fun sendDataToFlutter(dataType: ObserverDataType, data: List<Map<String, Any>>) {
-        eventSink?.let { sink ->
-            val eventData = mapOf(
-                "dataType" to dataType.typeName,
-                "data" to data,
-                "timestamp" to System.currentTimeMillis(),
-                "count" to data.size
-            )
-            
-            // UI 스레드에서 전송
-            CoroutineScope(Dispatchers.Main).launch {
-                sink.success(eventData)
-                Log.d(APP_TAG, "[${dataType.typeName}] Flutter로 ${data.size}개 데이터 전송 완료")
-            }
-        } ?: run {
-            Log.w(APP_TAG, "[${dataType.typeName}] EventSink가 null - Flutter 전송 실패")
-        }
     }
 }
 

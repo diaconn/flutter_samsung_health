@@ -40,48 +40,73 @@ class MockSamsungHealthPluginPlatform with MockPlatformInterfaceMixin implements
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getExerciseData(int start, int end) async {
-    return [];
+  Future<Map<String, dynamic>> openSamsungHealthPermissions() async {
+    return {'action': 'success'};
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getHeartRateData(int start, int end) async {
-    return [];
+  Future<Map<String, dynamic>> startObserver(List<String>? dataTypes) async {
+    return {'started': [], 'already_running': []};
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getSleepData(int start, int end) async {
-    return [];
+  Future<Map<String, dynamic>> stopObserver(List<String>? dataTypes) async {
+    return {'stopped': [], 'not_running': []};
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getStepData(int start, int end) async {
-    return [];
+  Future<dynamic> getObserverStatus(List<String>? dataTypes) async {
+    return {'running': [], 'stopped': []};
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getNutritionData(int start, int end) async {
-    return [];
+  Future<Map<String, dynamic>> getExerciseData(int start, int end) async {
+    return {'success': true, 'result': [], 'message': 'Test data'};
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getWeightData(int start, int end) async {
-    return [];
+  Future<Map<String, dynamic>> getHeartRateData(int start, int end) async {
+    return {'success': true, 'result': [], 'message': 'Test data'};
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getOxygenSaturationData(int start, int end) async {
-    return [];
+  Future<Map<String, dynamic>> getSleepData(int start, int end) async {
+    return {'success': true, 'result': [], 'message': 'Test data'};
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getBodyTemperatureData(int start, int end) async {
-    return [];
+  Future<Map<String, dynamic>> getStepsData(int start, int end) async {
+    return {'success': true, 'result': [], 'message': 'Test data'};
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getBloodGlucoseData(int start, int end) async {
-    return [];
+  Future<Map<String, dynamic>> getFiveMinuteStepsData(int start, int end) async {
+    return {'success': true, 'result': [], 'message': 'Test data'};
+  }
+
+  @override
+  Future<Map<String, dynamic>> getNutritionData(int start, int end) async {
+    return {'success': true, 'result': [], 'message': 'Test data'};
+  }
+
+  @override
+  Future<Map<String, dynamic>> getBodyCompositionData(int start, int end) async {
+    return {'success': true, 'result': [], 'message': 'Test data'};
+  }
+
+  @override
+  Future<Map<String, dynamic>> getOxygenSaturationData(int start, int end) async {
+    return {'success': true, 'result': [], 'message': 'Test data'};
+  }
+
+  @override
+  Future<Map<String, dynamic>> getBodyTemperatureData(int start, int end) async {
+    return {'success': true, 'result': [], 'message': 'Test data'};
+  }
+
+  @override
+  Future<Map<String, dynamic>> getBloodGlucoseData(int start, int end) async {
+    return {'success': true, 'result': [], 'message': 'Test data'};
   }
 }
 
