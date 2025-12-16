@@ -142,38 +142,17 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
 
   /// 전체 데이터 조회
   @override
-  Future<Map<String, List<Map<String, dynamic>>>> getTotalData(int start, int end) async {
+  Future<Map<String, dynamic>> getTotalData(int start, int end) async {
     final result = await methodChannel.invokeMethod<Map>('getTotalData', {
       'start': start,
       'end': end,
     });
-    if (result == null) return {};
-
-    final resultMap = result.map((key, value) => MapEntry(key.toString(), value));
-    
-    // Check if response follows standardized structure
-    if (resultMap.containsKey('success') && resultMap.containsKey('result')) {
-      final success = resultMap['success'] as bool? ?? false;
-      if (success) {
-        final resultData = resultMap['result'] as Map?;
-        if (resultData != null) {
-          Map<String, List<Map<String, dynamic>>> groupedData = {};
-          resultData.forEach((key, value) {
-            if (value is List) {
-              final List<Map<String, dynamic>> parsedList = value.map<Map<String, dynamic>>((item) {
-                if (item is Map) {
-                  return Map<String, dynamic>.from(item.map((k, v) => MapEntry(k.toString(), v)));
-                }
-                return {};
-              }).toList();
-              groupedData[key.toString()] = parsedList;
-            }
-          });
-          return groupedData;
-        }
-      }
-    }
-    return {};
+    return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
+      'success': false,
+      'result': {},
+      'message': 'Failed to get total data',
+      'error': 'METHOD_CHANNEL_ERROR'
+    };
   }
 
   /// 운동 데이터 조회

@@ -590,7 +590,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                                 "denied" to types,
                                 "status" to "error"
                             ),
-                            "message" to "권한 요청 실패 - Samsung Health 오류: ${error.message}",
+                            "message" to "권한 요청 실패 - 오류: ${error.message}",
                             "error" to "HEALTH_DATA_ERROR"
                         ))
                     }
@@ -658,7 +658,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                                 "granted" to emptyList<String>(),
                                 "status" to "error"
                             ),
-                            "message" to "권한 조회 실패 - Samsung Health 오류: ${error.message}",
+                            "message" to "권한 조회 실패 - 오류: ${error.message}",
                             "error" to "HEALTH_DATA_ERROR"
                         ))
                     }
@@ -1080,7 +1080,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                             wrapper.success(mapOf(
                                 "success" to false,
                                 "result" to emptyMap<String, List<Map<String, Any>>>(),
-                                "message" to "전체 데이터 조회 실패 - Samsung Health 오류: ${error.message}",
+                                "message" to "전체 데이터 조회 실패 - 오류: ${error.message}",
                                 "error" to "HEALTH_DATA_ERROR"
                             ))
                         }
@@ -1206,19 +1206,29 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                 withContext(Dispatchers.Main) {
                     when (error) {
                         is HealthDataException -> {
-                            wrapper.success(mapOf(
-                                "success" to false,
-                                "result" to emptyList<Map<String, Any>>(),
-                                "message" to "${dataTypeName} 데이터 조회 실패 - Samsung Health 오류: ${error.message}",
-                                "error" to "HEALTH_DATA_ERROR"
-                            ))
+                            // 권한 오류인지 확인
+                            if (error.message?.contains("not allowed to read") == true || error.message?.contains("2000") == true) {
+                                wrapper.success(mapOf(
+                                    "success" to false,
+                                    "result" to emptyList<Map<String, Any>>(),
+                                    "message" to "${dataTypeName} 권한 없음",
+                                    "error" to "PERMISSION_ERROR"
+                                ))
+                            } else {
+                                wrapper.success(mapOf(
+                                    "success" to false,
+                                    "result" to emptyList<Map<String, Any>>(),
+                                    "message" to "${dataTypeName} 데이터 조회 실패 - 오류: ${error.message}",
+                                    "error" to "HEALTH_DATA_ERROR"
+                                ))
+                            }
                         }
 
                         is SecurityException -> {
                             wrapper.success(mapOf(
                                 "success" to false,
                                 "result" to emptyList<Map<String, Any>>(),
-                                "message" to "${dataTypeName} 데이터 조회 실패 - 권한이 없습니다: ${error.message}",
+                                "message" to "${dataTypeName} 데이터 조회 실패 - ${dataTypeName} 권한 없음",
                                 "error" to "PERMISSION_ERROR"
                             ))
                         }

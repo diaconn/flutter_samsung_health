@@ -78,7 +78,7 @@ class FlutterSamsungHealth {
   }
 
   /// 전체 데이터 조회
-  Future<Map<String,List<Map<String, dynamic>>>> getTotalData({
+  Future<Map<String, dynamic>> getTotalData({
     required int start,
     required int end,
   }) {
