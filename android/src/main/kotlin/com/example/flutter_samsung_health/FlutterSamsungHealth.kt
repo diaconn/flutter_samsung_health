@@ -261,7 +261,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     "status" to "installed",
                     "versionName" to (packageInfo.versionName ?: "Unknown")
                 ),
-                "message" to "Samsung Health 설치 확인 완료 - 버전: ${packageInfo.versionName ?: "Unknown"}"
+                "message" to "설치 확인 완료"
             ))
         } catch (e: Exception) {
             wrapper.success(mapOf(
@@ -270,7 +270,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     "isInstalled" to false,
                     "status" to "not_installed"
                 ),
-                "message" to "Samsung Health 설치 확인 완료 - 설치되지 않음"
+                "message" to "설치 확인 완료"
             ))
         }
     }
@@ -294,7 +294,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                         "isLaunched" to true,
                         "status" to "launched"
                     ),
-                    "message" to "앱 실행 완료 - Samsung Health 앱을 실행했습니다"
+                    "message" to "앱 실행 완료"
                 ))
             } else {
                 wrapper.success(mapOf(
@@ -303,7 +303,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                         "isLaunched" to false,
                         "status" to "error"
                     ),
-                    "message" to "앱 실행 시도 완료 - 오류: 인텐트를 찾을 수 없습니다"
+                    "message" to "앱 실행 실패 - 인텐트를 찾을 수 없음"
                 ))
             }
         } catch (e: Exception) {
@@ -320,7 +320,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                         "isLaunched" to false,
                         "status" to "moved_to_store"
                     ),
-                    "message" to "앱 실행 완료 - Samsung Health 설치를 위해 스토어로 이동했습니다"
+                    "message" to "앱 실행 완료"
                 ))
             } catch (storeException: Exception) {
                 wrapper.success(mapOf(
@@ -329,7 +329,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                         "isLaunched" to false,
                         "status" to "error"
                     ),
-                    "message" to "앱 실행 시도 완료 - 오류: 앱 실행 및 스토어 이동이 모두 실패했습니다"
+                    "message" to "앱 실행 실패 - 앱 및 스토어 접근 불가"
                 ))
             }
         }
@@ -350,7 +350,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     "isConnected" to true,
                     "connectionTime" to System.currentTimeMillis()
                 ),
-                "message" to "Samsung Health에 성공적으로 연결되었습니다"
+                "message" to "연결 완료"
             ))
             
             // 연결 성공 후 저장된 옵저버 상태 복원 (매번 체크)
@@ -376,7 +376,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                                 "isConnected" to false,
                                 "status" to "user_action_required"
                             ),
-                            "message" to "연결 시도 완료 - 사용자 액션이 필요합니다. Samsung Health 설정을 확인하세요."
+                            "message" to "연결 완료 - 사용자 액션 필요"
                         ))
                     } else {
                         wrapper.success(mapOf(
@@ -385,7 +385,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                                 "isConnected" to false,
                                 "status" to "error"
                             ),
-                            "message" to "연결 시도 완료 - Activity가 없어 권한 요청을 할 수 없습니다."
+                            "message" to "연결 완료 - Activity 부재"
                         ))
                     }
                 }
@@ -397,7 +397,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                             "isConnected" to false,
                             "status" to "error"
                         ),
-                        "message" to "연결 시도 완료 - 오류: ${error.message ?: "Samsung Health 데이터 오류"}"
+                        "message" to "연결 실패 - Samsung Health 오류"
                     ))
                 }
 
@@ -408,7 +408,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                             "isConnected" to false,
                             "status" to "error"
                         ),
-                        "message" to "연결 시도 완료 - 오류: ${error.message ?: "알 수 없는 오류"}"
+                        "message" to "연결 실패 - 알 수 없는 오류"
                     ))
                 }
             }
@@ -428,7 +428,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     "isDisconnected" to true,
                     "status" to "already_disconnected"
                 ),
-                "message" to "연결 해제 완료 - 이미 연결되지 않은 상태입니다"
+                "message" to "연결 해제 완료"
             ))
             return
         }
@@ -443,7 +443,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     "isDisconnected" to true,
                     "status" to "disconnected"
                 ),
-                "message" to "연결 해제 완료 - Samsung Health 연결이 해제되었습니다"
+                "message" to "연결 해제 완료"
             ))
         } catch (e: Exception) {
             Log.e(APP_TAG, "연결 해제 실패: ${e.message}")
@@ -453,7 +453,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     "isDisconnected" to false,  // 연결 해제에 실패 = 여전히 연결됨
                     "status" to "error"
                 ),
-                "message" to "연결 해제 시도 완료 - 오류: ${e.message ?: "연결 해제에 실패했습니다"}"
+                "message" to "연결 해제 실패 - 알 수 없는 오류"
             ))
         } finally {
             // finally에서 무조건 실행 (이것도 실패할 수 있지만...)
@@ -478,7 +478,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     "denied" to types,
                     "status" to "error"
                 ),
-                "message" to "권한 요청 실패 - Samsung Health에 먼저 연결하세요",
+                "message" to "권한 요청 실패 - 연결 필요",
                 "error" to "STORE_NOT_READY"
             ))
             return
@@ -493,7 +493,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     "denied" to types,
                     "status" to "error"
                 ),
-                "message" to "권한 요청 실패 - Activity가 없습니다",
+                "message" to "권한 요청 실패 - Activity 부재",
                 "error" to "ACTIVITY_NOT_READY"
             ))
             return
@@ -507,7 +507,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     "denied" to types,
                     "status" to "error"
                 ),
-                "message" to "권한 요청 실패 - Activity가 유효하지 않습니다",
+                "message" to "권한 요청 실패 - Activity 무효",
                 "error" to "ACTIVITY_INVALID"
             ))
             return
@@ -529,7 +529,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     "denied" to emptyList<String>(),
                     "status" to "no_permissions"
                 ),
-                "message" to "권한 요청 완료 - 요청할 권한이 없습니다"
+                "message" to "권한 요청 완료"
             ))
             return
         }
@@ -559,9 +559,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                         "status" to if (allGranted) "all_granted" else "partial_granted"
                     ),
                     "message" to if (allGranted)
-                        "권한 요청 완료 - 모든 권한이 허용되었습니다"
+                        "권한 요청 완료"
                     else
-                        "권한 요청 완료 - 일부 권한이 거부되었습니다 (거부된 권한: ${deniedList.joinToString(", ")})"
+                        "권한 요청 완료"
                 ))
             }.onFailure { error ->
                 Log.e(APP_TAG, "권한 요청 실패: ${error.message}")
@@ -578,7 +578,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                                 "denied" to types,
                                 "status" to "user_action_required"
                             ),
-                            "message" to "권한 요청 완료 - 사용자 액션이 필요합니다: ${error.message}"
+                            "message" to "권한 요청 완료 - 사용자 액션 필요"
                         ))
                     }
 
@@ -590,7 +590,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                                 "denied" to types,
                                 "status" to "error"
                             ),
-                            "message" to "권한 요청 실패 - 오류: ${error.message}",
+                            "message" to "권한 요청 실패 - Samsung Health 오류",
                             "error" to "HEALTH_DATA_ERROR"
                         ))
                     }
@@ -603,7 +603,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                                 "denied" to types,
                                 "status" to "error"
                             ),
-                            "message" to "권한 요청 실패 - 오류: ${error.message ?: "알 수 없는 오류"}",
+                            "message" to "권한 요청 실패 - 알 수 없는 오류",
                             "error" to "PERMISSION_ERROR"
                         ))
                     }
@@ -658,7 +658,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                                 "granted" to emptyList<String>(),
                                 "status" to "error"
                             ),
-                            "message" to "권한 조회 실패 - 오류: ${error.message}",
+                            "message" to "권한 조회 실패 - Samsung Health 오류",
                             "error" to "HEALTH_DATA_ERROR"
                         ))
                     }
@@ -670,7 +670,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                                 "granted" to emptyList<String>(),
                                 "status" to "error"
                             ),
-                            "message" to "권한 조회 실패 - 오류: ${error.message ?: "알 수 없는 오류"}",
+                            "message" to "권한 조회 실패 - 알 수 없는 오류",
                             "error" to "PERMISSION_QUERY_ERROR"
                         ))
                     }
@@ -704,7 +704,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                         "isOpened" to true,
                         "status" to "opened_permissions"
                     ),
-                    "message" to "Samsung Health 권한 설정 화면을 열었습니다"
+                    "message" to "권한 설정 화면 열기 완료"
                 ))
             } else {
                 // 일반 Samsung Health 앱 실행
@@ -718,7 +718,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                             "isOpened" to true,
                             "status" to "opened_app"
                         ),
-                        "message" to "Samsung Health 앱을 열었습니다. 설정에서 권한을 확인하세요"
+                        "message" to "권한 설정 화면 열기 완료"
                     ))
                 } else {
                     wrapper.success(mapOf(
@@ -727,7 +727,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                             "isOpened" to false,
                             "status" to "app_not_found"
                         ),
-                        "message" to "권한 화면 열기 실패 - Samsung Health 앱이 설치되지 않았습니다"
+                        "message" to "권한 설정 화면 열기 실패 - 앱 미설치"
                     ))
                 }
             }
@@ -739,7 +739,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     "isOpened" to false,
                     "status" to "error"
                 ),
-                "message" to "권한 화면 열기 실패 - 오류: ${error.message ?: "알 수 없는 오류"}",
+                "message" to "권한 화면 열기 실패 - 알 수 없는 오류",
                 "error" to "PERMISSION_SCREEN_ERROR"
             ))
         }
@@ -775,7 +775,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     "failed" to emptyList<String>(),
                     "status" to "error"
                 ),
-                "message" to "옵저버 시작 실패 - 유효한 데이터 타입이 없습니다",
+                "message" to "옵저버 시작 실패 - 유효한 데이터 타입 없음",
                 "error" to "INVALID_DATA_TYPES"
             ))
             return
@@ -848,7 +848,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     "failed" to failedTypes,
                     "status" to overallStatus
                 ),
-                "message" to "${targetTypes.size}개 타입의 옵저버 시작 처리 완료"
+                "message" to "옵저버 시작 완료"
             ))
         }
     }
@@ -880,7 +880,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     "not_running" to emptyList<String>(),
                     "status" to "error"
                 ),
-                "message" to "옵저버 중단 실패 - 유효한 데이터 타입이 없습니다",
+                "message" to "옵저버 중단 실패 - 유효한 데이터 타입 없음",
                 "error" to "INVALID_DATA_TYPES"
             ))
             return
@@ -924,7 +924,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                 "not_running" to notRunningTypes,
                 "status" to overallStatus
             ),
-            "message" to "${targetTypes.size}개 타입의 옵저버 중단 처리 완료"
+            "message" to "옵저버 중단 완료"
         ))
     }
     
@@ -955,7 +955,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     "stopped" to emptyList<String>(),
                     "status" to "error"
                 ),
-                "message" to "옵저버 상태 조회 실패 - 유효한 데이터 타입이 없습니다",
+                "message" to "옵저버 상태 조회 실패 - 유효한 데이터 타입 없음",
                 "error" to "INVALID_DATA_TYPES"
             ))
             return
@@ -990,7 +990,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                 "stopped" to stoppedTypes,
                 "status" to overallStatus
             ),
-            "message" to "${targetTypes.size}개 타입의 옵저버 상태 조회 완료"
+            "message" to "옵저버 상태 조회 완료"
         ))
     }
 
@@ -1218,7 +1218,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                                 wrapper.success(mapOf(
                                     "success" to false,
                                     "result" to emptyList<Map<String, Any>>(),
-                                    "message" to "${dataTypeName} 데이터 조회 실패 - 오류: ${error.message}",
+                                    "message" to "${dataTypeName} 데이터 조회 실패 - Samsung Health 오류",
                                     "error" to "HEALTH_DATA_ERROR"
                                 ))
                             }
@@ -1228,7 +1228,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                             wrapper.success(mapOf(
                                 "success" to false,
                                 "result" to emptyList<Map<String, Any>>(),
-                                "message" to "${dataTypeName} 데이터 조회 실패 - ${dataTypeName} 권한 없음",
+                                "message" to "${dataTypeName} 권한 없음",
                                 "error" to "PERMISSION_ERROR"
                             ))
                         }
@@ -1237,7 +1237,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                             wrapper.success(mapOf(
                                 "success" to false,
                                 "result" to emptyList<Map<String, Any>>(),
-                                "message" to "${dataTypeName} 데이터 조회 실패 - 오류: ${error.message ?: "알 수 없는 오류"}",
+                                "message" to "${dataTypeName} 데이터 조회 실패 - 알 수 없는 오류",
                                 "error" to "READ_ERROR"
                             ))
                         }
