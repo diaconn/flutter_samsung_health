@@ -1199,7 +1199,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     wrapper.success(mapOf(
                         "success" to true,
                         "result" to data,
-                        "message" to "${dataTypeName} 데이터 없음"
                     ))
                 }
             }.onFailure { error ->
