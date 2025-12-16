@@ -16,7 +16,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
       'success': false,
       'result': {'isInstalled': false, 'status': 'error'},
-      'message': 'Failed to check Samsung Health installation',
+      'message': '설치 확인 실패 - 메소드 채널 오류',
       'error': 'METHOD_CHANNEL_ERROR'
     };
   }
@@ -28,7 +28,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
       'success': false,
       'result': {'isLaunched': false, 'status': 'error'},
-      'message': 'Failed to open Samsung Health',
+      'message': '앱 실행 실패 - 메소드 채널 오류',
       'error': 'METHOD_CHANNEL_ERROR'
     };
   }
@@ -40,7 +40,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
       'success': false,
       'result': {'isConnected': false, 'status': 'error'},
-      'message': 'Failed to connect to Samsung Health',
+      'message': '연결 실패 - 메소드 채널 오류',
       'error': 'METHOD_CHANNEL_ERROR'
     };
   }
@@ -52,7 +52,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
       'success': false,
       'result': {'isDisconnected': false, 'status': 'error'},
-      'message': 'Failed to disconnect from Samsung Health',
+      'message': '연결 해제 실패 - 메소드 채널 오류',
       'error': 'METHOD_CHANNEL_ERROR'
     };
   }
@@ -64,7 +64,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
       'success': false,
       'result': {'granted': [], 'denied': [], 'status': 'error'},
-      'message': 'Failed to request permissions',
+      'message': '권한 요청 실패 - 메소드 채널 오류',
       'error': 'METHOD_CHANNEL_ERROR'
     };
   }
@@ -76,7 +76,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
       'success': false,
       'result': {'granted': [], 'status': 'error'},
-      'message': 'Failed to get granted permissions',
+      'message': '권한 조회 실패 - 메소드 채널 오류',
       'error': 'METHOD_CHANNEL_ERROR'
     };
   }
@@ -88,7 +88,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
       'success': false,
       'result': {'isOpened': false, 'status': 'error'},
-      'message': 'Failed to open Samsung Health permissions',
+      'message': '권한 설정 화면 열기 실패 - 메소드 채널 오류',
       'error': 'METHOD_CHANNEL_ERROR'
     };
   }
@@ -102,7 +102,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
       'success': false,
       'result': {'started': [], 'already_running': [], 'failed': [], 'status': 'error'},
-      'message': 'Failed to start observer',
+      'message': '옵저버 시작 실패 - 메소드 채널 오류',
       'error': 'METHOD_CHANNEL_ERROR'
     };
   }
@@ -116,7 +116,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
       'success': false,
       'result': {'stopped': [], 'not_running': [], 'status': 'error'},
-      'message': 'Failed to stop observer',
+      'message': '옵저버 중단 실패 - 메소드 채널 오류',
       'error': 'METHOD_CHANNEL_ERROR'
     };
   }
@@ -135,7 +135,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     return result ?? {
       'success': false,
       'result': {'running': [], 'stopped': [], 'status': 'error'},
-      'message': 'Failed to get observer status',
+      'message': '옵저버 상태 조회 실패 - 메소드 채널 오류',
       'error': 'METHOD_CHANNEL_ERROR'
     };
   }
@@ -150,7 +150,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
       'success': false,
       'result': {},
-      'message': 'Failed to get total data',
+      'message': '전체 데이터 조회 실패 - 메소드 채널 오류',
       'error': 'METHOD_CHANNEL_ERROR'
     };
   }
@@ -165,7 +165,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
       'success': false,
       'result': [],
-      'message': 'Failed to get exercise data',
+      'message': '운동 데이터 조회 실패 - 메소드 채널 오류',
       'error': 'METHOD_CHANNEL_ERROR'
     };
   }
@@ -180,7 +180,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
       'success': false,
       'result': [],
-      'message': 'Failed to get heart rate data',
+      'message': '심박수 데이터 조회 실패 - 메소드 채널 오류',
       'error': 'METHOD_CHANNEL_ERROR'
     };
   }
@@ -195,7 +195,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
       'success': false,
       'result': [],
-      'message': 'Failed to get steps data',
+      'message': '걸음수 데이터 조회 실패 - 메소드 채널 오류',
       'error': 'METHOD_CHANNEL_ERROR'
     };
   }
@@ -210,7 +210,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
       'success': false,
       'result': [],
-      'message': 'Failed to get five minute steps data',
+      'message': '5분 간격 걸음수 데이터 조회 실패 - 메소드 채널 오류',
       'error': 'METHOD_CHANNEL_ERROR'
     };
   }
@@ -225,7 +225,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
       'success': false,
       'result': [],
-      'message': 'Failed to get sleep data',
+      'message': '수면 데이터 조회 실패 - 메소드 채널 오류',
       'error': 'METHOD_CHANNEL_ERROR'
     };
   }
@@ -240,7 +240,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
       'success': false,
       'result': [],
-      'message': 'Failed to get nutrition data',
+      'message': '영양소 데이터 조회 실패 - 메소드 채널 오류',
       'error': 'METHOD_CHANNEL_ERROR'
     };
   }
@@ -255,7 +255,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
       'success': false,
       'result': [],
-      'message': 'Failed to get blood glucose data',
+      'message': '혈당 데이터 조회 실패 - 메소드 채널 오류',
       'error': 'METHOD_CHANNEL_ERROR'
     };
   }
@@ -270,7 +270,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
       'success': false,
       'result': [],
-      'message': 'Failed to get body composition data',
+      'message': '신체구성 데이터 조회 실패 - 메소드 채널 오류',
       'error': 'METHOD_CHANNEL_ERROR'
     };
   }
@@ -285,7 +285,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
       'success': false,
       'result': [],
-      'message': 'Failed to get oxygen saturation data',
+      'message': '산소포화도 데이터 조회 실패 - 메소드 채널 오류',
       'error': 'METHOD_CHANNEL_ERROR'
     };
   }
@@ -300,7 +300,7 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
       'success': false,
       'result': [],
-      'message': 'Failed to get body temperature data',
+      'message': '체온 데이터 조회 실패 - 메소드 채널 오류',
       'error': 'METHOD_CHANNEL_ERROR'
     };
   }

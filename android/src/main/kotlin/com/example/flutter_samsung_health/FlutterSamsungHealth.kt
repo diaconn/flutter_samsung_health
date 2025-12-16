@@ -1054,10 +1054,10 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     "exercise" to exercise,
                     "heart_rate" to heartRate,
                     "sleep" to sleep,
-                    "step_count" to steps,
+                    "steps" to steps,
                     "nutrition" to nutrition,
                     "body_composition" to bodyComposition,
-                    "oxygen_saturation" to bloodOxygen,
+                    "blood_oxygen" to bloodOxygen,
                     "body_temperature" to bodyTemperature,
                     "blood_glucose" to bloodGlucose,
                 )
