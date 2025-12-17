@@ -840,6 +840,14 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                 else -> "failed"
             }
             
+            val message = when (overallStatus) {
+                "started" -> "옵저버 시작 완료"
+                "already_running" -> "옵저버 시작 완료 - 이미 실행 중"
+                "partially_started" -> "옵저버 시작 완료 - 일부 성공"
+                "failed" -> "옵저버 시작 실패 - 권한 없음"
+                else -> "옵저버 시작 처리 완료"
+            }
+            
             wrapper.success(mapOf(
                 "success" to (successTypes.isNotEmpty() || alreadyRunningTypes.isNotEmpty()),
                 "result" to mapOf(
@@ -848,7 +856,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     "failed" to failedTypes,
                     "status" to overallStatus
                 ),
-                "message" to "옵저버 시작 완료"
+                "message" to message
             ))
         }
     }
@@ -917,6 +925,13 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
             else -> "not_running"
         }
         
+        val message = when (overallStatus) {
+            "stopped" -> "옵저버 중단 완료"
+            "partially_stopped" -> "옵저버 중단 완료 - 일부 성공"
+            "not_running" -> "옵저버 중단 완료 - 이미 중단됨"
+            else -> "옵저버 중단 처리 완료"
+        }
+        
         wrapper.success(mapOf(
             "success" to true,
             "result" to mapOf(
@@ -924,7 +939,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                 "not_running" to notRunningTypes,
                 "status" to overallStatus
             ),
-            "message" to "옵저버 중단 완료"
+            "message" to message
         ))
     }
     

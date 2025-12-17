@@ -9,7 +9,12 @@ class FlutterSamsungHealth {
   
   /// 실시간 헬스 데이터 스트림
   Stream<Map<String, dynamic>> get healthDataStream => 
-      _eventChannel.receiveBroadcastStream().cast<Map<String, dynamic>>();
+      _eventChannel.receiveBroadcastStream().map((data) {
+        if (data is Map) {
+          return Map<String, dynamic>.from(data.cast<String, dynamic>());
+        }
+        return <String, dynamic>{};
+      });
   
   /// 헬스 데이터 스트림 시작 (편의 메서드)
   StreamSubscription startListening(Function(Map<String, dynamic>) onData, {Function(Object)? onError}) {

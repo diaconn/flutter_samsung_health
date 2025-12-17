@@ -43,7 +43,24 @@ class ResultDisplayWidget extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('결과', style: Theme.of(context).textTheme.headlineSmall),
+            Row(
+              children: [
+                Text('결과', style: Theme.of(context).textTheme.headlineSmall),
+                if (lastResult!['realtime'] == true)
+                  Container(
+                    margin: const EdgeInsets.only(left: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.green,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      '실시간',
+                      style: TextStyle(color: Colors.white, fontSize: 10),
+                    ),
+                  ),
+              ],
+            ),
             if (_formatResult(lastResult!).split('\n').length > 15)
               TextButton(
                 onPressed: onToggleExpanded,
