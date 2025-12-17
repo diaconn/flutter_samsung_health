@@ -53,6 +53,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
     private var healthDataStore: HealthDataStore? = null
     private var activity: Activity? = null
     private var eventSink: EventSink? = null
+    
+    // EventSink가 null일 때 데이터를 임시 저장할 대기열
+    private val pendingData = mutableListOf<Map<String, Any>>()
 
     private val APP_TAG: String = "FlutterSamsungHealth"
 
@@ -1696,7 +1699,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                 try {
                     val changes = readChangesForDataType(store, dataType, lastSync, end)
                     if (changes.isNotEmpty()) {
-                        Log.d(APP_TAG, "[${dataType.typeName}] ${changes.size}개 변경사항 감지 (필터링 전)")
+                        Log.d(APP_TAG, "[${dataType.typeName}] ${changes.size}개 변경사항 감지")
 
                         // UID 캐시 정리 (1시간마다)
                         cleanupUidCacheIfNeeded(dataType)
@@ -1705,15 +1708,12 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                         val newChanges = filterNewChanges(dataType, changes)
 
                         if (newChanges.isNotEmpty()) {
-                            Log.d(APP_TAG, "[${dataType.typeName}] ${newChanges.size}개 새로운 변경사항 처리")
-
                             // Flutter로 전송할 데이터 준비
                             val dataToSend = mutableListOf<Map<String, Any>>()
 
                             // 새로운 변경사항만 처리
                             for (change in newChanges) {
                                 val uid = change.upsertDataPoint?.uid ?: change.deleteDataUid ?: "unknown"
-                                Log.d(APP_TAG, "[${dataType.typeName}] ${change.changeType} - UID: $uid")
 
                                 // 상세 데이터 수집 (getExerciseData 같은 방식으로)
                                 if (change.changeType == ChangeType.UPSERT && change.upsertDataPoint != null) {
@@ -2091,24 +2091,38 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
     }
 
     /**
-     * Flutter로 실시간 데이터 전송
+     * Flutter로 실시간 데이터 전송 (큐잉 기능 포함)
      */
     private fun sendDataToFlutter(dataType: ObserverDataType, data: List<Map<String, Any>>) {
-        eventSink?.let { sink ->
-            val eventData = mapOf(
-                "dataType" to dataType.typeName,
-                "data" to data,
-                "timestamp" to System.currentTimeMillis(),
-                "count" to data.size
-            )
+        val eventData = mapOf(
+            "dataType" to dataType.typeName,
+            "data" to data,
+            "timestamp" to System.currentTimeMillis(),
+            "count" to data.size
+        )
 
+        eventSink?.let { sink ->
             // UI 스레드에서 전송
             CoroutineScope(Dispatchers.Main).launch {
+                // 대기 중인 데이터가 있으면 먼저 전송
+                if (pendingData.isNotEmpty()) {
+                    Log.d(APP_TAG, "대기 중인 ${pendingData.size}개 데이터를 먼저 전송")
+                    pendingData.forEach { pendingEventData ->
+                        sink.success(pendingEventData)
+                    }
+                    pendingData.clear()
+                }
+                
+                // 현재 데이터 전송
                 sink.success(eventData)
                 Log.d(APP_TAG, "[${dataType.typeName}] Flutter로 ${data.size}개 데이터 전송 완료")
             }
         } ?: run {
-            Log.w(APP_TAG, "[${dataType.typeName}] EventSink가 null - Flutter 전송 실패")
+            // EventSink가 null이면 데이터를 대기열에 저장
+            synchronized(pendingData) {
+                pendingData.add(eventData)
+            }
+            Log.w(APP_TAG, "[${dataType.typeName}] EventSink가 null - 데이터 대기열에 저장 (총 ${pendingData.size}개)")
         }
     }
     
@@ -2258,6 +2272,19 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
     override fun onListen(arguments: Any?, events: EventSink?) {
         Log.d(APP_TAG, "Event Channel 연결됨")
         eventSink = events
+        
+        // 대기 중인 데이터가 있으면 바로 전송
+        if (pendingData.isNotEmpty()) {
+            CoroutineScope(Dispatchers.Main).launch {
+                synchronized(pendingData) {
+                    Log.d(APP_TAG, "EventChannel 연결 시 대기 중인 ${pendingData.size}개 데이터 전송")
+                    pendingData.forEach { eventData ->
+                        events?.success(eventData)
+                    }
+                    pendingData.clear()
+                }
+            }
+        }
     }
 
     override fun onCancel(arguments: Any?) {

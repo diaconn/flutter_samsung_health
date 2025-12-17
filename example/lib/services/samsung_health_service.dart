@@ -152,52 +152,47 @@ class SamsungHealthService extends ChangeNotifier {
         .toList();
   }
 
-  /// 실시간 헬스 데이터 스트림 시작 (필요한 경우에만)
-  void _startHealthDataStreamIfNeeded() {
+  /// 실시간 헬스 데이터 스트림 시작
+  void _startHealthDataStream() {
     // 이미 리스너가 등록되어 있으면 통과
     if (_healthDataSubscription != null) {
       return;
     }
     
-    // 활성 옵저버가 1개 이상일 때만 리스너 등록
-    if (_activeObservers.isNotEmpty) {
-      _healthDataSubscription = _plugin.healthDataStream.listen(
-        (data) {
-          // 실시간 데이터를 결과에 표시
-          final dataType = data['dataType']?.toString() ?? 'unknown';
-          final timestamp = data['timestamp'] ?? DateTime.now().millisecondsSinceEpoch;
-          
-          _lastResult = {
-            'success': true,
-            'result': data,
-            'message': '실시간 $dataType 데이터 수신',
-            'timestamp': timestamp,
-            'realtime': true,
-          };
-          notifyListeners();
-        },
-        onError: (error) {
-          _lastResult = {
-            'success': false,
-            'result': {},
-            'message': '실시간 데이터 수신 오류: $error',
-            'error': 'STREAM_ERROR',
-            'realtime': true,
-          };
-          notifyListeners();
-        },
-      );
-    }
+    // 연결 시 무조건 스트림 리스너 등록
+    _healthDataSubscription = _plugin.healthDataStream.listen(
+      (data) {
+        // 실시간 데이터를 결과에 표시
+        final dataType = data['dataType']?.toString() ?? 'unknown';
+        final timestamp = data['timestamp'] ?? DateTime.now().millisecondsSinceEpoch;
+        
+        _lastResult = {
+          'success': true,
+          'result': data,
+          'message': '실시간 $dataType 데이터 수신',
+          'timestamp': timestamp,
+          'realtime': true,
+        };
+        notifyListeners();
+      },
+      onError: (error) {
+        _lastResult = {
+          'success': false,
+          'result': {},
+          'message': '실시간 데이터 수신 오류: $error',
+          'error': 'STREAM_ERROR',
+          'realtime': true,
+        };
+        notifyListeners();
+        
+        // 오류 발생 시 스트림이 끊어질 수 있으므로 재연결 시도
+        _healthDataSubscription = null;
+        _startHealthDataStream();
+      },
+      cancelOnError: false,
+    );
   }
 
-  /// 실시간 헬스 데이터 스트림 중지 (필요한 경우에만)
-  void _stopHealthDataStreamIfNeeded() {
-    // 활성 옵저버가 없으면 리스너 해제
-    if (_activeObservers.isEmpty && _healthDataSubscription != null) {
-      _healthDataSubscription?.cancel();
-      _healthDataSubscription = null;
-    }
-  }
 
   /// 강제 스트림 중지 (연결 해제 등에서 사용)
   void stopHealthDataStream() {
@@ -234,6 +229,11 @@ class SamsungHealthService extends ChangeNotifier {
       _connectionStatus = result['success'] == true ? '연결됨' : '연결 실패';
       _isConnected = result['success'] == true;
       _lastResult = result;
+      
+      // 연결 성공 시 실시간 데이터 스트림 시작
+      if (_isConnected) {
+        _startHealthDataStream();
+      }
     } catch (e) {
       _connectionStatus = '오류: $e';
       _isConnected = false;
@@ -343,9 +343,6 @@ class SamsungHealthService extends ChangeNotifier {
             // 성공한 것들과 이미 실행 중인 것들을 활성 목록에 추가
             _activeObservers.addAll(startedTypes);
             _activeObservers.addAll(alreadyRunningTypes);
-            
-            // 활성 옵저버가 1개 이상이고 리스너가 없으면 리스너 등록
-            _startHealthDataStreamIfNeeded();
           }
         } catch (e) {
           // 타입 변환 실패 시 로그만 찍고 계속 진행
@@ -381,9 +378,6 @@ class SamsungHealthService extends ChangeNotifier {
               // 특정 타입만 중지인 경우 해당 타입들만 제거
               _activeObservers.removeAll(stoppedTypes);
             }
-            
-            // 활성 옵저버가 없으면 리스너 해제, 있으면 유지
-            _stopHealthDataStreamIfNeeded();
           }
         } catch (e) {
           // 타입 변환 실패 시 로그만 찍고 계속 진행
