@@ -166,14 +166,21 @@ class SamsungHealthService extends ChangeNotifier {
         final dataType = data['dataType']?.toString() ?? 'unknown';
         final timestamp = data['timestamp'] ?? DateTime.now().millisecondsSinceEpoch;
         
+        // 실시간 데이터 수신 메시지
+        String message = '실시간 $dataType 데이터 수신';
+        
         _lastResult = {
           'success': true,
           'result': data,
-          'message': '실시간 $dataType 데이터 수신',
+          'message': message,
           'timestamp': timestamp,
           'realtime': true,
         };
-        notifyListeners();
+        try {
+          notifyListeners();
+        } catch (e) {
+          // disposed 상태에서 notifyListeners 호출 시 에러 무시
+        }
       },
       onError: (error) {
         _lastResult = {
@@ -183,7 +190,11 @@ class SamsungHealthService extends ChangeNotifier {
           'error': 'STREAM_ERROR',
           'realtime': true,
         };
-        notifyListeners();
+        try {
+          notifyListeners();
+        } catch (e) {
+          // disposed 상태에서 notifyListeners 호출 시 에러 무시
+        }
         
         // 오류 발생 시 스트림이 끊어질 수 있으므로 재연결 시도
         _healthDataSubscription = null;

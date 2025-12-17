@@ -142,11 +142,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
     
     // 각 데이터 타입별 마지막 동기화 시간 저장
     private val lastSyncTimes = mutableMapOf<ObserverDataType, Instant>()
-    
-    // 처리된 UID 캐시 (중복 방지용)
-    private val processedUids = mutableMapOf<ObserverDataType, MutableSet<String>>()
-    private val uidCacheCleanupTime = mutableMapOf<ObserverDataType, Long>()
-    
+
     // SharedPreferences for persistent observer state
     private lateinit var sharedPreferences: SharedPreferences
     private var hasRestoredOnce = false // 한 번만 복원되도록 플래그
@@ -637,7 +633,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
             runCatching {
                 val grantedPermissions = store.getGrantedPermissions(allPermissions)
                 val grantedList = grantedPermissions.map { _getDataTypeNameForPermission(it) }
-                Log.i(APP_TAG, "권한 조회 성공: ${grantedList.size}개 권한 허용됨")
+                Log.i(APP_TAG, "권한 조회 성공: ${grantedList.size}개 권한 허용됨(${grantedList})")
 
                 wrapper.success(mapOf(
                     "success" to true,
@@ -753,7 +749,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
      */
     /// 옵저버 시작
     private fun startObserver(dataTypeNames: List<String>?, wrapper: ResultWrapper) {
-        Log.d(APP_TAG, "startObserver() 호출: $dataTypeNames")
+        Log.d(APP_TAG, "startObserver() 호출")
         
         // 연결 상태와 무관하게 옵저버 상태 관리 (실제 동작은 연결 시에만)
         
@@ -816,12 +812,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     
                     // SharedPreferences에 상태 저장
                     saveObserverState(dataType, true)
-                    
-                    // UID 캐시 초기화
-                    if (!observerJobs.containsKey(dataType)) {
-                        processedUids[dataType]?.clear()
-                    }
-                    
+
                     // Samsung Health 연결 상태에 따라 실제 Job 시작 여부 결정
                     val store = healthDataStore
                     if (store != null) {
@@ -869,7 +860,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
      */
     /// 옵저버 중단
     private fun stopObserver(dataTypeNames: List<String>?, wrapper: ResultWrapper) {
-        Log.d(APP_TAG, "stopObserver() 호출: $dataTypeNames")
+        Log.d(APP_TAG, "stopObserver() 호출")
         
         // 데이터 타입 결정
         val targetTypes = when {
@@ -951,8 +942,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
      */
     /// 옵저버 상태 조회
     private fun getObserverStatus(dataTypeNames: List<String>?, wrapper: ResultWrapper) {
-        Log.d(APP_TAG, "getObserverStatus() 호출: $dataTypeNames")
-        
+        Log.d(APP_TAG, "getObserverStatus() 호출")
+
         // 데이터 타입 결정
         val targetTypes = when {
             dataTypeNames == null || dataTypeNames.isEmpty() -> {
@@ -1691,7 +1682,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
 
                 // 최소 1초 간격 보장
                 if (lastSync.plusSeconds(1).isAfter(end)) {
-                    Log.v(APP_TAG, "[${dataType.typeName}] 최소 간격 대기 중...")
                     delay(1000L)
                     continue
                 }
@@ -1701,25 +1691,34 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     if (changes.isNotEmpty()) {
                         Log.d(APP_TAG, "[${dataType.typeName}] ${changes.size}개 변경사항 감지")
 
-                        // UID 캐시 정리 (1시간마다)
-                        cleanupUidCacheIfNeeded(dataType)
-
-                        // 새로운 변경사항만 필터링
-                        val newChanges = filterNewChanges(dataType, changes)
-
-                        if (newChanges.isNotEmpty()) {
+                        // 모든 변경사항 처리
+                        if (changes.isNotEmpty()) {
                             // Flutter로 전송할 데이터 준비
                             val dataToSend = mutableListOf<Map<String, Any>>()
 
-                            // 새로운 변경사항만 처리
-                            for (change in newChanges) {
+                            // 모든 변경사항 처리 (추가/수정/삭제)
+                            for (change in changes) {
                                 val uid = change.upsertDataPoint?.uid ?: change.deleteDataUid ?: "unknown"
 
-                                // 상세 데이터 수집 (getExerciseData 같은 방식으로)
-                                if (change.changeType == ChangeType.UPSERT && change.upsertDataPoint != null) {
-                                    val detailedData = getDetailedDataForLog(dataType, change.upsertDataPoint!!)
-                                    dataToSend.add(detailedData)
-                                    Log.d(APP_TAG, "[${dataType.typeName}] 상세 데이터: $detailedData")
+                                // 변경 타입에 따른 처리
+                                when (change.changeType) {
+                                    ChangeType.UPSERT -> {
+                                        if (change.upsertDataPoint != null) {
+                                            val detailedData = getDetailedDataForLog(dataType, change.upsertDataPoint!!)
+                                            dataToSend.add(detailedData)
+                                            Log.d(APP_TAG, "[${dataType.typeName}] 상세 데이터: $detailedData")
+                                        }
+                                    }
+                                    ChangeType.DELETE -> {
+                                        val deleteData = mapOf(
+                                            "uid" to uid,
+                                            "action" to "DELETE",
+                                            "dataType" to dataType.typeName,
+                                            "deleted_at" to System.currentTimeMillis()
+                                        )
+                                        dataToSend.add(deleteData)
+                                        Log.d(APP_TAG, "[${dataType.typeName}] DELETE - UID: $uid")
+                                    }
                                 }
                             }
 
@@ -1827,10 +1826,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                 lastSyncTime = System.currentTimeMillis()
             )
         }
-
-        // UID 캐시 정리
-        processedUids.clear()
-        uidCacheCleanupTime.clear()
     }
 
     /**
@@ -1855,10 +1850,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
             // SharedPreferences에서도 제거
             saveObserverState(dataType, false)
         }
-
-        // UID 캐시 정리
-        processedUids.clear()
-        uidCacheCleanupTime.clear()
     }
 
     /**
@@ -1896,49 +1887,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
         }
     }
 
-    /**
-     * UID 캐시 정리 (1시간마다)
-     */
-    private fun cleanupUidCacheIfNeeded(dataType: ObserverDataType) {
-        val now = System.currentTimeMillis()
-        val lastCleanup = uidCacheCleanupTime[dataType] ?: 0
-        
-        // 1시간(3600초)마다 정리
-        if (now - lastCleanup > 3600_000L) {
-            Log.d(APP_TAG, "[${dataType.typeName}] UID 캐시 정리 실행")
-            processedUids[dataType]?.clear()
-            uidCacheCleanupTime[dataType] = now
-        }
-    }
-    
-    /**
-     * 새로운 변경사항만 필터링 (이미 처리된 UID 제외)
-     */
-    private fun filterNewChanges(dataType: ObserverDataType, changes: List<Change<HealthDataPoint>>): List<Change<HealthDataPoint>> {
-        val processedSet = processedUids.getOrPut(dataType) { mutableSetOf() }
-        val newChanges = mutableListOf<Change<HealthDataPoint>>()
-        
-        for (change in changes) {
-            val uid = change.upsertDataPoint?.uid ?: change.deleteDataUid
-            if (uid != null) {
-                if (!processedSet.contains(uid)) {
-                    // 새로운 UID면 처리 목록에 추가
-                    newChanges.add(change)
-                    processedSet.add(uid)
-                    // 새로운 UID 등록
-                } else {
-                    // 중복 UID 스킵
-                }
-            } else {
-                // UID가 없는 경우 (예외 상황)
-                newChanges.add(change)
-                Log.w(APP_TAG, "[${dataType.typeName}] UID 없는 변경사항: ${change.changeType}")
-            }
-        }
-        
-        return newChanges
-    }
-    
     /**
      * 옵저버 상태를 SharedPreferences에 저장
      */
@@ -2074,9 +2022,6 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
             status = ObserverStatus.RUNNING,
             lastSyncTime = System.currentTimeMillis()
         )
-        
-        // UID 캐시 초기화
-        processedUids[dataType]?.clear()
         
         // 동기화 시간 설정 (현재 시점)
         lastSyncTimes[dataType] = Instant.now()
