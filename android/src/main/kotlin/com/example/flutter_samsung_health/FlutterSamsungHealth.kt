@@ -59,6 +59,45 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
 
     private val APP_TAG: String = "FlutterSamsungHealth"
 
+    /**
+     * Samsung Health Data SDK 1.0.0에서 사용 가능한 기기 정보 조회
+     * 제한적인 정보만 제공 (SDK 1.0.0의 제약)
+     */
+    private fun getDeviceSourceInfo(dataPoint: HealthDataPoint): Map<String, Any?> {
+        return try {
+            // 기본 시스템 정보 조회
+            val manufacturer = android.os.Build.MANUFACTURER
+            val model = android.os.Build.MODEL
+            val androidVersion = android.os.Build.VERSION.RELEASE
+            val sdkVersion = android.os.Build.VERSION.SDK_INT
+            
+            // Samsung Health Data SDK 1.0.0에서는 UID가 소스를 나타내는 경우가 많음
+            val uid = dataPoint.uid ?: ""
+            val startTime = dataPoint.startTime?.toEpochMilli() ?: 0L
+            val endTime = dataPoint.endTime?.toEpochMilli() ?: 0L
+            
+            mapOf(
+                "device_info" to mapOf(
+                    "android_version" to androidVersion,
+                    "sdk_version" to sdkVersion,
+                    "device_manufacturer" to manufacturer,
+                    "device_model" to model
+                )
+            )
+        } catch (e: Exception) {
+            Log.w(APP_TAG, "기기 소스 정보 조회 실패: ${e.message}")
+            mapOf(
+                "device_info" to mapOf(
+                    "android_version" to android.os.Build.VERSION.RELEASE,
+                    "sdk_version" to android.os.Build.VERSION.SDK_INT,
+                    "device_manufacturer" to android.os.Build.MANUFACTURER,
+                    "device_model" to android.os.Build.MODEL,
+                    "error" to e.message
+                )
+            )
+        }
+    }
+
     // 권한 매핑 - DataTypes 사용
     private val allPermissions = setOf(
         Permission.of(DataTypes.EXERCISE, AccessType.READ),
@@ -1274,6 +1313,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
         for (dataPoint in result.dataList) {
             val exerciseType = dataPoint.getValue(DataType.ExerciseType.EXERCISE_TYPE)
             val sessions = dataPoint.getValue(DataType.ExerciseType.SESSIONS)
+            val deviceSourceInfo = getDeviceSourceInfo(dataPoint)
 
             sessions?.forEach { session ->
                 val sessionData = mapOf(
@@ -1287,9 +1327,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     "distance" to (session.distance ?: 0f),
                     "max_heart_rate" to (session.maxHeartRate ?: 0f),
                     "mean_heart_rate" to (session.meanHeartRate ?: 0f),
-                    "min_heart_rate" to (session.minHeartRate ?: 0f),
+                    "min_heart_rate" to (session.minHeartRate ?: 0f)
                 )
-                resultList.add(sessionData)
+                resultList.add(sessionData + (deviceSourceInfo as Map<String, Any>))
             }
         }
         return resultList
@@ -1318,7 +1358,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                 "heart_rate" to (dataPoint.getValue(DataType.HeartRateType.HEART_RATE) ?: 0f),
                 "min_heart_rate" to (dataPoint.getValue(DataType.HeartRateType.MIN_HEART_RATE) ?: 0f),
                 "max_heart_rate" to (dataPoint.getValue(DataType.HeartRateType.MAX_HEART_RATE) ?: 0f),
-                "series_count" to (seriesData?.size ?: 0)
+                "series_count" to (seriesData?.size ?: 0),
             )
 
             // 시리즈 데이터가 있으면 추가
@@ -1331,7 +1371,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                 }
                 dataMap["series_data"] = seriesList
             }
-            resultList.add(dataMap)
+            val deviceSourceInfo = getDeviceSourceInfo(dataPoint)
+            resultList.add(dataMap + (deviceSourceInfo as Map<String, Any>))
         }
         return resultList
     }
@@ -1389,7 +1430,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                 sleepMap["sessions"] = sessionsData
                 Log.v(APP_TAG, "수면 세션 데이터 추가: ${sessionsData.size}개")
             }
-            resultList.add(sleepMap)
+            val deviceSourceInfo = getDeviceSourceInfo(dataPoint)
+            resultList.add(sleepMap + (deviceSourceInfo as Map<String, Any>))
         }
         return resultList
     }
@@ -1415,7 +1457,16 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                 "steps" to (aggregateData.value ?: 0L),
                 "data_type" to "TOTAL_STEPS"
             )
-            resultList.add(stepData)
+            // Steps 데이터는 집계 데이터라서 dataPoint 대신 시스템 정보만 사용
+            val deviceSourceInfo = mapOf(
+                "device_info" to mapOf(
+                    "android_version" to android.os.Build.VERSION.RELEASE,
+                    "sdk_version" to android.os.Build.VERSION.SDK_INT,
+                    "device_manufacturer" to android.os.Build.MANUFACTURER,
+                    "device_model" to android.os.Build.MODEL,
+                )
+            )
+            resultList.add(stepData + (deviceSourceInfo as Map<String, Any>))
         }
         return resultList
     }
@@ -1455,7 +1506,16 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     "interval_minutes" to 5,
                     "data_type" to "FIVE_MINUTE_STEPS"
                 )
-                resultList.add(stepData)
+                // Steps 데이터는 집계 데이터라서 dataPoint 대신 시스템 정보만 사용
+            val deviceSourceInfo = mapOf(
+                "device_info" to mapOf(
+                    "android_version" to android.os.Build.VERSION.RELEASE,
+                    "sdk_version" to android.os.Build.VERSION.SDK_INT,
+                    "device_manufacturer" to android.os.Build.MANUFACTURER,
+                    "device_model" to android.os.Build.MODEL,
+                )
+            )
+            resultList.add(stepData + (deviceSourceInfo as Map<String, Any>))
                 
             } catch (e: Exception) {
                 Log.w(APP_TAG, "5분 구간 걸음수 조회 실패 ($currentTime ~ $actualEnd): ${e.message}")
@@ -1468,7 +1528,16 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     "data_type" to "FIVE_MINUTE_STEPS",
                     "error" to true
                 )
-                resultList.add(stepData)
+                // Steps 데이터는 집계 데이터라서 dataPoint 대신 시스템 정보만 사용
+            val deviceSourceInfo = mapOf(
+                "device_info" to mapOf(
+                    "android_version" to android.os.Build.VERSION.RELEASE,
+                    "sdk_version" to android.os.Build.VERSION.SDK_INT,
+                    "device_manufacturer" to android.os.Build.MANUFACTURER,
+                    "device_model" to android.os.Build.MODEL,
+                )
+            )
+            resultList.add(stepData + (deviceSourceInfo as Map<String, Any>))
             }
             
             currentTime = currentTime.plusMinutes(5)
@@ -1517,9 +1586,10 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                 "calcium" to (dataPoint.getValue(DataType.NutritionType.CALCIUM) ?: 0f),
                 "iron" to (dataPoint.getValue(DataType.NutritionType.IRON) ?: 0f),
                 "vitamin_a" to (dataPoint.getValue(DataType.NutritionType.VITAMIN_A) ?: 0f),
-                "vitamin_c" to (dataPoint.getValue(DataType.NutritionType.VITAMIN_C) ?: 0f),
+                "vitamin_c" to (dataPoint.getValue(DataType.NutritionType.VITAMIN_C) ?: 0f)
             )
-            resultList.add(nutritionData)
+            val deviceSourceInfo = getDeviceSourceInfo(dataPoint)
+            resultList.add(nutritionData + (deviceSourceInfo as Map<String, Any>))
         }
         return resultList
     }
@@ -1554,7 +1624,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                 "skeletal_muscle_mass" to (dataPoint.getValue(DataType.BodyCompositionType.SKELETAL_MUSCLE_MASS) ?: 0f),
                 "total_body_water" to (dataPoint.getValue(DataType.BodyCompositionType.TOTAL_BODY_WATER) ?: 0f),
             )
-            resultList.add(bodyData)
+            val deviceSourceInfo = getDeviceSourceInfo(dataPoint)
+            resultList.add(bodyData + (deviceSourceInfo as Map<String, Any>))
         }
         return resultList
     }
@@ -1579,7 +1650,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                 "end_time" to (dataPoint.endTime?.toEpochMilli() ?: 0L),
                 "oxygen_saturation" to (dataPoint.getValue(DataType.BloodOxygenType.OXYGEN_SATURATION) ?: 0f),
             )
-            resultList.add(oxygenData)
+            val deviceSourceInfo = getDeviceSourceInfo(dataPoint)
+            resultList.add(oxygenData + (deviceSourceInfo as Map<String, Any>))
         }
         return resultList
     }
@@ -1607,7 +1679,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                 "temperature" to temperature,
                 "temperature_fahrenheit" to ((temperature * 9 / 5) + 32)
             )
-            resultList.add(temperatureData)
+            val deviceSourceInfo = getDeviceSourceInfo(dataPoint)
+            resultList.add(temperatureData + (deviceSourceInfo as Map<String, Any>))
         }
         return resultList
     }
@@ -1640,9 +1713,10 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                 "measurement_type" to (measurementType?.ordinal ?: 0),
                 "measurement_type_name" to (measurementType?.name ?: "Unknown"),
                 "meal_status" to (mealStatus?.ordinal ?: 0),
-                "meal_status_name" to (mealStatus?.name ?: "Unknown"),
+                "meal_status_name" to (mealStatus?.name ?: "Unknown")
             )
-            resultList.add(glucoseData)
+            val deviceSourceInfo = getDeviceSourceInfo(dataPoint)
+            resultList.add(glucoseData + (deviceSourceInfo as Map<String, Any>))
         }
         return resultList
     }
@@ -2097,6 +2171,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
         val exerciseType = dataPoint.getValue(DataType.ExerciseType.EXERCISE_TYPE)
         val sessions = dataPoint.getValue(DataType.ExerciseType.SESSIONS)
         
+        // 데이터 출처 정보 (Samsung Health SDK 1.0.0)
+        val sourceInfo = getDeviceSourceInfo(dataPoint)
+        
         // 세션 데이터 파싱
         val sessionList = sessions?.map { session ->
             mapOf(
@@ -2127,7 +2204,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
             "min_heart_rate" to (firstSession?.minHeartRate ?: 0f),
             "session_count" to (sessions?.size ?: 0),
             "sessions" to sessionList
-        )
+        ) + (sourceInfo as Map<String, Any>)
     }
     
     /**
@@ -2135,6 +2212,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
      */
     private fun parseNutritionDataPoint(dataPoint: HealthDataPoint): Map<String, Any> {
         val mealType = dataPoint.getValue(DataType.NutritionType.MEAL_TYPE)
+        
+        // 데이터 출처 정보 (Samsung Health SDK 1.0.0)
+        val sourceInfo = getDeviceSourceInfo(dataPoint)
         
         return mapOf(
             "uid" to (dataPoint.uid ?: ""),
@@ -2160,7 +2240,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
             "iron" to (dataPoint.getValue(DataType.NutritionType.IRON) ?: 0f),
             "vitamin_a" to (dataPoint.getValue(DataType.NutritionType.VITAMIN_A) ?: 0f),
             "vitamin_c" to (dataPoint.getValue(DataType.NutritionType.VITAMIN_C) ?: 0f),
-        )
+        ) + (sourceInfo as Map<String, Any>)
     }
     
     /**
@@ -2170,6 +2250,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
         val glucoseMmol = dataPoint.getValue(DataType.BloodGlucoseType.GLUCOSE_LEVEL) ?: 0f
         val measurementType = dataPoint.getValue(DataType.BloodGlucoseType.MEASUREMENT_TYPE)
         val mealStatus = dataPoint.getValue(DataType.BloodGlucoseType.MEAL_STATUS)
+        
+        // 데이터 출처 정보 (Samsung Health SDK 1.0.0)
+        val sourceInfo = getDeviceSourceInfo(dataPoint)
         
         return mapOf(
             "uid" to (dataPoint.uid ?: ""),
@@ -2181,7 +2264,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
             "measurement_type_name" to (measurementType?.name ?: "Unknown"),
             "meal_status" to (mealStatus?.ordinal ?: 0),
             "meal_status_name" to (mealStatus?.name ?: "Unknown")
-        )
+        ) + (sourceInfo as Map<String, Any>)
     }
 
     // ===== FlutterPlugin 생명주기 =====
