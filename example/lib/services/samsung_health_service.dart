@@ -24,7 +24,7 @@ class SamsungHealthService extends ChangeNotifier {
   bool _showDateSelection = false;
   
   // 날짜 범위
-  DateTime _startDate = DateTime.now().subtract(const Duration(days: 7));
+  DateTime _startDate = DateTime.now();
   DateTime _endDate = DateTime.now();
   
   // 권한 선택 상태
@@ -417,12 +417,11 @@ class SamsungHealthService extends ChangeNotifier {
 
   /// 설정된 날짜 범위의 시간 범위를 계산 (시간대 오프셋 적용)
   (int, int) calculateTimeRange(DateTime startDate, DateTime endDate) {
-    final startLocal = DateTime(startDate.year, startDate.month, startDate.day, 0, 0, 0);
-    final endLocal = DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59);
-    final timeZoneOffsetMillis = startDate.timeZoneOffset.inMilliseconds;
-    final start = startLocal.millisecondsSinceEpoch + timeZoneOffsetMillis;
-    final end = endLocal.millisecondsSinceEpoch + timeZoneOffsetMillis;
-    return (start, end);
+    final timeZoneOffsetMills = endDate.timeZoneOffset.inMilliseconds;
+    final startMillis = startDate.millisecondsSinceEpoch + timeZoneOffsetMills;
+    final endMillis = endDate.millisecondsSinceEpoch + timeZoneOffsetMills;
+    
+    return (startMillis, endMillis);
   }
 
   /// 전체 데이터 조회

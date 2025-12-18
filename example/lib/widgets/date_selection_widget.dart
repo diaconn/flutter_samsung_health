@@ -81,8 +81,8 @@ class DateSelectionWidget extends StatelessWidget {
                 TextButton(
                   onPressed: () {
                     final now = DateTime.now();
-                    onEndDateChanged(now);
-                    onStartDateChanged(now.subtract(const Duration(days: 1)));
+                    onStartDateChanged(now);  // 오늘부터
+                    onEndDateChanged(now);    // 오늘까지 (1일치)
                   },
                   child: const Text('1일', style: TextStyle(fontSize: 12)),
                 ),
@@ -90,7 +90,7 @@ class DateSelectionWidget extends StatelessWidget {
                   onPressed: () {
                     final now = DateTime.now();
                     onEndDateChanged(now);
-                    onStartDateChanged(now.subtract(const Duration(days: 7)));
+                    onStartDateChanged(now.subtract(const Duration(days: 6))); // 7일치: 오늘 포함 6일 전부터
                   },
                   child: const Text('7일', style: TextStyle(fontSize: 12)),
                 ),
@@ -98,7 +98,7 @@ class DateSelectionWidget extends StatelessWidget {
                   onPressed: () {
                     final now = DateTime.now();
                     onEndDateChanged(now);
-                    onStartDateChanged(now.subtract(const Duration(days: 30)));
+                    onStartDateChanged(now.subtract(const Duration(days: 29))); // 30일치: 오늘 포함 29일 전부터
                   },
                   child: const Text('30일', style: TextStyle(fontSize: 12)),
                 ),
