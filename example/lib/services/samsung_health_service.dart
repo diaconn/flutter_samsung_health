@@ -557,4 +557,79 @@ class SamsungHealthService extends ChangeNotifier {
     }
     notifyListeners();
   }
+
+  /// 5분 간격 걸음수 샘플 데이터 생성
+  Future<void> generateFiveMinuteStepsSampleData() async {
+    try {
+      // 오늘 하루 동안의 샘플 데이터 생성
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      
+      // 실제 활동이 있을 만한 시간대에만 걸음수 데이터 생성
+      final sampleData = <Map<String, dynamic>>[];
+      final random = DateTime.now().millisecondsSinceEpoch % 1000; // 간단한 시드값
+      
+      // 오전 7시부터 오후 11시까지 활동 시간대
+      final activeHours = [7, 8, 9, 12, 13, 14, 17, 18, 19, 20, 21, 22];
+      
+      for (int hour in activeHours) {
+        // 각 시간대에서 랜덤하게 몇 개의 5분 구간에 걸음수 데이터 추가
+        final intervalsInHour = (random + hour * 7) % 8 + 2; // 2-9개 구간
+        
+        for (int i = 0; i < intervalsInHour; i++) {
+          final minute = (i * 7 + random * hour) % 60; // 0-59분 중 랜덤
+          final adjustedMinute = (minute ~/ 5) * 5; // 5분 단위로 맞춤
+          
+          final startTime = DateTime(today.year, today.month, today.day, hour, adjustedMinute);
+          final endTime = startTime.add(const Duration(minutes: 5));
+          
+          // 걸음수는 시간대별로 다르게 설정
+          int steps;
+          if (hour >= 7 && hour <= 9) {
+            // 아침 출근시간: 높은 걸음수
+            steps = 80 + (random * hour) % 120;
+          } else if (hour >= 12 && hour <= 14) {
+            // 점심시간: 중간 걸음수
+            steps = 40 + (random * hour) % 80;
+          } else if (hour >= 17 && hour <= 19) {
+            // 저녁 퇴근시간: 높은 걸음수
+            steps = 90 + (random * hour) % 150;
+          } else if (hour >= 20 && hour <= 22) {
+            // 저녁 산책시간: 중간 걸음수
+            steps = 30 + (random * hour) % 100;
+          } else {
+            // 기타 시간: 낮은 걸음수
+            steps = 10 + (random * hour) % 50;
+          }
+          
+          sampleData.add({
+            'start_time': startTime.millisecondsSinceEpoch,
+            'end_time': endTime.millisecondsSinceEpoch,
+            'steps': steps,
+            'interval_minutes': 5,
+            'data_type': 'FIVE_MINUTE_STEPS',
+            'device_info': {
+              'android_version': 'Sample Data',
+              'sdk_version': 0,
+              'device_manufacturer': 'Sample',
+              'device_model': 'Sample Device',
+            },
+          });
+        }
+      }
+      
+      // 시간순으로 정렬
+      sampleData.sort((a, b) => (a['start_time'] as int).compareTo(b['start_time'] as int));
+      
+      _lastResult = {
+        'success': true,
+        'result': sampleData,
+        'message': '5분 간격 걸음수 샘플 데이터 생성됨 (${sampleData.length}개 구간)',
+        'sample_data': true,
+      };
+    } catch (e) {
+      _lastResult = {'error': e.toString()};
+    }
+    notifyListeners();
+  }
 }

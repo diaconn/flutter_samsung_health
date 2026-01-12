@@ -1499,51 +1499,36 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     intervalSteps += aggregateData.value ?: 0L
                 }
                 
-                val stepData = mapOf(
-                    "start_time" to currentTime.toEpochSecond(ZoneOffset.UTC) * 1000,
-                    "end_time" to actualEnd.toEpochSecond(ZoneOffset.UTC) * 1000,
-                    "steps" to intervalSteps,
-                    "interval_minutes" to 5,
-                    "data_type" to "FIVE_MINUTE_STEPS"
-                )
-                // Steps 데이터는 집계 데이터라서 dataPoint 대신 시스템 정보만 사용
-            val deviceSourceInfo = mapOf(
-                "device_info" to mapOf(
-                    "android_version" to android.os.Build.VERSION.RELEASE,
-                    "sdk_version" to android.os.Build.VERSION.SDK_INT,
-                    "device_manufacturer" to android.os.Build.MANUFACTURER,
-                    "device_model" to android.os.Build.MODEL,
-                )
-            )
-            resultList.add(stepData + (deviceSourceInfo as Map<String, Any>))
+                // 걸음수가 0이 아닌 경우만 추가
+                if (intervalSteps > 0) {
+                    val stepData = mapOf(
+                        "start_time" to currentTime.toEpochSecond(ZoneOffset.UTC) * 1000,
+                        "end_time" to actualEnd.toEpochSecond(ZoneOffset.UTC) * 1000,
+                        "steps" to intervalSteps,
+                        "interval_minutes" to 5,
+                        "data_type" to "FIVE_MINUTE_STEPS"
+                    )
+                    // Steps 데이터는 집계 데이터라서 dataPoint 대신 시스템 정보만 사용
+                    val deviceSourceInfo = mapOf(
+                        "device_info" to mapOf(
+                            "android_version" to android.os.Build.VERSION.RELEASE,
+                            "sdk_version" to android.os.Build.VERSION.SDK_INT,
+                            "device_manufacturer" to android.os.Build.MANUFACTURER,
+                            "device_model" to android.os.Build.MODEL,
+                        )
+                    )
+                    resultList.add(stepData + (deviceSourceInfo as Map<String, Any>))
+                }
                 
             } catch (e: Exception) {
                 Log.w(APP_TAG, "5분 구간 걸음수 조회 실패 ($currentTime ~ $actualEnd): ${e.message}")
-                // 실패한 구간도 0으로라도 넣어줄지 결정
-                val stepData = mapOf(
-                    "start_time" to currentTime.toEpochSecond(ZoneOffset.UTC) * 1000,
-                    "end_time" to actualEnd.toEpochSecond(ZoneOffset.UTC) * 1000,
-                    "steps" to 0L,
-                    "interval_minutes" to 5,
-                    "data_type" to "FIVE_MINUTE_STEPS",
-                    "error" to true
-                )
-                // Steps 데이터는 집계 데이터라서 dataPoint 대신 시스템 정보만 사용
-            val deviceSourceInfo = mapOf(
-                "device_info" to mapOf(
-                    "android_version" to android.os.Build.VERSION.RELEASE,
-                    "sdk_version" to android.os.Build.VERSION.SDK_INT,
-                    "device_manufacturer" to android.os.Build.MANUFACTURER,
-                    "device_model" to android.os.Build.MODEL,
-                )
-            )
-            resultList.add(stepData + (deviceSourceInfo as Map<String, Any>))
+                // 실패한 구간은 로그만 남기고 결과에 추가하지 않음 (0이므로)
             }
             
             currentTime = currentTime.plusMinutes(5)
         }
         
-        Log.d(APP_TAG, "5분 간격 조회 완료: ${resultList.size}개 구간")
+        Log.d(APP_TAG, "5분 간격 조회 완료: ${resultList.size}개 구간 (걸음수 > 0인 구간만)")
         return resultList
     }
 

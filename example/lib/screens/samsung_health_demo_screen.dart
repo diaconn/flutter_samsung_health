@@ -147,6 +147,7 @@ class _SamsungHealthDemoScreenState extends State<SamsungHealthDemoScreen> {
               _buildButton('심박수 데이터 조회', _service.isConnected ? () => _service.getHeartRateData(_service.startDate, _service.endDate) : null),
               _buildButton('걸음수 데이터 조회', _service.isConnected ? () => _service.getStepsData(_service.startDate, _service.endDate) : null),
               _buildButton('5분 간격 걸음수 조회', _service.isConnected ? () => _service.getFiveMinuteStepsData(_service.startDate, _service.endDate) : null),
+              _buildButton('5분 간격 걸음수 샘플 데이터', () => _service.generateFiveMinuteStepsSampleData()),
               _buildButton('수면 데이터 조회', _service.isConnected ? () => _service.getSleepData(_service.startDate, _service.endDate) : null),
               _buildButton('영양소 데이터 조회', _service.isConnected ? () => _service.getNutritionData(_service.startDate, _service.endDate) : null),
               _buildButton('신체구성 데이터 조회', _service.isConnected ? () => _service.getBodyCompositionData(_service.startDate, _service.endDate) : null),
