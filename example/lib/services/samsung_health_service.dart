@@ -613,6 +613,8 @@ class SamsungHealthService extends ChangeNotifier {
         sampleData.add({
           'start_time': startTime.millisecondsSinceEpoch,
           'end_time': endTime.millisecondsSinceEpoch,
+          'start_dttm': '${startTime.year.toString().padLeft(4, '0')}-${startTime.month.toString().padLeft(2, '0')}-${startTime.day.toString().padLeft(2, '0')} ${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}:${startTime.second.toString().padLeft(2, '0')}',
+          'end_dttm': '${endTime.year.toString().padLeft(4, '0')}-${endTime.month.toString().padLeft(2, '0')}-${endTime.day.toString().padLeft(2, '0')} ${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}:${endTime.second.toString().padLeft(2, '0')}',
           'steps': steps,
           'interval_minutes': 5,
           'data_type': 'FIVE_MINUTE_STEPS',
