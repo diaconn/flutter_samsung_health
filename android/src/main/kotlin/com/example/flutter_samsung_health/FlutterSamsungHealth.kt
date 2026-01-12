@@ -1078,6 +1078,10 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     .onFailure { Log.w(APP_TAG, "Steps 데이터 조회 실패: ${it.message}") }
                     .getOrElse { emptyList() }
 
+                val fiveMinuteSteps = runCatching { readFiveMinuteStepsData(store, startTime, endTime) }
+                    .onFailure { Log.w(APP_TAG, "FiveMinuteSteps 데이터 조회 실패: ${it.message}") }
+                    .getOrElse { emptyList() }
+
                 val nutrition = runCatching { readNutritionData(store, startTime, endTime) }
                     .onFailure { Log.w(APP_TAG, "Nutrition 데이터 조회 실패: ${it.message}") }
                     .getOrElse { emptyList() }
@@ -1103,6 +1107,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     "heart_rate" to heartRate,
                     "sleep" to sleep,
                     "steps" to steps,
+                    "five_minute_steps" to fiveMinuteSteps,
                     "nutrition" to nutrition,
                     "body_composition" to bodyComposition,
                     "blood_oxygen" to bloodOxygen,
