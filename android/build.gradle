@@ -13,13 +13,13 @@ buildscript {
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version")
     }
 }
-
-allprojects {
+def pluginLibsDir = new File(projectDir, 'libs')
+rootProject.allprojects {
     repositories {
         google()
         mavenCentral()
         flatDir {
-            dirs 'libs'
+            dirs pluginLibsDir
         }
     }
 }
