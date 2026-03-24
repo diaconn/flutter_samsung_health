@@ -83,11 +83,14 @@ class FlutterSamsungHealth {
   }
 
   /// 전체 데이터 조회
+  /// [excludeTypes] - 조회에서 제외할 데이터 타입 리스트
+  /// 가능한 값: exercise, heart_rate, sleep, steps, five_minute_steps, nutrition, body_composition, blood_oxygen, body_temperature, blood_glucose
   Future<Map<String, dynamic>> getTotalData({
     required int start,
     required int end,
+    List<String>? excludeTypes,
   }) {
-    return FlutterSamsungHealthPlatform.instance.getTotalData(start, end);
+    return FlutterSamsungHealthPlatform.instance.getTotalData(start, end, excludeTypes: excludeTypes);
   }
 
   /// 운동 데이터 조회

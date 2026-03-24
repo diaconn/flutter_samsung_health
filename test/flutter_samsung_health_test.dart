@@ -35,7 +35,7 @@ class MockSamsungHealthPluginPlatform with MockPlatformInterfaceMixin implements
   }
 
   @override
-  Future<Map<String, List<Map<String, dynamic>>>> getTotalData(int start, int end) async {
+  Future<Map<String, dynamic>> getTotalData(int start, int end, {List<String>? excludeTypes}) async {
     return {};
   }
 

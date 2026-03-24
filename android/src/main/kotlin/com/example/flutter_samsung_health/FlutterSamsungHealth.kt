@@ -231,7 +231,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
             "getTotalData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
-                getTotalData(start, end, wrapper)
+                val excludeTypes = call.argument<List<String>?>("excludeTypes") ?: emptyList()
+                getTotalData(start, end, excludeTypes, wrapper)
             }
             "getExerciseData" -> {
                 val start = call.argument<Long>("start")!!
@@ -1043,7 +1044,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
     }
 
     /// 전체 데이터 조회
-    private fun getTotalData(start: Long, end: Long, wrapper: ResultWrapper) {
+    private fun getTotalData(start: Long, end: Long, excludeTypes: List<String>, wrapper: ResultWrapper) {
         val store = healthDataStore
         if (store == null) {
             wrapper.success(mapOf(
@@ -1059,64 +1060,73 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
             runCatching {
                 val startTime = Instant.ofEpochMilli(start).atZone(ZoneOffset.UTC).toLocalDateTime()
                 val endTime = Instant.ofEpochMilli(end).atZone(ZoneOffset.UTC).toLocalDateTime()
-                Log.i(APP_TAG, "전체 데이터 조회 시작: ${startTime} ~ ${endTime}")
+                Log.i(APP_TAG, "전체 데이터 조회 시작: ${startTime} ~ ${endTime}, 제외 항목: $excludeTypes")
 
-                // 각 데이터 타입별로 runCatching을 사용하여 개별 실패를 처리
-                val exercise = runCatching { readExerciseData(store, startTime, endTime) }
-                    .onFailure { Log.w(APP_TAG, "Exercise 데이터 조회 실패: ${it.message}") }
-                    .getOrElse { emptyList() }
+                val totalResult = mutableMapOf<String, List<Map<String, Any>>>()
 
-                val heartRate = runCatching { readHeartRateData(store, startTime, endTime) }
-                    .onFailure { Log.w(APP_TAG, "HeartRate 데이터 조회 실패: ${it.message}") }
-                    .getOrElse { emptyList() }
+                // 각 데이터 타입별로 excludeTypes에 포함되지 않은 경우에만 조회
+                if ("exercise" !in excludeTypes) {
+                    totalResult["exercise"] = runCatching { readExerciseData(store, startTime, endTime) }
+                        .onFailure { Log.w(APP_TAG, "Exercise 데이터 조회 실패: ${it.message}") }
+                        .getOrElse { emptyList() }
+                }
 
-                val sleep = runCatching { readSleepData(store, startTime, endTime) }
-                    .onFailure { Log.w(APP_TAG, "Sleep 데이터 조회 실패: ${it.message}") }
-                    .getOrElse { emptyList() }
+                if ("heart_rate" !in excludeTypes) {
+                    totalResult["heart_rate"] = runCatching { readHeartRateData(store, startTime, endTime) }
+                        .onFailure { Log.w(APP_TAG, "HeartRate 데이터 조회 실패: ${it.message}") }
+                        .getOrElse { emptyList() }
+                }
 
-                val steps = runCatching { readStepsData(store, startTime, endTime) }
-                    .onFailure { Log.w(APP_TAG, "Steps 데이터 조회 실패: ${it.message}") }
-                    .getOrElse { emptyList() }
+                if ("sleep" !in excludeTypes) {
+                    totalResult["sleep"] = runCatching { readSleepData(store, startTime, endTime) }
+                        .onFailure { Log.w(APP_TAG, "Sleep 데이터 조회 실패: ${it.message}") }
+                        .getOrElse { emptyList() }
+                }
 
-                val fiveMinuteSteps = runCatching { readFiveMinuteStepsData(store, startTime, endTime) }
-                    .onFailure { Log.w(APP_TAG, "FiveMinuteSteps 데이터 조회 실패: ${it.message}") }
-                    .getOrElse { emptyList() }
+                if ("steps" !in excludeTypes) {
+                    totalResult["steps"] = runCatching { readStepsData(store, startTime, endTime) }
+                        .onFailure { Log.w(APP_TAG, "Steps 데이터 조회 실패: ${it.message}") }
+                        .getOrElse { emptyList() }
+                }
 
-                val nutrition = runCatching { readNutritionData(store, startTime, endTime) }
-                    .onFailure { Log.w(APP_TAG, "Nutrition 데이터 조회 실패: ${it.message}") }
-                    .getOrElse { emptyList() }
+                if ("five_minute_steps" !in excludeTypes) {
+                    totalResult["five_minute_steps"] = runCatching { readFiveMinuteStepsData(store, startTime, endTime) }
+                        .onFailure { Log.w(APP_TAG, "FiveMinuteSteps 데이터 조회 실패: ${it.message}") }
+                        .getOrElse { emptyList() }
+                }
 
-                val bodyComposition = runCatching { readBodyCompositionData(store, startTime, endTime) }
-                    .onFailure { Log.w(APP_TAG, "BodyComposition 데이터 조회 실패: ${it.message}") }
-                    .getOrElse { emptyList() }
+                if ("nutrition" !in excludeTypes) {
+                    totalResult["nutrition"] = runCatching { readNutritionData(store, startTime, endTime) }
+                        .onFailure { Log.w(APP_TAG, "Nutrition 데이터 조회 실패: ${it.message}") }
+                        .getOrElse { emptyList() }
+                }
 
-                val bloodOxygen = runCatching { readOxygenSaturationData(store, startTime, endTime) }
-                    .onFailure { Log.w(APP_TAG, "BloodOxygen 데이터 조회 실패: ${it.message}") }
-                    .getOrElse { emptyList() }
+                if ("body_composition" !in excludeTypes) {
+                    totalResult["body_composition"] = runCatching { readBodyCompositionData(store, startTime, endTime) }
+                        .onFailure { Log.w(APP_TAG, "BodyComposition 데이터 조회 실패: ${it.message}") }
+                        .getOrElse { emptyList() }
+                }
 
-                val bodyTemperature = runCatching { readBodyTemperatureData(store, startTime, endTime) }
-                    .onFailure { Log.w(APP_TAG, "BodyTemp 데이터 조회 실패: ${it.message}") }
-                    .getOrElse { emptyList() }
+                if ("blood_oxygen" !in excludeTypes) {
+                    totalResult["blood_oxygen"] = runCatching { readOxygenSaturationData(store, startTime, endTime) }
+                        .onFailure { Log.w(APP_TAG, "BloodOxygen 데이터 조회 실패: ${it.message}") }
+                        .getOrElse { emptyList() }
+                }
 
-                val bloodGlucose = runCatching { readBloodGlucoseData(store, startTime, endTime) }
-                    .onFailure { Log.w(APP_TAG, "BloodGlucose 데이터 조회 실패: ${it.message}") }
-                    .getOrElse { emptyList() }
+                if ("body_temperature" !in excludeTypes) {
+                    totalResult["body_temperature"] = runCatching { readBodyTemperatureData(store, startTime, endTime) }
+                        .onFailure { Log.w(APP_TAG, "BodyTemp 데이터 조회 실패: ${it.message}") }
+                        .getOrElse { emptyList() }
+                }
 
-                val totalResult = mapOf(
-                    "exercise" to exercise,
-                    "heart_rate" to heartRate,
-                    "sleep" to sleep,
-                    "steps" to steps,
-                    "five_minute_steps" to fiveMinuteSteps,
-                    "nutrition" to nutrition,
-                    "body_composition" to bodyComposition,
-                    "blood_oxygen" to bloodOxygen,
-                    "body_temperature" to bodyTemperature,
-                    "blood_glucose" to bloodGlucose,
-                )
+                if ("blood_glucose" !in excludeTypes) {
+                    totalResult["blood_glucose"] = runCatching { readBloodGlucoseData(store, startTime, endTime) }
+                        .onFailure { Log.w(APP_TAG, "BloodGlucose 데이터 조회 실패: ${it.message}") }
+                        .getOrElse { emptyList() }
+                }
 
-                Log.i(APP_TAG, "전체 데이터 조회 완료")
-                totalResult
+                Log.i(APP_TAG, "전체 데이터 조회 완료 (조회된 항목: ${totalResult.keys})")
+                totalResult.toMap()
             }.onSuccess { result ->
                 withContext(Dispatchers.Main) {
                     wrapper.success(mapOf(

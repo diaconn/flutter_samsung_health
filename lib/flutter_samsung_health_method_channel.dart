@@ -142,10 +142,11 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
 
   /// 전체 데이터 조회
   @override
-  Future<Map<String, dynamic>> getTotalData(int start, int end) async {
+  Future<Map<String, dynamic>> getTotalData(int start, int end, {List<String>? excludeTypes}) async {
     final result = await methodChannel.invokeMethod<Map>('getTotalData', {
       'start': start,
       'end': end,
+      'excludeTypes': excludeTypes ?? [],
     });
     return result?.map((key, value) => MapEntry(key.toString(), value)) ?? {
       'success': false,

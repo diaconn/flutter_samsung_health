@@ -84,6 +84,16 @@ final exerciseData = await plugin.getExerciseData(start: weekAgo, end: now);
 final sleepData = await plugin.getSleepData(start: weekAgo, end: now);
 final stepsData = await plugin.getStepsData(start: weekAgo, end: now);
 
+// 전체 데이터 조회
+final totalData = await plugin.getTotalData(start: weekAgo, end: now);
+
+// 특정 항목 제외하고 전체 조회
+final filteredData = await plugin.getTotalData(
+  start: weekAgo,
+  end: now,
+  excludeTypes: ['exercise', 'nutrition', 'blood_glucose'],
+);
+
 // 연결 해제
 await plugin.disconnect();
 ```
@@ -154,7 +164,7 @@ await plugin.stopObserver(['exercise', 'nutrition']);
 
 | 메서드 | 설명 |
 |--------|------|
-| `getTotalData()` | 모든 데이터 타입 일괄 조회 |
+| `getTotalData({excludeTypes})` | 모든 데이터 타입 일괄 조회 (excludeTypes로 제외할 타입 지정 가능) |
 | `getExerciseData()` | 운동 데이터 |
 | `getHeartRateData()` | 심박수 데이터 |
 | `getStepsData()` | 걸음수 데이터 (일별 집계) |
@@ -181,6 +191,25 @@ await plugin.stopObserver(['exercise', 'nutrition']);
 | `nutrition` | 영양소 데이터 |
 | `body_composition` | 신체구성 데이터 |
 | `oxygen_saturation` | 산소포화도 데이터 |
+| `body_temperature` | 체온 데이터 |
+| `blood_glucose` | 혈당 데이터 |
+
+---
+
+## getTotalData 제외 타입
+
+`getTotalData()`의 `excludeTypes` 파라미터에 전달할 수 있는 데이터 타입 키:
+
+| 데이터 타입 키 | 설명 |
+|---------------|------|
+| `exercise` | 운동 데이터 |
+| `heart_rate` | 심박수 데이터 |
+| `sleep` | 수면 데이터 |
+| `steps` | 걸음수 데이터 |
+| `five_minute_steps` | 5분 간격 걸음수 데이터 |
+| `nutrition` | 영양소 데이터 |
+| `body_composition` | 신체구성 데이터 |
+| `blood_oxygen` | 산소포화도 데이터 |
 | `body_temperature` | 체온 데이터 |
 | `blood_glucose` | 혈당 데이터 |
 
