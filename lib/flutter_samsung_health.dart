@@ -2,20 +2,23 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'flutter_samsung_health_platform_interface.dart';
+import 'src/samsung_health_data_type.dart';
+
+export 'src/samsung_health_data_type.dart';
 
 class FlutterSamsungHealth {
   static const EventChannel _eventChannel = EventChannel('flutter_samsung_health/stream');
   StreamSubscription? _subscription;
-  
+
   /// 실시간 헬스 데이터 스트림
-  Stream<Map<String, dynamic>> get healthDataStream => 
+  Stream<Map<String, dynamic>> get healthDataStream =>
       _eventChannel.receiveBroadcastStream().map((data) {
         if (data is Map) {
           return Map<String, dynamic>.from(data.cast<String, dynamic>());
         }
         return <String, dynamic>{};
       });
-  
+
   /// 헬스 데이터 스트림 시작 (편의 메서드)
   StreamSubscription startListening(Function(Map<String, dynamic>) onData, {Function(Object)? onError}) {
     _subscription?.cancel(); // 기존 구독 취소
@@ -25,7 +28,7 @@ class FlutterSamsungHealth {
     );
     return _subscription!;
   }
-  
+
   /// 헬스 데이터 스트림 중지
   void stopListening() {
     _subscription?.cancel();
@@ -53,8 +56,9 @@ class FlutterSamsungHealth {
   }
 
   /// 데이터 권한 요청
-  Future<Map<String, dynamic>> requestPermissions(List<String>? types) {
-    return FlutterSamsungHealthPlatform.instance.requestPermissions(types);
+  Future<Map<String, dynamic>> requestPermissions(List<SamsungHealthDataType> types) {
+    return FlutterSamsungHealthPlatform.instance
+        .requestPermissions(types.toStringValues());
   }
 
   /// 승인된 권한 조회
@@ -68,29 +72,32 @@ class FlutterSamsungHealth {
   }
 
   /// 옵저버 시작
-  Future<Map<String, dynamic>> startObserver([List<String>? dataTypes]) {
-    return FlutterSamsungHealthPlatform.instance.startObserver(dataTypes);
+  Future<Map<String, dynamic>> startObserver([List<SamsungHealthDataType>? dataTypes]) {
+    return FlutterSamsungHealthPlatform.instance
+        .startObserver(dataTypes?.toStringValues());
   }
 
   /// 옵저버 중단
-  Future<Map<String, dynamic>> stopObserver([List<String>? dataTypes]) {
-    return FlutterSamsungHealthPlatform.instance.stopObserver(dataTypes);
+  Future<Map<String, dynamic>> stopObserver([List<SamsungHealthDataType>? dataTypes]) {
+    return FlutterSamsungHealthPlatform.instance
+        .stopObserver(dataTypes?.toStringValues());
   }
 
   /// 옵저버 상태 조회
-  Future<dynamic> getObserverStatus([List<String>? dataTypes]) {
-    return FlutterSamsungHealthPlatform.instance.getObserverStatus(dataTypes);
+  Future<dynamic> getObserverStatus([List<SamsungHealthDataType>? dataTypes]) {
+    return FlutterSamsungHealthPlatform.instance
+        .getObserverStatus(dataTypes?.toStringValues());
   }
 
   /// 전체 데이터 조회
   /// [excludeTypes] - 조회에서 제외할 데이터 타입 리스트
-  /// 가능한 값: exercise, heart_rate, sleep, steps, five_minute_steps, nutrition, body_composition, blood_oxygen, body_temperature, blood_glucose
   Future<Map<String, dynamic>> getTotalData({
     required int start,
     required int end,
-    List<String>? excludeTypes,
+    List<SamsungHealthDataType>? excludeTypes,
   }) {
-    return FlutterSamsungHealthPlatform.instance.getTotalData(start, end, excludeTypes: excludeTypes);
+    return FlutterSamsungHealthPlatform.instance
+        .getTotalData(start, end, excludeTypes: excludeTypes?.toStringValues());
   }
 
   /// 운동 데이터 조회
