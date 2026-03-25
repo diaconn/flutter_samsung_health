@@ -167,7 +167,7 @@ await plugin.stopObserver(['exercise', 'nutrition']);
 | `getTotalData({excludeTypes})` | 모든 데이터 타입 일괄 조회 (excludeTypes로 제외할 타입 지정 가능) |
 | `getExerciseData()` | 운동 데이터 |
 | `getHeartRateData()` | 심박수 데이터 |
-| `getStepsData()` | 걸음수 데이터 (일별 집계) |
+| `getStepsData()` | 일자별 걸음수 (최신순, 0걸음 포함) |
 | `getFiveMinuteStepsData()` | 5분 간격 걸음수 데이터 |
 | `getSleepData()` | 수면 데이터 (수면 단계 포함) |
 | `getNutritionData()` | 영양소 데이터 |
@@ -240,7 +240,7 @@ await plugin.stopObserver(['exercise', 'nutrition']);
 Samsung Health SDK for Android (1.5.x)에서 Samsung Health Data SDK (1.0.0)로 마이그레이션되었습니다:
 
 **변경된 API:**
-- `getStepData()` → `getStepsData()` (메서드명 변경, 일별 집계 데이터 반환)
+- `getStepData()` → `getStepsData()` (메서드명 변경, 일자별 데이터 반환 - 최신순, 0걸음 포함)
 - `getWeightData()` → `getBodyCompositionData()` (데이터 타입 변경)
 - `getSleepStageData()` → `getSleepData()`에 통합 (세션 데이터에 단계 포함)
 

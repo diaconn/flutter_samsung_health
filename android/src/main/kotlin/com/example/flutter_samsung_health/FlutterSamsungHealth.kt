@@ -1456,33 +1456,55 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
         startTime: LocalDateTime,
         endTime: LocalDateTime
     ): List<Map<String, Any>> {
-
-        // 새 SDK는 집계 데이터 조회 - DataType.StepsType.TOTAL.requestBuilder 사용
-        val readRequest = DataType.StepsType.TOTAL.requestBuilder
-            .setLocalTimeFilter(LocalTimeFilter.of(startTime, endTime))
-            .build()
-
-        val result = store.aggregateData(readRequest)
         val resultList = mutableListOf<Map<String, Any>>()
 
-        for (aggregateData in result.dataList) {
-            val stepData = mapOf(
-                "start_time" to (aggregateData.startTime?.toEpochMilli() ?: 0L),
-                "end_time" to (aggregateData.endTime?.toEpochMilli() ?: 0L),
-                "steps" to (aggregateData.value ?: 0L),
-                "data_type" to "TOTAL_STEPS"
-            )
-            // Steps 데이터는 집계 데이터라서 dataPoint 대신 시스템 정보만 사용
-            val deviceSourceInfo = mapOf(
-                "device_info" to mapOf(
-                    "android_version" to android.os.Build.VERSION.RELEASE,
-                    "sdk_version" to android.os.Build.VERSION.SDK_INT,
-                    "device_manufacturer" to android.os.Build.MANUFACTURER,
-                    "device_model" to android.os.Build.MODEL,
+        // 시작일부터 종료일까지 일자별로 쪼개서 조회
+        val startDate = startTime.toLocalDate()
+        val lastDate = endTime.toLocalDate()
+
+        // 최신 → 과거 순으로 조회하기 위해 마지막 날짜부터 시작
+        var currentDate = lastDate
+
+        while (!currentDate.isBefore(startDate)) {
+            val dayStart = currentDate.atStartOfDay()
+            val dayEnd = currentDate.plusDays(1).atStartOfDay()
+
+            try {
+                val readRequest = DataType.StepsType.TOTAL.requestBuilder
+                    .setLocalTimeFilter(LocalTimeFilter.of(dayStart, dayEnd))
+                    .build()
+
+                val result = store.aggregateData(readRequest)
+
+                var dailySteps = 0L
+                for (aggregateData in result.dataList) {
+                    dailySteps += aggregateData.value ?: 0L
+                }
+
+                val stepData = mapOf(
+                    "date" to currentDate.toString(),
+                    "start_time" to dayStart.toEpochSecond(java.time.ZoneOffset.UTC) * 1000,
+                    "end_time" to dayEnd.toEpochSecond(java.time.ZoneOffset.UTC) * 1000,
+                    "steps" to dailySteps,
+                    "data_type" to "DAILY_STEPS"
                 )
-            )
-            resultList.add(stepData + (deviceSourceInfo as Map<String, Any>))
+                val deviceSourceInfo = mapOf(
+                    "device_info" to mapOf(
+                        "android_version" to android.os.Build.VERSION.RELEASE,
+                        "sdk_version" to android.os.Build.VERSION.SDK_INT,
+                        "device_manufacturer" to android.os.Build.MANUFACTURER,
+                        "device_model" to android.os.Build.MODEL,
+                    )
+                )
+                resultList.add(stepData + (deviceSourceInfo as Map<String, Any>))
+
+            } catch (e: Exception) {
+                Log.w(APP_TAG, "일자별 걸음수 조회 실패 ($currentDate): ${e.message}")
+            }
+
+            currentDate = currentDate.minusDays(1)
         }
+
         return resultList
     }
 
