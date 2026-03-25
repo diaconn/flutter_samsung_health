@@ -118,9 +118,25 @@ class _SamsungHealthDemoScreenState extends State<SamsungHealthDemoScreen> {
               
               const SizedBox(height: 16),
               
+              // 샘플 데이터 조회
+              Text('샘플 데이터 조회', style: Theme.of(context).textTheme.headlineSmall),
+              _buildButton('전체 샘플 데이터', () => _service.getSampleTotalData()),
+              _buildButton('운동 샘플 데이터', () => _service.getSampleExerciseData()),
+              _buildButton('심박수 샘플 데이터', () => _service.getSampleHeartRateData()),
+              _buildButton('걸음수 샘플 데이터', () => _service.getSampleStepsData()),
+              _buildButton('5분 간격 걸음수 샘플', () => _service.getSampleFiveMinuteStepsData()),
+              _buildButton('수면 샘플 데이터', () => _service.getSampleSleepData()),
+              _buildButton('영양소 샘플 데이터', () => _service.getSampleNutritionData()),
+              _buildButton('신체구성 샘플 데이터', () => _service.getSampleBodyCompositionData()),
+              _buildButton('산소포화도 샘플 데이터', () => _service.getSampleBloodOxygenData()),
+              _buildButton('체온 샘플 데이터', () => _service.getSampleBodyTemperatureData()),
+              _buildButton('혈당 샘플 데이터', () => _service.getSampleBloodGlucoseData()),
+
+              const SizedBox(height: 16),
+
               // 데이터 조회
               Text('데이터 조회', style: Theme.of(context).textTheme.headlineSmall),
-              
+
               // 날짜 선택
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -140,7 +156,7 @@ class _SamsungHealthDemoScreenState extends State<SamsungHealthDemoScreen> {
                   onEndDateChanged: _service.updateEndDate,
                 ),
               ],
-              
+
               // 데이터 조회 버튼들
               _buildButton('전체 데이터 조회', _service.isConnected ? () => _service.getTotalData() : null),
               _buildButton('운동 데이터 조회', _service.isConnected ? () => _service.getExerciseData(_service.startDate, _service.endDate) : null),
@@ -150,7 +166,7 @@ class _SamsungHealthDemoScreenState extends State<SamsungHealthDemoScreen> {
               _buildButton('수면 데이터 조회', _service.isConnected ? () => _service.getSleepData(_service.startDate, _service.endDate) : null),
               _buildButton('영양소 데이터 조회', _service.isConnected ? () => _service.getNutritionData(_service.startDate, _service.endDate) : null),
               _buildButton('신체구성 데이터 조회', _service.isConnected ? () => _service.getBodyCompositionData(_service.startDate, _service.endDate) : null),
-              _buildButton('산소포화도 데이터 조회', _service.isConnected ? () => _service.getOxygenSaturationData(_service.startDate, _service.endDate) : null),
+              _buildButton('산소포화도 데이터 조회', _service.isConnected ? () => _service.getBloodOxygenData(_service.startDate, _service.endDate) : null),
               _buildButton('체온 데이터 조회', _service.isConnected ? () => _service.getBodyTemperatureData(_service.startDate, _service.endDate) : null),
               _buildButton('혈당 데이터 조회', _service.isConnected ? () => _service.getBloodGlucoseData(_service.startDate, _service.endDate) : null),
               

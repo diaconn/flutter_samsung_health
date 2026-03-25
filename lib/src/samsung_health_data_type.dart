@@ -24,7 +24,7 @@ enum SamsungHealthDataType {
   bodyComposition('body_composition'),
 
   /// 산소포화도 데이터
-  oxygenSaturation('oxygen_saturation'),
+  bloodOxygen('blood_oxygen'),
 
   /// 체온 데이터
   bodyTemperature('body_temperature'),

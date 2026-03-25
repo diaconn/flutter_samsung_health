@@ -278,8 +278,8 @@ class MethodChannelFlutterSamsungHealth extends FlutterSamsungHealthPlatform {
 
   /// 산소 포화도 데이터 조회
   @override
-  Future<Map<String, dynamic>> getOxygenSaturationData(int start, int end) async {
-    final result = await methodChannel.invokeMethod<Map>('getOxygenSaturationData', {
+  Future<Map<String, dynamic>> getBloodOxygenData(int start, int end) async {
+    final result = await methodChannel.invokeMethod<Map>('getBloodOxygenData', {
       'start': start,
       'end': end,
     });

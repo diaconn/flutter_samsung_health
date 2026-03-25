@@ -95,7 +95,7 @@ class MockSamsungHealthPluginPlatform with MockPlatformInterfaceMixin implements
   }
 
   @override
-  Future<Map<String, dynamic>> getOxygenSaturationData(int start, int end) async {
+  Future<Map<String, dynamic>> getBloodOxygenData(int start, int end) async {
     return {'success': true, 'result': [], 'message': 'Test data'};
   }
 

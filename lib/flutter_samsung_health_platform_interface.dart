@@ -55,7 +55,6 @@ abstract class FlutterSamsungHealthPlatform extends PlatformInterface {
 
   /// 전체 데이터 조회
   /// [excludeTypes] - 조회에서 제외할 데이터 타입 리스트
-  /// 가능한 값: exercise, heart_rate, sleep, steps, five_minute_steps, nutrition, body_composition, blood_oxygen, body_temperature, blood_glucose
   Future<Map<String, dynamic>> getTotalData(int start, int end, {List<String>? excludeTypes});
 
   /// 운동 데이터 조회
@@ -83,7 +82,7 @@ abstract class FlutterSamsungHealthPlatform extends PlatformInterface {
   Future<Map<String, dynamic>> getBodyCompositionData(int start, int end);
 
   /// 산소 포화도 데이터 조회
-  Future<Map<String, dynamic>> getOxygenSaturationData(int start, int end);
+  Future<Map<String, dynamic>> getBloodOxygenData(int start, int end);
 
   /// 체온 데이터 조회
   Future<Map<String, dynamic>> getBodyTemperatureData(int start, int end);

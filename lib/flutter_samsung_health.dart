@@ -165,11 +165,11 @@ class FlutterSamsungHealth {
   }
 
   /// 산소 포화도 데이터 조회
-  Future<Map<String, dynamic>> getOxygenSaturationData({
+  Future<Map<String, dynamic>> getBloodOxygenData({
     required int start,
     required int end,
   }) {
-    return FlutterSamsungHealthPlatform.instance.getOxygenSaturationData(start, end);
+    return FlutterSamsungHealthPlatform.instance.getBloodOxygenData(start, end);
   }
 
   /// 체온 데이터 조회

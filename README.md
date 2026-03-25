@@ -172,7 +172,7 @@ await plugin.stopObserver(['exercise', 'nutrition']);
 | `getSleepData()` | 수면 데이터 (수면 단계 포함) |
 | `getNutritionData()` | 영양소 데이터 |
 | `getBodyCompositionData()` | 신체구성 데이터 (체중, 체지방 등) |
-| `getOxygenSaturationData()` | 산소포화도 데이터 |
+| `getBloodOxygenData()` | 산소포화도 데이터 |
 | `getBodyTemperatureData()` | 체온 데이터 |
 | `getBloodGlucoseData()` | 혈당 데이터 |
 
@@ -190,7 +190,7 @@ await plugin.stopObserver(['exercise', 'nutrition']);
 | `steps` | 걸음수 데이터 |
 | `nutrition` | 영양소 데이터 |
 | `body_composition` | 신체구성 데이터 |
-| `oxygen_saturation` | 산소포화도 데이터 |
+| `blood_oxygen` | 산소포화도 데이터 |
 | `body_temperature` | 체온 데이터 |
 | `blood_glucose` | 혈당 데이터 |
 

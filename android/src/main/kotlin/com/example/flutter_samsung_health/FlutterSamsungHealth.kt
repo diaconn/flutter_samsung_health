@@ -274,10 +274,10 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                 val end = call.argument<Long>("end")!!
                 getBodyCompositionData(start, end, wrapper)
             }
-            "getOxygenSaturationData" -> {
+            "getBloodOxygenData" -> {
                 val start = call.argument<Long>("start")!!
                 val end = call.argument<Long>("end")!!
-                getOxygenSaturationData(start, end, wrapper)
+                getBloodOxygenData(start, end, wrapper)
             }
             "getBodyTemperatureData" -> {
                 val start = call.argument<Long>("start")!!
@@ -1108,7 +1108,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                 }
 
                 if ("blood_oxygen" !in excludeTypes) {
-                    totalResult["blood_oxygen"] = runCatching { readOxygenSaturationData(store, startTime, endTime) }
+                    totalResult["blood_oxygen"] = runCatching { readBloodOxygenData(store, startTime, endTime) }
                         .onFailure { Log.w(APP_TAG, "BloodOxygen 데이터 조회 실패: ${it.message}") }
                         .getOrElse { emptyList() }
                 }
@@ -1212,9 +1212,9 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
     }
 
     /// 산소 포화도 데이터 조회
-    private fun getOxygenSaturationData(start: Long, end: Long, wrapper: ResultWrapper) {
+    private fun getBloodOxygenData(start: Long, end: Long, wrapper: ResultWrapper) {
         readDataWithWrapper(start, end, wrapper, "산소포화도") { store, startTime, endTime ->
-            readOxygenSaturationData(store, startTime, endTime)
+            readBloodOxygenData(store, startTime, endTime)
         }
     }
 
@@ -1670,7 +1670,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
         return resultList
     }
 
-    private suspend fun readOxygenSaturationData(
+    private suspend fun readBloodOxygenData(
         store: HealthDataStore,
         startTime: LocalDateTime,
         endTime: LocalDateTime

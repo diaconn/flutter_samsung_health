@@ -40,7 +40,7 @@ class SamsungHealthService extends ChangeNotifier {
     SamsungHealthDataType.sleep: '수면',
     SamsungHealthDataType.nutrition: '영양소',
     SamsungHealthDataType.bodyComposition: '신체구성',
-    SamsungHealthDataType.oxygenSaturation: '산소포화도',
+    SamsungHealthDataType.bloodOxygen: '산소포화도',
     SamsungHealthDataType.bodyTemperature: '체온',
     SamsungHealthDataType.bloodGlucose: '혈당',
   };
@@ -542,10 +542,10 @@ class SamsungHealthService extends ChangeNotifier {
   }
 
   /// 산소포화도 데이터 조회
-  Future<void> getOxygenSaturationData(DateTime startDate, DateTime endDate) async {
+  Future<void> getBloodOxygenData(DateTime startDate, DateTime endDate) async {
     try {
       final (start, end) = calculateTimeRange(startDate, endDate);
-      final result = await _plugin.getOxygenSaturationData(start: start, end: end);
+      final result = await _plugin.getBloodOxygenData(start: start, end: end);
       _lastResult = result;
     } catch (e) {
       _lastResult = {'error': e.toString()};
@@ -574,6 +574,591 @@ class SamsungHealthService extends ChangeNotifier {
     } catch (e) {
       _lastResult = {'error': e.toString()};
     }
+    notifyListeners();
+  }
+
+  // ===== 샘플 데이터 생성 메서드들 =====
+
+  /// 샘플 디바이스 정보 생성
+  Map<String, dynamic> _getSampleDeviceInfo() {
+    return {
+      'device_info': {
+        'android_version': '14',
+        'sdk_version': 34,
+        'device_manufacturer': 'Samsung',
+        'device_model': 'Galaxy S24 Ultra',
+      }
+    };
+  }
+
+  /// 전체 샘플 데이터 조회
+  void getSampleTotalData() {
+    final now = DateTime.now();
+    _lastResult = {
+      'success': true,
+      'result': {
+        'exercise': _generateSampleExerciseData(now),
+        'heart_rate': _generateSampleHeartRateData(now),
+        'sleep': _generateSampleSleepData(now),
+        'steps': _generateSampleStepsData(now),
+        'five_minute_steps': _generateSampleFiveMinuteStepsData(now),
+        'nutrition': _generateSampleNutritionData(now),
+        'body_composition': _generateSampleBodyCompositionData(now),
+        'blood_oxygen': _generateSampleBloodOxygenData(now),
+        'body_temperature': _generateSampleBodyTemperatureData(now),
+        'blood_glucose': _generateSampleBloodGlucoseData(now),
+      },
+      'message': '샘플 데이터 조회 완료 (전체)',
+      'isSampleData': true,
+    };
+    notifyListeners();
+  }
+
+  /// 샘플 운동 데이터 생성
+  List<Map<String, dynamic>> _generateSampleExerciseData(DateTime baseTime) {
+    final deviceInfo = _getSampleDeviceInfo();
+    return [
+      {
+        'uid': 'sample_exercise_001',
+        'start_time': baseTime.subtract(const Duration(hours: 2)).millisecondsSinceEpoch,
+        'end_time': baseTime.subtract(const Duration(hours: 1)).millisecondsSinceEpoch,
+        'exercise_type': 1001,
+        'exercise_type_name': 'RUNNING',
+        'duration': 3600000, // 1시간
+        'calories': 450.5,
+        'distance': 5200.0, // 5.2km
+        'max_heart_rate': 165.0,
+        'mean_heart_rate': 142.0,
+        'min_heart_rate': 95.0,
+        ...deviceInfo,
+      },
+      {
+        'uid': 'sample_exercise_002',
+        'start_time': baseTime.subtract(const Duration(days: 1, hours: 3)).millisecondsSinceEpoch,
+        'end_time': baseTime.subtract(const Duration(days: 1, hours: 2)).millisecondsSinceEpoch,
+        'exercise_type': 1002,
+        'exercise_type_name': 'WALKING',
+        'duration': 3600000,
+        'calories': 180.0,
+        'distance': 3500.0,
+        'max_heart_rate': 110.0,
+        'mean_heart_rate': 95.0,
+        'min_heart_rate': 72.0,
+        ...deviceInfo,
+      },
+      {
+        'uid': 'sample_exercise_003',
+        'start_time': baseTime.subtract(const Duration(days: 2, hours: 1)).millisecondsSinceEpoch,
+        'end_time': baseTime.subtract(const Duration(days: 2)).millisecondsSinceEpoch,
+        'exercise_type': 1010,
+        'exercise_type_name': 'CYCLING',
+        'duration': 3600000,
+        'calories': 320.0,
+        'distance': 15000.0, // 15km
+        'max_heart_rate': 155.0,
+        'mean_heart_rate': 130.0,
+        'min_heart_rate': 85.0,
+        ...deviceInfo,
+      },
+    ];
+  }
+
+  /// 샘플 심박수 데이터 생성
+  List<Map<String, dynamic>> _generateSampleHeartRateData(DateTime baseTime) {
+    final deviceInfo = _getSampleDeviceInfo();
+    return [
+      {
+        'uid': 'sample_hr_001',
+        'start_time': baseTime.subtract(const Duration(minutes: 30)).millisecondsSinceEpoch,
+        'end_time': baseTime.millisecondsSinceEpoch,
+        'heart_rate': 72.0,
+        'min_heart_rate': 68.0,
+        'max_heart_rate': 85.0,
+        'series_count': 3,
+        'series_data': [
+          {'start_time': baseTime.subtract(const Duration(minutes: 30)).millisecondsSinceEpoch, 'heart_rate': 68.0},
+          {'start_time': baseTime.subtract(const Duration(minutes: 15)).millisecondsSinceEpoch, 'heart_rate': 72.0},
+          {'start_time': baseTime.millisecondsSinceEpoch, 'heart_rate': 85.0},
+        ],
+        ...deviceInfo,
+      },
+      {
+        'uid': 'sample_hr_002',
+        'start_time': baseTime.subtract(const Duration(hours: 2)).millisecondsSinceEpoch,
+        'end_time': baseTime.subtract(const Duration(hours: 1, minutes: 30)).millisecondsSinceEpoch,
+        'heart_rate': 145.0,
+        'min_heart_rate': 120.0,
+        'max_heart_rate': 168.0,
+        'series_count': 2,
+        'series_data': [
+          {'start_time': baseTime.subtract(const Duration(hours: 2)).millisecondsSinceEpoch, 'heart_rate': 120.0},
+          {'start_time': baseTime.subtract(const Duration(hours: 1, minutes: 30)).millisecondsSinceEpoch, 'heart_rate': 168.0},
+        ],
+        ...deviceInfo,
+      },
+    ];
+  }
+
+  /// 샘플 수면 데이터 생성
+  List<Map<String, dynamic>> _generateSampleSleepData(DateTime baseTime) {
+    final deviceInfo = _getSampleDeviceInfo();
+    final sleepStart = DateTime(baseTime.year, baseTime.month, baseTime.day - 1, 23, 30);
+    final sleepEnd = DateTime(baseTime.year, baseTime.month, baseTime.day, 7, 15);
+
+    return [
+      {
+        'uid': 'sample_sleep_001',
+        'start_time': sleepStart.millisecondsSinceEpoch,
+        'end_time': sleepEnd.millisecondsSinceEpoch,
+        'duration': sleepEnd.difference(sleepStart).inMilliseconds,
+        'sleep_score': 85.0,
+        'session_count': 1,
+        'sessions': [
+          {
+            'session_no': 1,
+            'session_start_time': sleepStart.millisecondsSinceEpoch,
+            'session_end_time': sleepEnd.millisecondsSinceEpoch,
+            'session_duration': sleepEnd.difference(sleepStart).inMilliseconds,
+            'sleep_session_id': 12345,
+            'stage_count': 5,
+            'stages': [
+              {
+                'stage_type': 1,
+                'stage_type_name': 'AWAKE',
+                'start_time': sleepStart.millisecondsSinceEpoch,
+                'end_time': sleepStart.add(const Duration(minutes: 15)).millisecondsSinceEpoch,
+              },
+              {
+                'stage_type': 2,
+                'stage_type_name': 'LIGHT',
+                'start_time': sleepStart.add(const Duration(minutes: 15)).millisecondsSinceEpoch,
+                'end_time': sleepStart.add(const Duration(hours: 1, minutes: 30)).millisecondsSinceEpoch,
+              },
+              {
+                'stage_type': 3,
+                'stage_type_name': 'DEEP',
+                'start_time': sleepStart.add(const Duration(hours: 1, minutes: 30)).millisecondsSinceEpoch,
+                'end_time': sleepStart.add(const Duration(hours: 3)).millisecondsSinceEpoch,
+              },
+              {
+                'stage_type': 4,
+                'stage_type_name': 'REM',
+                'start_time': sleepStart.add(const Duration(hours: 3)).millisecondsSinceEpoch,
+                'end_time': sleepStart.add(const Duration(hours: 4, minutes: 30)).millisecondsSinceEpoch,
+              },
+              {
+                'stage_type': 2,
+                'stage_type_name': 'LIGHT',
+                'start_time': sleepStart.add(const Duration(hours: 4, minutes: 30)).millisecondsSinceEpoch,
+                'end_time': sleepEnd.millisecondsSinceEpoch,
+              },
+            ],
+          },
+        ],
+        ...deviceInfo,
+      },
+    ];
+  }
+
+  /// 샘플 걸음수 데이터 생성
+  List<Map<String, dynamic>> _generateSampleStepsData(DateTime baseTime) {
+    final deviceInfo = _getSampleDeviceInfo();
+    return [
+      {
+        'date': baseTime.toString().substring(0, 10),
+        'start_time': DateTime(baseTime.year, baseTime.month, baseTime.day).millisecondsSinceEpoch,
+        'end_time': DateTime(baseTime.year, baseTime.month, baseTime.day + 1).millisecondsSinceEpoch,
+        'steps': 8542,
+        'data_type': 'DAILY_STEPS',
+        ...deviceInfo,
+      },
+      {
+        'date': baseTime.subtract(const Duration(days: 1)).toString().substring(0, 10),
+        'start_time': DateTime(baseTime.year, baseTime.month, baseTime.day - 1).millisecondsSinceEpoch,
+        'end_time': DateTime(baseTime.year, baseTime.month, baseTime.day).millisecondsSinceEpoch,
+        'steps': 12350,
+        'data_type': 'DAILY_STEPS',
+        ...deviceInfo,
+      },
+      {
+        'date': baseTime.subtract(const Duration(days: 2)).toString().substring(0, 10),
+        'start_time': DateTime(baseTime.year, baseTime.month, baseTime.day - 2).millisecondsSinceEpoch,
+        'end_time': DateTime(baseTime.year, baseTime.month, baseTime.day - 1).millisecondsSinceEpoch,
+        'steps': 6780,
+        'data_type': 'DAILY_STEPS',
+        ...deviceInfo,
+      },
+    ];
+  }
+
+  /// 샘플 5분 간격 걸음수 데이터 생성
+  List<Map<String, dynamic>> _generateSampleFiveMinuteStepsData(DateTime baseTime) {
+    final deviceInfo = _getSampleDeviceInfo();
+    final baseStart = DateTime(baseTime.year, baseTime.month, baseTime.day, 9, 0);
+
+    return [
+      {
+        'start_time': baseStart.millisecondsSinceEpoch,
+        'end_time': baseStart.add(const Duration(minutes: 5)).millisecondsSinceEpoch,
+        'steps': 125,
+        'interval_minutes': 5,
+        'data_type': 'FIVE_MINUTE_STEPS',
+        ...deviceInfo,
+      },
+      {
+        'start_time': baseStart.add(const Duration(minutes: 5)).millisecondsSinceEpoch,
+        'end_time': baseStart.add(const Duration(minutes: 10)).millisecondsSinceEpoch,
+        'steps': 230,
+        'interval_minutes': 5,
+        'data_type': 'FIVE_MINUTE_STEPS',
+        ...deviceInfo,
+      },
+      {
+        'start_time': baseStart.add(const Duration(minutes: 10)).millisecondsSinceEpoch,
+        'end_time': baseStart.add(const Duration(minutes: 15)).millisecondsSinceEpoch,
+        'steps': 180,
+        'interval_minutes': 5,
+        'data_type': 'FIVE_MINUTE_STEPS',
+        ...deviceInfo,
+      },
+      {
+        'start_time': baseStart.add(const Duration(minutes: 15)).millisecondsSinceEpoch,
+        'end_time': baseStart.add(const Duration(minutes: 20)).millisecondsSinceEpoch,
+        'steps': 95,
+        'interval_minutes': 5,
+        'data_type': 'FIVE_MINUTE_STEPS',
+        ...deviceInfo,
+      },
+    ];
+  }
+
+  /// 샘플 영양소 데이터 생성
+  List<Map<String, dynamic>> _generateSampleNutritionData(DateTime baseTime) {
+    final deviceInfo = _getSampleDeviceInfo();
+    return [
+      {
+        'uid': 'sample_nutrition_001',
+        'start_time': DateTime(baseTime.year, baseTime.month, baseTime.day, 8, 0).millisecondsSinceEpoch,
+        'end_time': DateTime(baseTime.year, baseTime.month, baseTime.day, 8, 30).millisecondsSinceEpoch,
+        'title': '아침식사',
+        'meal_type': 1,
+        'meal_type_name': 'BREAKFAST',
+        'calories': 450.0,
+        'total_fat': 15.0,
+        'saturated_fat': 5.0,
+        'trans_fat': 0.0,
+        'polysaturated_fat': 3.0,
+        'monosaturated_fat': 7.0,
+        'cholesterol': 180.0,
+        'protein': 25.0,
+        'carbohydrate': 55.0,
+        'sugar': 12.0,
+        'dietary_fiber': 8.0,
+        'sodium': 650.0,
+        'potassium': 420.0,
+        'calcium': 250.0,
+        'iron': 3.5,
+        'vitamin_a': 120.0,
+        'vitamin_c': 25.0,
+        ...deviceInfo,
+      },
+      {
+        'uid': 'sample_nutrition_002',
+        'start_time': DateTime(baseTime.year, baseTime.month, baseTime.day, 12, 30).millisecondsSinceEpoch,
+        'end_time': DateTime(baseTime.year, baseTime.month, baseTime.day, 13, 0).millisecondsSinceEpoch,
+        'title': '점심식사',
+        'meal_type': 2,
+        'meal_type_name': 'LUNCH',
+        'calories': 720.0,
+        'total_fat': 25.0,
+        'saturated_fat': 8.0,
+        'trans_fat': 0.5,
+        'polysaturated_fat': 5.0,
+        'monosaturated_fat': 11.0,
+        'cholesterol': 220.0,
+        'protein': 35.0,
+        'carbohydrate': 85.0,
+        'sugar': 18.0,
+        'dietary_fiber': 12.0,
+        'sodium': 1200.0,
+        'potassium': 680.0,
+        'calcium': 180.0,
+        'iron': 5.0,
+        'vitamin_a': 80.0,
+        'vitamin_c': 35.0,
+        ...deviceInfo,
+      },
+      {
+        'uid': 'sample_nutrition_003',
+        'start_time': DateTime(baseTime.year, baseTime.month, baseTime.day, 19, 0).millisecondsSinceEpoch,
+        'end_time': DateTime(baseTime.year, baseTime.month, baseTime.day, 19, 45).millisecondsSinceEpoch,
+        'title': '저녁식사',
+        'meal_type': 3,
+        'meal_type_name': 'DINNER',
+        'calories': 650.0,
+        'total_fat': 22.0,
+        'saturated_fat': 7.0,
+        'trans_fat': 0.0,
+        'polysaturated_fat': 4.0,
+        'monosaturated_fat': 10.0,
+        'cholesterol': 195.0,
+        'protein': 40.0,
+        'carbohydrate': 70.0,
+        'sugar': 10.0,
+        'dietary_fiber': 10.0,
+        'sodium': 980.0,
+        'potassium': 750.0,
+        'calcium': 220.0,
+        'iron': 4.5,
+        'vitamin_a': 150.0,
+        'vitamin_c': 45.0,
+        ...deviceInfo,
+      },
+    ];
+  }
+
+  /// 샘플 신체구성 데이터 생성
+  List<Map<String, dynamic>> _generateSampleBodyCompositionData(DateTime baseTime) {
+    final deviceInfo = _getSampleDeviceInfo();
+    return [
+      {
+        'uid': 'sample_body_001',
+        'start_time': baseTime.subtract(const Duration(hours: 1)).millisecondsSinceEpoch,
+        'end_time': baseTime.millisecondsSinceEpoch,
+        'weight': 72.5,
+        'height': 175.0,
+        'body_fat': 18.5,
+        'skeletal_muscle': 35.2,
+        'basal_metabolic_rate': 1680.0,
+        'muscle_mass': 32.5,
+        'body_fat_mass': 13.4,
+        'fat_free_mass': 59.1,
+        'fat_free': 81.5,
+        'skeletal_muscle_mass': 25.5,
+        'total_body_water': 43.2,
+        ...deviceInfo,
+      },
+      {
+        'uid': 'sample_body_002',
+        'start_time': baseTime.subtract(const Duration(days: 7)).millisecondsSinceEpoch,
+        'end_time': baseTime.subtract(const Duration(days: 7)).millisecondsSinceEpoch,
+        'weight': 73.2,
+        'height': 175.0,
+        'body_fat': 19.0,
+        'skeletal_muscle': 34.8,
+        'basal_metabolic_rate': 1665.0,
+        'muscle_mass': 32.0,
+        'body_fat_mass': 13.9,
+        'fat_free_mass': 59.3,
+        'fat_free': 81.0,
+        'skeletal_muscle_mass': 25.2,
+        'total_body_water': 42.8,
+        ...deviceInfo,
+      },
+    ];
+  }
+
+  /// 샘플 산소포화도 데이터 생성
+  List<Map<String, dynamic>> _generateSampleBloodOxygenData(DateTime baseTime) {
+    final deviceInfo = _getSampleDeviceInfo();
+    return [
+      {
+        'uid': 'sample_blood_oxygen_001',
+        'start_time': baseTime.subtract(const Duration(hours: 1)).millisecondsSinceEpoch,
+        'end_time': baseTime.millisecondsSinceEpoch,
+        'oxygen_saturation': 98.0,
+        ...deviceInfo,
+      },
+      {
+        'uid': 'sample_blood_oxygen_002',
+        'start_time': baseTime.subtract(const Duration(hours: 4)).millisecondsSinceEpoch,
+        'end_time': baseTime.subtract(const Duration(hours: 3)).millisecondsSinceEpoch,
+        'oxygen_saturation': 97.0,
+        ...deviceInfo,
+      },
+      {
+        'uid': 'sample_blood_oxygen_003',
+        'start_time': baseTime.subtract(const Duration(hours: 8)).millisecondsSinceEpoch,
+        'end_time': baseTime.subtract(const Duration(hours: 7)).millisecondsSinceEpoch,
+        'oxygen_saturation': 96.5,
+        ...deviceInfo,
+      },
+    ];
+  }
+
+  /// 샘플 체온 데이터 생성
+  List<Map<String, dynamic>> _generateSampleBodyTemperatureData(DateTime baseTime) {
+    final deviceInfo = _getSampleDeviceInfo();
+    return [
+      {
+        'uid': 'sample_temp_001',
+        'start_time': baseTime.subtract(const Duration(hours: 2)).millisecondsSinceEpoch,
+        'end_time': baseTime.millisecondsSinceEpoch,
+        'temperature': 36.5,
+        'temperature_fahrenheit': 97.7,
+        ...deviceInfo,
+      },
+      {
+        'uid': 'sample_temp_002',
+        'start_time': baseTime.subtract(const Duration(days: 1)).millisecondsSinceEpoch,
+        'end_time': baseTime.subtract(const Duration(days: 1)).millisecondsSinceEpoch,
+        'temperature': 36.8,
+        'temperature_fahrenheit': 98.24,
+        ...deviceInfo,
+      },
+    ];
+  }
+
+  /// 샘플 혈당 데이터 생성
+  List<Map<String, dynamic>> _generateSampleBloodGlucoseData(DateTime baseTime) {
+    final deviceInfo = _getSampleDeviceInfo();
+    return [
+      {
+        'uid': 'sample_glucose_001',
+        'start_time': DateTime(baseTime.year, baseTime.month, baseTime.day, 7, 0).millisecondsSinceEpoch,
+        'end_time': DateTime(baseTime.year, baseTime.month, baseTime.day, 7, 0).millisecondsSinceEpoch,
+        'glucose_mmol': 5.2,
+        'glucose_mgdl': 93.7,
+        'measurement_type': 0,
+        'measurement_type_name': 'CAPILLARY_BLOOD',
+        'meal_status': 0,
+        'meal_status_name': 'FASTING',
+        ...deviceInfo,
+      },
+      {
+        'uid': 'sample_glucose_002',
+        'start_time': DateTime(baseTime.year, baseTime.month, baseTime.day, 10, 0).millisecondsSinceEpoch,
+        'end_time': DateTime(baseTime.year, baseTime.month, baseTime.day, 10, 0).millisecondsSinceEpoch,
+        'glucose_mmol': 6.8,
+        'glucose_mgdl': 122.5,
+        'measurement_type': 0,
+        'measurement_type_name': 'CAPILLARY_BLOOD',
+        'meal_status': 1,
+        'meal_status_name': 'AFTER_MEAL',
+        ...deviceInfo,
+      },
+      {
+        'uid': 'sample_glucose_003',
+        'start_time': DateTime(baseTime.year, baseTime.month, baseTime.day, 14, 30).millisecondsSinceEpoch,
+        'end_time': DateTime(baseTime.year, baseTime.month, baseTime.day, 14, 30).millisecondsSinceEpoch,
+        'glucose_mmol': 5.5,
+        'glucose_mgdl': 99.1,
+        'measurement_type': 0,
+        'measurement_type_name': 'CAPILLARY_BLOOD',
+        'meal_status': 2,
+        'meal_status_name': 'BEFORE_MEAL',
+        ...deviceInfo,
+      },
+    ];
+  }
+
+  /// 샘플 운동 데이터 조회
+  void getSampleExerciseData() {
+    _lastResult = {
+      'success': true,
+      'result': _generateSampleExerciseData(DateTime.now()),
+      'message': '샘플 운동 데이터',
+      'isSampleData': true,
+    };
+    notifyListeners();
+  }
+
+  /// 샘플 심박수 데이터 조회
+  void getSampleHeartRateData() {
+    _lastResult = {
+      'success': true,
+      'result': _generateSampleHeartRateData(DateTime.now()),
+      'message': '샘플 심박수 데이터',
+      'isSampleData': true,
+    };
+    notifyListeners();
+  }
+
+  /// 샘플 걸음수 데이터 조회
+  void getSampleStepsData() {
+    _lastResult = {
+      'success': true,
+      'result': _generateSampleStepsData(DateTime.now()),
+      'message': '샘플 걸음수 데이터',
+      'isSampleData': true,
+    };
+    notifyListeners();
+  }
+
+  /// 샘플 5분 간격 걸음수 데이터 조회
+  void getSampleFiveMinuteStepsData() {
+    _lastResult = {
+      'success': true,
+      'result': _generateSampleFiveMinuteStepsData(DateTime.now()),
+      'message': '샘플 5분 간격 걸음수 데이터',
+      'isSampleData': true,
+    };
+    notifyListeners();
+  }
+
+  /// 샘플 수면 데이터 조회
+  void getSampleSleepData() {
+    _lastResult = {
+      'success': true,
+      'result': _generateSampleSleepData(DateTime.now()),
+      'message': '샘플 수면 데이터',
+      'isSampleData': true,
+    };
+    notifyListeners();
+  }
+
+  /// 샘플 영양소 데이터 조회
+  void getSampleNutritionData() {
+    _lastResult = {
+      'success': true,
+      'result': _generateSampleNutritionData(DateTime.now()),
+      'message': '샘플 영양소 데이터',
+      'isSampleData': true,
+    };
+    notifyListeners();
+  }
+
+  /// 샘플 신체구성 데이터 조회
+  void getSampleBodyCompositionData() {
+    _lastResult = {
+      'success': true,
+      'result': _generateSampleBodyCompositionData(DateTime.now()),
+      'message': '샘플 신체구성 데이터',
+      'isSampleData': true,
+    };
+    notifyListeners();
+  }
+
+  /// 샘플 산소포화도 데이터 조회
+  void getSampleBloodOxygenData() {
+    _lastResult = {
+      'success': true,
+      'result': _generateSampleBloodOxygenData(DateTime.now()),
+      'message': '샘플 산소포화도 데이터',
+      'isSampleData': true,
+    };
+    notifyListeners();
+  }
+
+  /// 샘플 체온 데이터 조회
+  void getSampleBodyTemperatureData() {
+    _lastResult = {
+      'success': true,
+      'result': _generateSampleBodyTemperatureData(DateTime.now()),
+      'message': '샘플 체온 데이터',
+      'isSampleData': true,
+    };
+    notifyListeners();
+  }
+
+  /// 샘플 혈당 데이터 조회
+  void getSampleBloodGlucoseData() {
+    _lastResult = {
+      'success': true,
+      'result': _generateSampleBloodGlucoseData(DateTime.now()),
+      'message': '샘플 혈당 데이터',
+      'isSampleData': true,
+    };
     notifyListeners();
   }
 }
