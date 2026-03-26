@@ -42,7 +42,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDateTime
-import java.time.ZoneOffset
+import java.time.ZoneId
 
 /** FlutterSamsungHealth - Samsung Health Data SDK 1.0.0 */
 class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, StreamHandler {
@@ -1058,9 +1058,10 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
 
         CoroutineScope(Dispatchers.IO).launch {
             runCatching {
-                val startTime = Instant.ofEpochMilli(start).atZone(ZoneOffset.UTC).toLocalDateTime()
-                val endTime = Instant.ofEpochMilli(end).atZone(ZoneOffset.UTC).toLocalDateTime()
-                Log.i(APP_TAG, "전체 데이터 조회 시작: ${startTime} ~ ${endTime}, 제외 항목: $excludeTypes")
+                val systemZone = ZoneId.systemDefault()
+                val startTime = Instant.ofEpochMilli(start).atZone(systemZone).toLocalDateTime()
+                val endTime = Instant.ofEpochMilli(end).atZone(systemZone).toLocalDateTime()
+                Log.i(APP_TAG, "전체 데이터 조회 시작: ${startTime} ~ ${endTime}, 제외 항목: $excludeTypes, 타임존: $systemZone")
 
                 val totalResult = mutableMapOf<String, List<Map<String, Any>>>()
 
@@ -1252,9 +1253,10 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
 
         CoroutineScope(Dispatchers.IO).launch {
             runCatching {
-                val startTime = Instant.ofEpochMilli(start).atZone(ZoneOffset.UTC).toLocalDateTime()
-                val endTime = Instant.ofEpochMilli(end).atZone(ZoneOffset.UTC).toLocalDateTime()
-                Log.d(APP_TAG, "${dataTypeName} 데이터 읽기: ${startTime} ~ ${endTime}")
+                val systemZone = ZoneId.systemDefault()
+                val startTime = Instant.ofEpochMilli(start).atZone(systemZone).toLocalDateTime()
+                val endTime = Instant.ofEpochMilli(end).atZone(systemZone).toLocalDateTime()
+                Log.d(APP_TAG, "${dataTypeName} 데이터 읽기: ${startTime} ~ ${endTime}, 타임존: $systemZone")
                 reader(store, startTime, endTime)
             }.onSuccess { data ->
                 Log.i(APP_TAG, "${dataTypeName} 데이터 읽기 성공: ${data.size}건")
@@ -1457,6 +1459,7 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
         endTime: LocalDateTime
     ): List<Map<String, Any>> {
         val resultList = mutableListOf<Map<String, Any>>()
+        val systemZone = ZoneId.systemDefault()
 
         // 시작일부터 종료일까지 일자별로 쪼개서 조회
         val startDate = startTime.toLocalDate()
@@ -1483,8 +1486,8 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
 
                 val stepData = mapOf(
                     "date" to currentDate.toString(),
-                    "start_time" to dayStart.toEpochSecond(java.time.ZoneOffset.UTC) * 1000,
-                    "end_time" to dayEnd.toEpochSecond(java.time.ZoneOffset.UTC) * 1000,
+                    "start_time" to dayStart.atZone(systemZone).toInstant().toEpochMilli(),
+                    "end_time" to dayEnd.atZone(systemZone).toInstant().toEpochMilli(),
                     "steps" to dailySteps,
                     "data_type" to "DAILY_STEPS"
                 )
@@ -1514,51 +1517,52 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
         endTime: LocalDateTime
     ): List<Map<String, Any>> {
         Log.d(APP_TAG, "5분 간격 걸음 데이터 조회: $startTime ~ $endTime")
-        
+
         val resultList = mutableListOf<Map<String, Any>>()
+        val systemZone = ZoneId.systemDefault()
 
         // 조회 시작일의 자정부터 5분 단위 구간 생성 (00:00, 00:05, 00:10...)
         val startDate = startTime.toLocalDate()
         val midnight = startDate.atStartOfDay()
-        
+
         // startTime이 포함되는 첫 번째 5분 구간 찾기
         val minutesSinceMidnight = java.time.Duration.between(midnight, startTime).toMinutes().toInt()
         val intervalIndex = minutesSinceMidnight / 5
         var currentTime = midnight.plusMinutes((intervalIndex * 5).toLong())
-        
+
         // startTime보다 이전 구간이면 다음 구간으로 이동
         if (currentTime.isBefore(startTime)) {
             currentTime = currentTime.plusMinutes(5)
         }
-        
+
         // 고정된 5분 구간별로 조회 (완전한 구간만)
         while (currentTime.isBefore(endTime)) {
             val intervalEnd = currentTime.plusMinutes(5)
-            
+
             // 완전한 5분 구간이 아니면 건너뛰기
             if (intervalEnd.isAfter(endTime)) {
                 Log.d(APP_TAG, "미완성 구간 건너뛰기: $currentTime ~ $endTime")
                 break
             }
-            
+
             try {
                 // 완전한 5분 구간의 걸음수 집계
                 val readRequest = DataType.StepsType.TOTAL.requestBuilder
                     .setLocalTimeFilter(LocalTimeFilter.of(currentTime, intervalEnd))
                     .build()
-                
+
                 val result = store.aggregateData(readRequest)
-                
+
                 var intervalSteps = 0L
                 for (aggregateData in result.dataList) {
                     intervalSteps += aggregateData.value ?: 0L
                 }
-                
+
                 // 걸음수가 0이 아닌 경우만 추가
                 if (intervalSteps > 0) {
                     val stepData = mapOf(
-                        "start_time" to currentTime.toEpochSecond(ZoneOffset.UTC) * 1000,
-                        "end_time" to intervalEnd.toEpochSecond(ZoneOffset.UTC) * 1000,
+                        "start_time" to currentTime.atZone(systemZone).toInstant().toEpochMilli(),
+                        "end_time" to intervalEnd.atZone(systemZone).toInstant().toEpochMilli(),
                         "steps" to intervalSteps,
                         "interval_minutes" to 5,
                         "data_type" to "FIVE_MINUTE_STEPS"
@@ -1574,15 +1578,15 @@ class FlutterSamsungHealth : FlutterPlugin, MethodCallHandler, ActivityAware, St
                     )
                     resultList.add(stepData + (deviceSourceInfo as Map<String, Any>))
                 }
-                
+
             } catch (e: Exception) {
                 Log.w(APP_TAG, "5분 구간 걸음수 조회 실패 ($currentTime ~ $intervalEnd): ${e.message}")
                 // 실패한 구간은 로그만 남기고 결과에 추가하지 않음 (0이므로)
             }
-            
+
             currentTime = intervalEnd
         }
-        
+
         Log.d(APP_TAG, "5분 간격 조회 완료: ${resultList.size}개 구간 (걸음수 > 0인 구간만)")
         return resultList
     }

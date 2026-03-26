@@ -434,13 +434,9 @@ class SamsungHealthService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 설정된 날짜 범위의 시간 범위를 계산 (시간대 오프셋 적용)
+  /// 설정된 날짜 범위의 시간 범위를 계산 (플러그인에서 시스템 타임존 자동 적용)
   (int, int) calculateTimeRange(DateTime startDate, DateTime endDate) {
-    final timeZoneOffsetMills = endDate.timeZoneOffset.inMilliseconds;
-    final startMillis = startDate.millisecondsSinceEpoch + timeZoneOffsetMills;
-    final endMillis = endDate.millisecondsSinceEpoch + timeZoneOffsetMills;
-
-    return (startMillis, endMillis);
+    return (startDate.millisecondsSinceEpoch, endDate.millisecondsSinceEpoch);
   }
 
   /// 전체 데이터 조회
